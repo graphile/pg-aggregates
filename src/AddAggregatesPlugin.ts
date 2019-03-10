@@ -1,17 +1,18 @@
 import { Plugin } from "graphile-build";
 import { PgAttribute, QueryBuilder } from "graphile-build-pg";
-import { GraphQLEnumValueConfigMap, GraphQLResolveInfo } from "graphql";
+import { GraphQLResolveInfo, GraphQLFieldConfigMap } from "graphql";
 
 const AddAggregatesPlugin: Plugin = builder => {
-  // Hook all connections to add the aggregate field
+  // Hook all connections to add the 'aggregates' field
   builder.hook("GraphQLObjectType:fields", (fields, build, context) => {
     const {
-      pgSql: sql,
       newWithHooks,
-      graphql: { GraphQLEnumType, GraphQLNonNull, GraphQLFloat },
+      graphql: { GraphQLObjectType },
       inflection,
-      getSafeAliasFromAlias,
       getSafeAliasFromResolveInfo,
+      pgSql: sql,
+      getSafeAliasFromAlias,
+      pgQueryFromResolveData: queryFromResolveData,
     } = build;
     const {
       fieldWithHooks,
@@ -28,103 +29,215 @@ const AddAggregatesPlugin: Plugin = builder => {
       return fields;
     }
 
-    // Figure out the columns that we're allowed to do a `SUM(...)` of
-    const values = table.attributes.reduce(
-      (
-        memo: GraphQLEnumValueConfigMap,
-        attr: PgAttribute
-      ): GraphQLEnumValueConfigMap => {
-        // Didn't use 'numeric' here because it'd be confusing with the 'NUMERIC' type.
-        const attrIsNumberLike = attr.type.category === "N";
-        if (attrIsNumberLike) {
-          memo[inflection.column(attr)] = {
-            value: {
-              // Note this expression generator is just an sql fragment, so you
-              // could add CASE statements, function calls, or whatever you need
-              // here
-              expressionGenerator: (queryBuilder: QueryBuilder) =>
-                sql.fragment`${queryBuilder.getTableAlias()}.${sql.identifier(
-                  attr.name
-                )}`,
-            },
-          };
-        }
-        return memo;
+    const AggregateType = newWithHooks(
+      GraphQLObjectType,
+      {
+        name: inflection.aggregateType(table),
       },
-      {}
+      {
+        isPgAggregateType: true,
+        pgIntrospection: table,
+      },
+      true
     );
 
-    // If there's no summable columns, don't add the aggregate
-    if (!Object.keys(values).length) {
+    if (!AggregateType) {
+      // No aggregates for this connection, abort
       return fields;
     }
 
-    // Build the enum for the summable fields using the fields above (this is
-    // hookable so you could add computed columns or other fields you want to
-    // sum)
-    const summableFieldsEnum = newWithHooks(
-      GraphQLEnumType,
-      {
-        name: inflection.summableFieldEnum(table),
-        values,
-      },
-      {
-        pgIntrospection: table,
-        isPgSummableFieldEnum: true,
-      }
-    );
-
-    // Add our aggregate 'sum' field to the schema
-    const fieldName = inflection.sumAggregate(table);
+    const fieldName = inflection.aggregatesField(table);
     return {
       ...fields,
       [fieldName]: fieldWithHooks(
         fieldName,
-        ({ addDataGenerator }: any) => {
+        ({ addDataGenerator, getDataFromParsedResolveInfoFragment }: any) => {
           addDataGenerator((parsedResolveInfoFragment: any) => {
+            const safeAlias = getSafeAliasFromAlias(
+              parsedResolveInfoFragment.alias
+            );
+            const resolveData = getDataFromParsedResolveInfoFragment(
+              parsedResolveInfoFragment,
+              AggregateType
+            );
             return {
               // This tells the query planner that we want to add an aggregate
               pgAggregateQuery: (aggregateQueryBuilder: QueryBuilder) => {
-                const expr = parsedResolveInfoFragment.args.field.expressionGenerator(
-                  aggregateQueryBuilder
-                );
-                aggregateQueryBuilder.select(
-                  // You can put any aggregate expression here; I've wrapped it in `coalesce` so that it cannot be null
-                  sql.fragment`coalesce(sum(${expr}), 0)`,
-                  // We need a unique alias that we can later reference in the resolver
-                  getSafeAliasFromAlias(parsedResolveInfoFragment.alias)
-                );
+                aggregateQueryBuilder.select(() => {
+                  const query = queryFromResolveData(
+                    sql.identifier(Symbol()),
+                    aggregateQueryBuilder.getTableAlias(), // Keep using our alias down the tree
+                    resolveData,
+                    { onlyJsonField: true },
+                    (innerQueryBuilder: QueryBuilder) => {
+                      innerQueryBuilder.parentQueryBuilder = aggregateQueryBuilder;
+                    },
+                    aggregateQueryBuilder.context
+                  );
+                  return sql.fragment`(${query})`;
+                }, safeAlias);
               },
             };
           });
+
           return {
-            description: `Sum`,
-            args: {
-              field: {
-                type: new GraphQLNonNull(summableFieldsEnum),
-              },
-            },
-            type: new GraphQLNonNull(GraphQLFloat),
+            description: `Aggregates across the matching connection (ignoring before/after/first/last/offset)`,
+            type: AggregateType,
             resolve(
               parent: any,
               _args: any,
               _context: any,
               resolveInfo: GraphQLResolveInfo
             ) {
-              if (!parent.aggregates) {
-                return 0; // This should never happen
-              }
               // Figure out the unique alias we chose earlier
               const safeAlias = getSafeAliasFromResolveInfo(resolveInfo);
               // All aggregates are stored into the 'aggregates' object, reference ours here
-              return parent.aggregates[safeAlias];
+              return parent.aggregates[safeAlias] || 0;
             },
           };
         },
+        {}
+      ),
+    };
+  });
+
+  // Hook the '*Aggregates' type for each table to add the "sum" operation
+  builder.hook("GraphQLObjectType:fields", (fields, build, context) => {
+    const {
+      pgField,
+      inflection,
+      newWithHooks,
+      graphql: { GraphQLObjectType },
+      getSafeAliasFromResolveInfo,
+    } = build;
+    const {
+      fieldWithHooks,
+      scope: { isPgAggregateType, pgIntrospection: table },
+    } = context;
+    if (!isPgAggregateType) {
+      return fields;
+    }
+
+    const AggregateSumType = newWithHooks(
+      GraphQLObjectType,
+      {
+        name: inflection.aggregateSumType(table),
+      },
+      {
+        isPgSumAggregateType: true,
+        pgIntrospection: table,
+      },
+      true
+    );
+
+    if (!AggregateSumType) {
+      // No sum aggregates for this connection, abort
+      return fields;
+    }
+
+    const fieldName = inflection.aggregatesSumField(table);
+    return {
+      ...fields,
+      [fieldName]: pgField(
+        build,
+        fieldWithHooks,
+        fieldName,
         {
-          // In case anyone wants to hook us, describe ourselves
-          isPgConnectionSumField: true,
-        }
+          description: `Sum aggregates across the matching connection (ignoring before/after/first/last/offset)`,
+          type: AggregateSumType,
+          resolve(
+            parent: any,
+            _args: any,
+            _context: any,
+            resolveInfo: GraphQLResolveInfo
+          ) {
+            const safeAlias = getSafeAliasFromResolveInfo(resolveInfo);
+            return parent[safeAlias];
+          },
+        },
+        {} // scope,
+      ),
+    };
+  });
+
+  // Hook the sum aggregates type to add fields for each numeric table column
+  builder.hook("GraphQLObjectType:fields", (fields, build, context) => {
+    const {
+      pgSql: sql,
+      graphql: { GraphQLNonNull, GraphQLFloat },
+      inflection,
+      getSafeAliasFromAlias,
+      getSafeAliasFromResolveInfo,
+      pgField,
+    } = build;
+    const {
+      fieldWithHooks,
+      scope: { isPgSumAggregateType, pgIntrospection: table },
+    } = context;
+    if (!isPgSumAggregateType || !table || table.kind !== "class") {
+      return fields;
+    }
+
+    return {
+      ...fields,
+      // Figure out the columns that we're allowed to do a `SUM(...)` of
+      ...table.attributes.reduce(
+        (memo: GraphQLFieldConfigMap<any, any>, attr: PgAttribute) => {
+          // Didn't use 'numeric' here because it'd be confusing with the 'NUMERIC' type.
+          const attrIsNumberLike = attr.type.category === "N";
+          if (attrIsNumberLike) {
+            const fieldName = inflection.column(attr);
+            return build.extend(memo, {
+              [fieldName]: pgField(
+                build,
+                fieldWithHooks,
+                fieldName,
+                ({ addDataGenerator }: any) => {
+                  addDataGenerator((parsedResolveInfoFragment: any) => {
+                    return {
+                      pgQuery: (queryBuilder: QueryBuilder) => {
+                        // Note this expression is just an sql fragment, so you
+                        // could add CASE statements, function calls, or whatever
+                        // you need here
+                        const expr = sql.fragment`${queryBuilder.getTableAlias()}.${sql.identifier(
+                          attr.name
+                        )}`;
+                        queryBuilder.select(
+                          // You can put any aggregate expression here; I've wrapped it in `coalesce` so that it cannot be null
+                          sql.fragment`coalesce(sum(${expr}), 0)`,
+                          // We need a unique alias that we can later reference in the resolver
+                          getSafeAliasFromAlias(parsedResolveInfoFragment.alias)
+                        );
+                      },
+                    };
+                  });
+                  return {
+                    description: `Sum of ${fieldName} across the matching connection`,
+                    type: new GraphQLNonNull(GraphQLFloat), // TODO: not necessarily the correct type
+                    resolve(
+                      parent: any,
+                      _args: any,
+                      _context: any,
+                      resolveInfo: GraphQLResolveInfo
+                    ) {
+                      const safeAlias = getSafeAliasFromResolveInfo(
+                        resolveInfo
+                      );
+                      return parent[safeAlias];
+                    },
+                  };
+                },
+                {
+                  // In case anyone wants to hook us, describe ourselves
+                  isPgConnectionSumField: true,
+                  pgFieldIntrospection: attr,
+                }
+              ),
+            });
+          }
+          return memo;
+        },
+        {}
       ),
     };
   });
