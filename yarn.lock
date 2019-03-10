@@ -977,6 +977,14 @@ graphile-build@4.4.0-beta.3:
     pluralize "^7.0.0"
     semver "^5.6.0"
 
+graphile-utils@^4.4.0-beta.3:
+  version "4.4.0-beta.3"
+  resolved "https://registry.yarnpkg.com/graphile-utils/-/graphile-utils-4.4.0-beta.3.tgz#9026a047b63a9c36b29ca1a30cdd8c7bc0afda31"
+  integrity sha512-0wna6pokSWZzlZsvbTVCX9GfsfoUgcmZtbAO8dBPDK4C87gOyap1iaumG07FwLudx6t6lbnIeROywlnhrH2w8A==
+  dependencies:
+    debug ">=2 <3"
+    graphql ">=0.9 <0.14 || ^14.0.2"
+
 graphql-iso-date@^3.6.0:
   version "3.6.1"
   resolved "https://registry.yarnpkg.com/graphql-iso-date/-/graphql-iso-date-3.6.1.tgz#bd2d0dc886e0f954cbbbc496bbf1d480b57ffa96"
@@ -990,7 +998,7 @@ graphql-parse-resolve-info@4.1.0:
     "@types/graphql" "^14.0.3"
     debug ">=2 <3"
 
-"graphql@^0.6.0 || ^0.7.0 || ^0.8.0-b || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14.0.2":
+"graphql@>=0.9 <0.14 || ^14.0.2", "graphql@^0.6.0 || ^0.7.0 || ^0.8.0-b || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14.0.2":
   version "14.1.1"
   resolved "https://registry.yarnpkg.com/graphql/-/graphql-14.1.1.tgz#d5d77df4b19ef41538d7215d1e7a28834619fac0"
   integrity sha512-C5zDzLqvfPAgTtP8AUPIt9keDabrdRAqSWjj2OPRKrKxI9Fb65I36s1uCs1UUBFnSWTdO7hyHi7z1ZbwKMKF6Q==

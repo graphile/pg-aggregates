@@ -1,4 +1,4 @@
-import { Plugin } from "graphile-build";
+import { makePluginByCombiningPlugins } from "graphile-utils";
+import InflectionPlugin from "./InflectionPlugin";
 
-const PgAggregatesPlugin: Plugin = async (builder, options) => {};
-export default PgAggregatesPlugin;
+export default makePluginByCombiningPlugins(InflectionPlugin);
