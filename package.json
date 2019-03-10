@@ -1,0 +1,56 @@
+{
+  "name": "@graphile/pg-aggregates",
+  "version": "0.0.0",
+  "description": "Aggregates support for PostGraphile",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "test": "jest -i",
+    "tslint": "prettier --list-different 'src/**/*' && tslint --config tslint.json --project tsconfig.json",
+    "postgraphile": "nodemon --watch dist -x 'postgraphile --append-plugins `pwd`/dist/index.js -c graphile_aggregates -s test --enhance-graphiql --watch --dynamic-json --show-error-stack --extended-errors severity,code,detail,hint,position,internalPosition,internalQuery,where,schema,table,column,dataType,constraint,file,line,routine'",
+    "dev": "psql -f __tests__/schema.sql graphile_aggregates && concurrently --kill-others 'npm run watch' 'npm run postgraphile'",
+    "prepack": "rm -Rf dist && npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/graphile/pg-aggregates.git"
+  },
+  "keywords": [
+    "postgraphile",
+    "graphile",
+    "plugin",
+    "aggregates",
+    "pg",
+    "postgres",
+    "postgresql",
+    "graphql"
+  ],
+  "author": "Benjie Gillam <code@benjiegillam.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/graphile/pg-aggregates/issues"
+  },
+  "homepage": "https://github.com/graphile/pg-aggregates#readme",
+  "peerDependencies": {
+    "graphile-build": "^4.3.0",
+    "graphile-build-pg": "^4.3.0"
+  },
+  "devDependencies": {
+    "concurrently": "^4.1.0",
+    "nodemon": "^1.18.10",
+    "postgraphile": "^4.4.0-beta.3",
+    "prettier": "^1.16.4",
+    "tslint": "^5.13.1",
+    "tslint-config-prettier": "^1.18.0",
+    "typescript": "^3.3.3333"
+  },
+  "dependencies": {
+    "@types/debug": "^4.1.2",
+    "@types/graphql": "^14.0.7",
+    "debug": "^4.1.1"
+  },
+  "files": [
+    "dist"
+  ]
+}
