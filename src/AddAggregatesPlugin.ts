@@ -471,6 +471,11 @@ const AddAggregatesPlugin: Plugin = (builder) => {
               computed: true,
               aggregateWrapper: spec.sqlAggregateWrap,
               pgTypeAndModifierModifier: spec.pgTypeAndModifierModifier,
+              description: `${
+                spec.HumanLabel
+              } of this field across the matching connection.${
+                proc.description ? `\n\n---\n\n${proc.description}` : ""
+              }`,
             }),
           });
         },
