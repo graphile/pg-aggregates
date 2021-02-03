@@ -11,10 +11,17 @@ create table films (
   duration_in_minutes int not null
 );
 
-create function films_computed_column(films films) 
+create function films_computed_column(films films)
 returns integer as $$
-  SELECT duration_in_minutes + 10 from test.films where test.films.id = $1.id;
-$$ language sql stable;
+  SELECT films.duration_in_minutes + 10;
+$$ language sql stable strict;
+comment on function films_computed_column is E'Ten minutes longer than the film duration (in minutes).';
+
+create function films_computed_column_with_arguments(films films, number_to_add int)
+returns integer as $$
+  SELECT films.duration_in_minutes + number_to_add;
+$$ language sql stable strict;
+comment on function films_computed_column_with_arguments is E'Your chosen number of minutes longer than the film duration (in minutes).';
 
 insert into films (name, year_of_release, box_office_in_billions, duration_in_minutes) values
   ('Transformers: Dark of the Moon', 2011, 1.52, 154),

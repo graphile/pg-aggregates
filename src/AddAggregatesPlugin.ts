@@ -1,55 +1,27 @@
-import { Plugin, Build } from "graphile-build";
+import { Plugin } from "graphile-build";
 import {
   PgAttribute,
   QueryBuilder,
   PgProc,
-  PgClass,
+  // @ts-ignore
+  getComputedColumnDetails,
+  SQL,
   PgType,
 } from "graphile-build-pg";
-import { GraphQLResolveInfo, GraphQLFieldConfigMap } from "graphql";
+import {
+  GraphQLResolveInfo,
+  GraphQLFieldConfigMap,
+  GraphQLNamedType,
+} from "graphql";
 
-export const getComputedColumnDetails = (
-  build: Build,
-  table: PgClass,
-  proc: PgProc
-) => {
-  if (!proc.isStable) return null;
-  if (proc.namespaceId !== table.namespaceId) return null;
-  if (!proc.name.startsWith(`${table.name}_`)) return null;
-  if (proc.argTypeIds.length < 1) return null;
-  if (proc.argTypeIds[0] !== table.type.id) return null;
-  // TODO: Support computed columns with arguments
-  if (proc.argTypeIds.length !== 1) return null;
-  const argTypes = proc.argTypeIds.reduce((prev: PgType[], typeId, idx) => {
-    if (
-      proc.argModes.length === 0 || // all args are `in`
-      proc.argModes[idx] === "i" || // this arg is `in`
-      proc.argModes[idx] === "b" // this arg is `inout`
-    ) {
-      prev.push(build.pgIntrospectionResultsByKind.typeById[typeId]);
-    }
-    return prev;
-  }, []);
-  if (
-    argTypes
-      .slice(1)
-      .some(
-        type =>
-          type.type === "c" &&
-          type.classId &&
-          build.pgIntrospectionResultsByKind.typeById[type.classId] &&
-          build.pgIntrospectionResultsByKind.typeById[type.classId].isSelectable
-      )
-  ) {
-    // Accepts two input tables? Skip.
-    return null;
-  }
+export const aggregateTypes = [
+  {
+    aggregateName: "sum",
+    description: `Sum aggregates across the matching connection (ignoring before/after/first/last/offset)`,
+  },
+];
 
-  const pseudoColumnName = proc.name.substr(table.name.length + 1);
-  return { argTypes, pseudoColumnName };
-};
-
-const AddAggregatesPlugin: Plugin = builder => {
+const AddAggregatesPlugin: Plugin = (builder) => {
   // Hook all connections to add the 'aggregates' field
   builder.hook("GraphQLObjectType:fields", (fields, build, context) => {
     const {
@@ -217,7 +189,6 @@ const AddAggregatesPlugin: Plugin = builder => {
       getSafeAliasFromResolveInfo,
       pgField,
       pgIntrospectionResultsByKind,
-      pgColumnFilter,
     } = build;
     const {
       fieldWithHooks,
@@ -290,75 +261,40 @@ const AddAggregatesPlugin: Plugin = builder => {
       ),
       ...pgIntrospectionResultsByKind.procedure.reduce(
         (memo: GraphQLFieldConfigMap<any, any>, proc: PgProc) => {
-          /* TODO: Do fields need to be omitted? */
+          if (proc.returnsSet) {
+            return memo;
+          }
           const attrIsNumberLike =
             pgIntrospectionResultsByKind.typeById[proc.returnTypeId]
               .category === "N";
-          if (attrIsNumberLike && pgColumnFilter(proc, build, context)) {
-            const computedColumnDetails = getComputedColumnDetails(
-              build,
-              table,
-              proc
-            );
-            if (computedColumnDetails) {
-              const fieldName = inflection.computedColumn(
-                computedColumnDetails.pseudoColumnName,
-                proc,
-                table
-              );
-              return build.extend(memo, {
-                [fieldName]: pgField(
-                  build,
-                  fieldWithHooks,
-                  fieldName,
-                  ({ addDataGenerator }: any) => {
-                    addDataGenerator((parsedResolveInfoFragment: any) => {
-                      return {
-                        pgQuery: (queryBuilder: QueryBuilder) => {
-                          // Note this expression is just an sql fragment, so you
-                          // could add CASE statements, function calls, or whatever
-                          // you need here
-                          const expr = sql.fragment`${sql.identifier(
-                            proc.namespaceName,
-                            proc.name
-                          )}(${queryBuilder.getTableAlias()})`;
-                          queryBuilder.select(
-                            // You can put any aggregate expression here; I've wrapped it in `coalesce` so that it cannot be null
-                            sql.fragment`coalesce(sum(${expr}), 0)`,
-                            // We need a unique alias that we can later reference in the resolver
-                            getSafeAliasFromAlias(
-                              parsedResolveInfoFragment.alias
-                            )
-                          );
-                        },
-                      };
-                    });
-                    return {
-                      description: `Sum of ${fieldName} across the matching connection`,
-                      type: new GraphQLNonNull(GraphQLFloat), // TODO: not necessarily the correct type
-                      resolve(
-                        parent: any,
-                        _args: any,
-                        _context: any,
-                        resolveInfo: GraphQLResolveInfo
-                      ) {
-                        const safeAlias = getSafeAliasFromResolveInfo(
-                          resolveInfo
-                        );
-                        return parent[safeAlias];
-                      },
-                    };
-                  },
-                  {
-                    // In case anyone wants to hook us, describe ourselves
-                    isPgConnectionSumField: true,
-                    pgFieldIntrospection: proc,
-                  }
-                ),
-              });
-            }
+          if (!attrIsNumberLike) {
+            return memo;
           }
-          return memo;
+          const computedColumnDetails = getComputedColumnDetails(
+            build,
+            table,
+            proc
+          );
+          if (!computedColumnDetails) {
+            return memo;
+          }
+          const { pseudoColumnName } = computedColumnDetails;
+          const fieldName = inflection.computedColumn(
+            pseudoColumnName,
+            proc,
+            table
+          );
+          return build.extend(memo, {
+            [fieldName]: build.pgMakeProcField(fieldName, proc, build, {
+              fieldWithHooks,
+              computed: true,
+              aggregateWrapper: (sqlFunctionCall: SQL) =>
+                sql.fragment`coalesce(sum(${sqlFunctionCall}), 0)`,
+              typeModifier: (_pgType: PgType, _gqlType: GraphQLNamedType) => {
+                return build.getTypeByName(inflection.builtin("BigFloat"));
+              },
+            }),
+          });
         },
         {}
       ),
