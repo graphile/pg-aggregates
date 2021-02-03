@@ -86,7 +86,7 @@ const AddAggregatesPlugin: Plugin = (builder) => {
         humanLabel: "mean average",
         HumanLabel: "Mean average",
         isSuitableType: isNumberLike,
-        sqlAggregateWrap: (sqlFrag) => sql.fragment`max(${sqlFrag})`,
+        sqlAggregateWrap: (sqlFrag) => sql.fragment`avg(${sqlFrag})`,
 
         // An AVG(...) ends up more precise than any individual value; see
         // https://www.postgresql.org/docs/current/functions-aggregate.html for
