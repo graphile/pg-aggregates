@@ -299,10 +299,8 @@ const AddAggregatesPlugin: Plugin = (builder) => {
           if (proc.returnsSet) {
             return memo;
           }
-          const attrIsNumberLike =
-            pgIntrospectionResultsByKind.typeById[proc.returnTypeId]
-              .category === "N";
-          if (!attrIsNumberLike) {
+          const type = pgIntrospectionResultsByKind.typeById[proc.returnTypeId];
+          if (!spec.isSuitableType(type)) {
             return memo;
           }
           const computedColumnDetails = getComputedColumnDetails(
@@ -323,11 +321,8 @@ const AddAggregatesPlugin: Plugin = (builder) => {
             [fieldName]: build.pgMakeProcField(fieldName, proc, build, {
               fieldWithHooks,
               computed: true,
-              aggregateWrapper: (sqlFunctionCall: SQL) =>
-                sql.fragment`coalesce(sum(${sqlFunctionCall}), 0)`,
-              typeModifier: (_pgType: PgType, _gqlType: GraphQLNamedType) => {
-                return build.getTypeByName(inflection.builtin("BigFloat"));
-              },
+              aggregateWrapper: spec.sqlAggregateWrap,
+              typeModifier: spec.typeModifier,
             }),
           });
         },
