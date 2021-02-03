@@ -11,6 +11,11 @@ create table films (
   duration_in_minutes int not null
 );
 
+create function films_computed_column(films films) 
+returns integer as $$
+  SELECT duration_in_minutes + 10 from test.films where test.films.id = $1.id;
+$$ language sql stable;
+
 insert into films (name, year_of_release, box_office_in_billions, duration_in_minutes) values
   ('Transformers: Dark of the Moon', 2011, 1.52, 154),
   ('Captain America: Civil War', 2016, 1.15, 147),
