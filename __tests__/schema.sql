@@ -44,3 +44,43 @@ insert into films (name, year_of_release, box_office_in_billions, duration_in_mi
   ('Star Wars: The Force Awakens', 2015, 2.07, 135),
   ('Titanic', 1997, 2.19, 195),
   ('Avatar', 2009, 2.79, 161);
+
+create table players (
+  id serial primary key,
+  name text not null
+);
+
+insert into players (name) values
+  ('BenjieG'),
+  ('Purge'),
+  ('HollaDolla'),
+  ('Jmar25'),
+  ('JutheKid');
+
+create table matches (
+  id serial primary key
+);
+
+insert into matches
+  select from generate_series(1, 20);
+
+create table match_stats (
+  id serial primary key,
+  match_id int not null references matches,
+  player_id int not null references players,
+  team_position int not null,
+  points int not null,
+  goals int not null,
+  saves int not null
+);
+
+insert into match_stats (match_id, player_id, team_position, points, goals, saves)
+  select
+    matches.id,
+    players.id,
+    (((7 * (players.id + matches.id)) + (players.id)) % 6) + 1,
+    ((matches.id + 2) * players.id) * 432 % 473,
+    (6 + matches.id + players.id) % 7,
+    (2 + matches.id + players.id) % 3
+  from matches, players
+  where matches.id % 2 = players.id % 2;
