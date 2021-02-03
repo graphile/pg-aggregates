@@ -268,13 +268,10 @@ const AddAggregatesPlugin: Plugin = (builder) => {
           const [pgType, pgTypeModifier] = spec.pgTypeAndModifierModifier
             ? spec.pgTypeAndModifierModifier(attr.type, attr.typeModifier)
             : [attr.type, attr.typeModifier];
-          const BaseType = build.pgGetGqlTypeByTypeIdAndModifier(
+          const Type = build.pgGetGqlTypeByTypeIdAndModifier(
             pgType.id,
             pgTypeModifier
           );
-          const Type = spec.graphqlTypeModifier
-            ? spec.graphqlTypeModifier(BaseType, pgType, pgTypeModifier)
-            : BaseType;
           if (!Type) {
             return memo;
           }

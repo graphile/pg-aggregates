@@ -1,5 +1,4 @@
 import { PgType, SQL } from "graphile-build-pg";
-import { GraphQLOutputType } from "graphql";
 
 export interface AggregateSpec {
   /** Must not change since it's used in type names/etc */
@@ -28,15 +27,6 @@ export interface AggregateSpec {
     pgType: PgType,
     pgTypeModifier: null | string | number
   ) => [string, null | string | number];
-
-  /**
-   * I think we want to delete this. Do not use.
-   */
-  graphqlTypeModifier?: (
-    gqlType: GraphQLOutputType,
-    pgType: PgType,
-    pgTypeModifier: null | string | number
-  ) => GraphQLOutputType;
 
   /** Set true if the result is guaranteed to be non-null */
   isNonNull?: boolean;
