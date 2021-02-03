@@ -5,14 +5,9 @@ import {
   PgProc,
   // @ts-ignore
   getComputedColumnDetails,
-  SQL,
   PgType,
 } from "graphile-build-pg";
-import {
-  GraphQLResolveInfo,
-  GraphQLFieldConfigMap,
-  GraphQLNamedType,
-} from "graphql";
+import { GraphQLResolveInfo, GraphQLFieldConfigMap } from "graphql";
 import { AggregateSpec } from "./interfaces";
 
 const AddAggregatesPlugin: Plugin = (builder) => {
@@ -30,11 +25,39 @@ const AddAggregatesPlugin: Plugin = (builder) => {
           // You can put any aggregate expression here; I've wrapped it in `coalesce` so that it cannot be null
           return build.pgSql.fragment`coalesce(sum(${sqlFrag}), 0)`;
         },
-        typeModifier(_pgType, _gqlType) {
-          // bigint
-          return build.pgGetGqlTypeByTypeIdAndModifier("20", null);
+        pgTypeAndModifierModifier(_pgType, _pgTypeModifier) {
+          const bigint = build.pgIntrospectionResultsByKind.type.find(
+            (t: PgType) => t.id === "20"
+          );
+          return [bigint, null];
         },
         isNonNull: true,
+      },
+      {
+        id: "min",
+        humanLabel: "minimum",
+        HumanLabel: "Minimum",
+        isSuitableType(pgType) {
+          // Is number-like
+          return pgType.category === "N";
+        },
+        sqlAggregateWrap(sqlFrag) {
+          // You can put any aggregate expression here; I've wrapped it in `coalesce` so that it cannot be null
+          return build.pgSql.fragment`min(${sqlFrag})`;
+        },
+      },
+      {
+        id: "max",
+        humanLabel: "maximum",
+        HumanLabel: "Maximum",
+        isSuitableType(pgType) {
+          // Is number-like
+          return pgType.category === "N";
+        },
+        sqlAggregateWrap(sqlFrag) {
+          // You can put any aggregate expression here; I've wrapped it in `coalesce` so that it cannot be null
+          return build.pgSql.fragment`max(${sqlFrag})`;
+        },
       },
     ];
     return build.extend(build, {
@@ -159,52 +182,55 @@ const AddAggregatesPlugin: Plugin = (builder) => {
 
     return build.extend(
       fields,
-      build.pgAggregateSpecs.reduce((memo, spec) => {
-        const AggregateType = newWithHooks(
-          GraphQLObjectType,
-          {
-            name: inflection.aggregateType(table, spec),
-          },
-          {
-            isPgAggregateType: true,
-            pgAggregateSpec: spec,
-            pgIntrospection: table,
-          },
-          true
-        );
-
-        if (!AggregateType) {
-          // No aggregates for this connection for this spec, abort
-          return memo;
-        }
-        const fieldName = inflection.aggregatesField(table, spec);
-        return build.extend(memo, {
-          ...fields,
-          [fieldName]: pgField(
-            build,
-            fieldWithHooks,
-            fieldName,
+      (build.pgAggregateSpecs as AggregateSpec[]).reduce(
+        (memo: GraphQLFieldConfigMap<unknown, unknown>, spec) => {
+          const AggregateType = newWithHooks(
+            GraphQLObjectType,
             {
-              description: `${spec.HumanLabel} aggregates across the matching connection (ignoring before/after/first/last/offset)`,
-              type: AggregateType,
-              resolve(
-                parent: any,
-                _args: any,
-                _context: any,
-                resolveInfo: GraphQLResolveInfo
-              ) {
-                const safeAlias = getSafeAliasFromResolveInfo(resolveInfo);
-                return parent[safeAlias];
-              },
+              name: inflection.aggregateType(table, spec),
             },
             {
-              isPgAggregateField: true,
+              isPgAggregateType: true,
               pgAggregateSpec: spec,
-              pgFieldIntrospection: table,
-            } // scope,
-          ),
-        });
-      }, {})
+              pgIntrospection: table,
+            },
+            true
+          );
+
+          if (!AggregateType) {
+            // No aggregates for this connection for this spec, abort
+            return memo;
+          }
+          const fieldName = inflection.aggregatesField(table, spec);
+          return build.extend(memo, {
+            ...fields,
+            [fieldName]: pgField(
+              build,
+              fieldWithHooks,
+              fieldName,
+              {
+                description: `${spec.HumanLabel} aggregates across the matching connection (ignoring before/after/first/last/offset)`,
+                type: AggregateType,
+                resolve(
+                  parent: any,
+                  _args: any,
+                  _context: any,
+                  resolveInfo: GraphQLResolveInfo
+                ) {
+                  const safeAlias = getSafeAliasFromResolveInfo(resolveInfo);
+                  return parent[safeAlias];
+                },
+              },
+              {
+                isPgAggregateField: true,
+                pgAggregateSpec: spec,
+                pgFieldIntrospection: table,
+              } // scope,
+            ),
+          });
+        },
+        {}
+      )
     );
   });
 
@@ -239,6 +265,19 @@ const AddAggregatesPlugin: Plugin = (builder) => {
           if (!spec.isSuitableType(attr.type)) {
             return memo;
           }
+          const [pgType, pgTypeModifier] = spec.pgTypeAndModifierModifier
+            ? spec.pgTypeAndModifierModifier(attr.type, attr.typeModifier)
+            : [attr.type, attr.typeModifier];
+          const BaseType = build.pgGetGqlTypeByTypeIdAndModifier(
+            pgType.id,
+            pgTypeModifier
+          );
+          const Type = spec.graphqlTypeModifier
+            ? spec.graphqlTypeModifier(BaseType, pgType, pgTypeModifier)
+            : BaseType;
+          if (!Type) {
+            return memo;
+          }
           const fieldName = inflection.column(attr);
           return build.extend(memo, {
             [fieldName]: pgField(
@@ -246,12 +285,6 @@ const AddAggregatesPlugin: Plugin = (builder) => {
               fieldWithHooks,
               fieldName,
               ({ addDataGenerator }: any) => {
-                const Type = spec.typeModifier(
-                  build.pgGetGqlTypeByTypeIdAndModifier(
-                    attr.type.id,
-                    attr.typeModifier
-                  )
-                );
                 addDataGenerator((parsedResolveInfoFragment: any) => {
                   return {
                     pgQuery: (queryBuilder: QueryBuilder) => {
@@ -288,6 +321,11 @@ const AddAggregatesPlugin: Plugin = (builder) => {
                 // In case anyone wants to hook us, describe ourselves
                 isPgConnectionAggregateField: true,
                 pgFieldIntrospection: attr,
+              },
+              false,
+              {
+                pgType,
+                pgTypeModifier,
               }
             ),
           });
@@ -322,7 +360,7 @@ const AddAggregatesPlugin: Plugin = (builder) => {
               fieldWithHooks,
               computed: true,
               aggregateWrapper: spec.sqlAggregateWrap,
-              typeModifier: spec.typeModifier,
+              pgTypeAndModifierModifier: spec.pgTypeAndModifierModifier,
             }),
           });
         },
