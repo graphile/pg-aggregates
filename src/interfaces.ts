@@ -26,7 +26,7 @@ export interface AggregateSpec {
   pgTypeAndModifierModifier?: (
     pgType: PgType,
     pgTypeModifier: null | string | number
-  ) => [string, null | string | number];
+  ) => [PgType, null | string | number];
 
   /** Set true if the result is guaranteed to be non-null */
   isNonNull?: boolean;
