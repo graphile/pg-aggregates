@@ -12,52 +12,66 @@ import { AggregateSpec } from "./interfaces";
 
 const AddAggregatesPlugin: Plugin = (builder) => {
   builder.hook("build", (build) => {
+    const { pgSql: sql } = build;
+    const isNumberLike = (pgType: PgType): boolean => pgType.category === "N";
     const pgAggregateSpecs: AggregateSpec[] = [
       {
         id: "sum",
         humanLabel: "sum",
         HumanLabel: "Sum",
-        isSuitableType(pgType) {
-          // Is number-like
-          return pgType.category === "N";
-        },
-        sqlAggregateWrap(sqlFrag) {
-          // You can put any aggregate expression here; I've wrapped it in `coalesce` so that it cannot be null
-          return build.pgSql.fragment`coalesce(sum(${sqlFrag}), 0)`;
-        },
-        pgTypeAndModifierModifier(_pgType, _pgTypeModifier) {
-          const bigint = build.pgIntrospectionResultsByKind.type.find(
-            (t: PgType) => t.id === "20"
-          );
-          return [bigint, null];
-        },
+        isSuitableType: isNumberLike,
+        // I've wrapped it in `coalesce` so that it cannot be null
+        sqlAggregateWrap: (sqlFrag) =>
+          sql.fragment`coalesce(sum(${sqlFrag}), 0)`,
         isNonNull: true,
+
+        // A SUM(...) often ends up significantly larger than any individual
+        // value; see
+        // https://www.postgresql.org/docs/current/functions-aggregate.html for
+        // how the sum aggregate changes result type.
+        pgTypeAndModifierModifier(_pgType, _pgTypeModifier) {
+          /** Maps from the data type of the column to the data type of the sum aggregate */
+          const dataTypeToAggregateTypeMap = {
+            21: "20", // smallint -> bigint
+            23: "20", // integer -> bigint
+            20: "1700", // bigint -> numeric
+            700: "700", // real -> real
+            701: "701", // double precision -> double precision
+            1186: "1186", // interval -> interval
+            790: "790", // money -> money
+          };
+          /** BigFloat is our fallback type; it should be valid for almost all numeric types */
+          const fallback = "1700";
+
+          const targetTypeId =
+            dataTypeToAggregateTypeMap[_pgType.id] || fallback;
+
+          const targetType = build.pgIntrospectionResultsByKind.type.find(
+            (t: PgType) => t.id === targetTypeId
+          );
+
+          if (!targetType) {
+            throw new Error(
+              `Could not find PostgreSQL type with oid '${targetTypeId}' whilst processing aggregate.`
+            );
+          }
+
+          return [targetType, null];
+        },
       },
       {
         id: "min",
         humanLabel: "minimum",
         HumanLabel: "Minimum",
-        isSuitableType(pgType) {
-          // Is number-like
-          return pgType.category === "N";
-        },
-        sqlAggregateWrap(sqlFrag) {
-          // You can put any aggregate expression here; I've wrapped it in `coalesce` so that it cannot be null
-          return build.pgSql.fragment`min(${sqlFrag})`;
-        },
+        isSuitableType: isNumberLike,
+        sqlAggregateWrap: (sqlFrag) => sql.fragment`min(${sqlFrag})`,
       },
       {
         id: "max",
         humanLabel: "maximum",
         HumanLabel: "Maximum",
-        isSuitableType(pgType) {
-          // Is number-like
-          return pgType.category === "N";
-        },
-        sqlAggregateWrap(sqlFrag) {
-          // You can put any aggregate expression here; I've wrapped it in `coalesce` so that it cannot be null
-          return build.pgSql.fragment`max(${sqlFrag})`;
-        },
+        isSuitableType: isNumberLike,
+        sqlAggregateWrap: (sqlFrag) => sql.fragment`max(${sqlFrag})`,
       },
     ];
     return build.extend(build, {
