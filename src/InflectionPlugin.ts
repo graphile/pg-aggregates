@@ -1,26 +1,22 @@
 import { PgClass } from "graphile-build-pg";
 import { makeAddInflectorsPlugin } from "graphile-utils";
+import { AggregateSpec } from "./interfaces";
 
 export default makeAddInflectorsPlugin({
-  aggregateType(table: PgClass) {
+  aggregateContainerType(table: PgClass) {
     return this.upperCamelCase(
       `${this._singularizedTableName(table)}-aggregates`
     );
   },
-  aggregateSumType(table: PgClass) {
+  aggregateType(table: PgClass, aggregateSpec: AggregateSpec) {
     return this.upperCamelCase(
-      `${this._singularizedTableName(table)}-sum-aggregates`
+      `${this._singularizedTableName(table)}-${aggregateSpec.id}-aggregates`
     );
   },
-  aggregatesField(_table: PgClass) {
+  aggregatesContainerField(_table: PgClass) {
     return "aggregates";
   },
-  aggregatesSumField(_table: PgClass) {
-    return "sum";
-  },
-  summableFieldEnum(table: PgClass) {
-    return this.upperCamelCase(
-      `${this._singularizedTableName(table)}-summable-field-enum`
-    );
+  aggregatesField(_table: PgClass, aggregateSpec: AggregateSpec) {
+    return aggregateSpec.id;
   },
 });
