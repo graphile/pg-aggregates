@@ -1,5 +1,16 @@
 import { PgType, SQL } from "graphile-build-pg";
 
+export interface AggregateGroupBySpec {
+  /** Must not change since it's used in type names/etc */
+  id: string; // e.g. 'truncated-to-hour'
+
+  /** Return true if we can process this type */
+  isSuitableType: (pgType: PgType) => boolean;
+
+  /** Wraps the SQL to return a derivative (e.g. sqlFrag => sql.fragment`date_trunc('hour', ${sqlFrag})`) */
+  sqlWrap: (sqlFrag: SQL) => SQL;
+}
+
 export interface AggregateSpec {
   /** Must not change since it's used in type names/etc */
   id: string;

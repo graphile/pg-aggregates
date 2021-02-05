@@ -25,6 +25,12 @@ export default makeAddInflectorsPlugin({
   aggregatesField(_table: PgClass, aggregateSpec: AggregateSpec) {
     return aggregateSpec.id;
   },
+  aggregateGroupByType(table: PgClass) {
+    return this.upperCamelCase(`${this._tableName(table)}-group-by`);
+  },
+  aggregateGroupByColumnEnum(attr: PgAttribute) {
+    return this.constantCase(`${this._columnName(attr)}`);
+  },
   orderByCountOfManyRelationByKeys(
     detailedKeys: Keys,
     table: PgClass,

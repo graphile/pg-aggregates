@@ -1,6 +1,6 @@
 import { Plugin } from "graphile-build";
 import { PgType } from "graphile-build-pg";
-import { AggregateSpec } from "./interfaces";
+import { AggregateSpec, AggregateGroupBySpec } from "./interfaces";
 
 const TIMESTAMP_OID = "1114";
 const TIMESTAMPTZ_OID = "1184";
@@ -188,8 +188,20 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
         ),
       },
     ];
+
+    const pgAggregateGroupBySpecs: AggregateGroupBySpec[] = [
+      {
+        id: "truncated-to-hour",
+        isSuitableType: (pgType) =>
+          /* timestamp or timestamptz */
+          pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
+        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('hour', ${sqlFrag})`,
+      },
+    ];
+
     return build.extend(build, {
       pgAggregateSpecs,
+      pgAggregateGroupBySpecs,
     });
   });
 };
