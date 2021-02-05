@@ -2,6 +2,18 @@ import { Plugin } from "graphile-build";
 import { PgType } from "graphile-build-pg";
 import { AggregateSpec } from "./interfaces";
 
+const TIMESTAMP_OID = "1114";
+const TIMESTAMPTZ_OID = "1184";
+
+const SMALLINT_OID = "21";
+const BIGINT_OID = "20";
+const INTEGER_OID = "23";
+const NUMERIC_OID = "1700";
+const REAL_OID = "700";
+const DOUBLE_PRECISION_OID = "701";
+const INTERVAL_OID = "1186";
+const MONEY_OID = "790";
+
 const AggregateSpecsPlugin: Plugin = (builder) => {
   builder.hook("build", (build) => {
     const { pgSql: sql } = build;
@@ -48,15 +60,15 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
         // how the sum aggregate changes result type.
         pgTypeAndModifierModifier: convertWithMapAndFallback(
           {
-            21: "20", // smallint -> bigint
-            23: "20", // integer -> bigint
-            20: "1700", // bigint -> numeric
-            700: "700", // real -> real
-            701: "701", // double precision -> double precision
-            1186: "1186", // interval -> interval
-            790: "790", // money -> money
+            [SMALLINT_OID]: BIGINT_OID, // smallint -> bigint
+            [INTEGER_OID]: BIGINT_OID, // integer -> bigint
+            [BIGINT_OID]: NUMERIC_OID, // bigint -> numeric
+            [REAL_OID]: REAL_OID, // real -> real
+            [DOUBLE_PRECISION_OID]: DOUBLE_PRECISION_OID, // double precision -> double precision
+            [INTERVAL_OID]: INTERVAL_OID, // interval -> interval
+            [MONEY_OID]: MONEY_OID, // money -> money
           },
-          "1700" /* numeric */
+          NUMERIC_OID /* numeric */
         ),
       },
       {
@@ -67,7 +79,7 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
         sqlAggregateWrap: (sqlFrag) => sql.fragment`count(distinct ${sqlFrag})`,
         pgTypeAndModifierModifier: convertWithMapAndFallback(
           {},
-          "20" /* always use bigint */
+          BIGINT_OID /* always use bigint */
         ),
       },
       {
@@ -96,13 +108,13 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
         // how the avg aggregate changes result type.
         pgTypeAndModifierModifier: convertWithMapAndFallback(
           {
-            21: "1700", // smallint -> numeric
-            23: "1700", // integer -> numeric
-            20: "1700", // bigint -> numeric
-            1700: "1700", // numeric -> numeric
-            700: "701", // real -> double precision
-            701: "701", // double precision -> double precision
-            1186: "1186", // interval -> interval
+            [SMALLINT_OID]: NUMERIC_OID, // smallint -> numeric
+            [INTEGER_OID]: NUMERIC_OID, // integer -> numeric
+            [BIGINT_OID]: NUMERIC_OID, // bigint -> numeric
+            [NUMERIC_OID]: NUMERIC_OID, // numeric -> numeric
+            [REAL_OID]: DOUBLE_PRECISION_OID, // real -> double precision
+            [DOUBLE_PRECISION_OID]: DOUBLE_PRECISION_OID, // double precision -> double precision
+            [INTERVAL_OID]: INTERVAL_OID, // interval -> interval
           },
           "1700" /* numeric */
         ),
@@ -118,10 +130,10 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
         // for how this aggregate changes result type.
         pgTypeAndModifierModifier: convertWithMapAndFallback(
           {
-            700: "701", // real -> double precision
-            701: "701", // double precision -> double precision
+            [REAL_OID]: DOUBLE_PRECISION_OID, // real -> double precision
+            [DOUBLE_PRECISION_OID]: DOUBLE_PRECISION_OID, // double precision -> double precision
           },
-          "1700" /* numeric */
+          NUMERIC_OID /* numeric */
         ),
       },
       {
@@ -135,10 +147,10 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
         // for how this aggregate changes result type.
         pgTypeAndModifierModifier: convertWithMapAndFallback(
           {
-            700: "701", // real -> double precision
-            701: "701", // double precision -> double precision
+            [REAL_OID]: DOUBLE_PRECISION_OID, // real -> double precision
+            [DOUBLE_PRECISION_OID]: DOUBLE_PRECISION_OID, // double precision -> double precision
           },
-          "1700" /* numeric */
+          NUMERIC_OID /* numeric */
         ),
       },
       {
@@ -152,10 +164,10 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
         // for how this aggregate changes result type.
         pgTypeAndModifierModifier: convertWithMapAndFallback(
           {
-            700: "701", // real -> double precision
-            701: "701", // double precision -> double precision
+            [REAL_OID]: DOUBLE_PRECISION_OID, // real -> double precision
+            [DOUBLE_PRECISION_OID]: DOUBLE_PRECISION_OID, // double precision -> double precision
           },
-          "1700" /* numeric */
+          NUMERIC_OID /* numeric */
         ),
       },
       {
@@ -169,10 +181,10 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
         // for how this aggregate changes result type.
         pgTypeAndModifierModifier: convertWithMapAndFallback(
           {
-            700: "701", // real -> double precision
-            701: "701", // double precision -> double precision
+            [REAL_OID]: DOUBLE_PRECISION_OID, // real -> double precision
+            [DOUBLE_PRECISION_OID]: DOUBLE_PRECISION_OID, // double precision -> double precision
           },
-          "1700" /* numeric */
+          NUMERIC_OID /* numeric */
         ),
       },
     ];
