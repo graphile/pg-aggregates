@@ -71,17 +71,19 @@ create table match_stats (
   team_position int not null,
   points int not null,
   goals int not null,
-  saves int not null
+  saves int not null,
+  created_at timestamptz not null default now()
 );
 
-insert into match_stats (match_id, player_id, team_position, points, goals, saves)
+insert into match_stats (match_id, player_id, team_position, points, goals, saves, created_at)
   select
     matches.id,
     players.id,
     (((7 * (players.id + matches.id)) + (players.id)) % 6) + 1,
     ((matches.id + 2) * players.id) * 432 % 473,
     (6 + matches.id + players.id) % 7,
-    (2 + matches.id + players.id) % 3
+    (2 + matches.id + players.id) % 3,
+    '2020-10-22T17:00:00Z'::timestamptz + (floor(matches.id / 6) * interval '1 day' + (matches.id % 6) * interval '17 minutes')
   from matches, players
   where matches.id % 2 = players.id % 2
   and matches.id % (players.id + 1) > 0;
