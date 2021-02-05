@@ -1,5 +1,6 @@
 import type { SQL, QueryBuilder, PgClass } from "graphile-build-pg";
 import type { Plugin } from "graphile-build";
+import { AggregateSpec } from "./interfaces";
 
 type OrderBySpecIdentity =
   | string
@@ -28,6 +29,7 @@ const OrderByAggregatesPlugin: Plugin = (builder) => {
       pgSql: sql,
       inflection,
     } = build;
+    const pgAggregateSpecs: AggregateSpec[] = build.pgAggregateSpecs;
     const {
       scope: { isPgRowSortEnum, pgIntrospection },
     } = context;
@@ -81,7 +83,9 @@ const OrderByAggregatesPlugin: Plugin = (builder) => {
       const tableAlias = sql.identifier(
         Symbol(`${foreignTable.namespaceName}.${foreignTable.name}`)
       );
-      return build.extend(
+
+      // Add count
+      memo = build.extend(
         memo,
         orderByAscDesc(
           inflection.orderByCountOfManyRelationByKeys(
@@ -109,8 +113,50 @@ const OrderByAggregatesPlugin: Plugin = (builder) => {
           },
           false
         ),
-        `Adding orderBy to '${foreignTable.namespaceName}.${foreignTable.name}' using constraint '${constraint.name}'`
+        `Adding orderBy count to '${foreignTable.namespaceName}.${foreignTable.name}' using constraint '${constraint.name}'`
       );
+
+      // Add other aggregates
+      pgAggregateSpecs.forEach((spec) => {
+        table.attributes.forEach((attr) => {
+          memo = build.extend(
+            memo,
+            orderByAscDesc(
+              inflection.orderByColumnAggregateOfManyRelationByKeys(
+                keys,
+                table,
+                foreignTable,
+                constraint,
+                spec,
+                attr
+              ),
+              ({ queryBuilder }) => {
+                const foreignTableAlias = queryBuilder.getTableAlias();
+                const conditions: SQL[] = [];
+                keys.forEach((key, i) => {
+                  conditions.push(
+                    sql.fragment`${tableAlias}.${sql.identifier(
+                      key.name
+                    )} = ${foreignTableAlias}.${sql.identifier(
+                      foreignKeys[i].name
+                    )}`
+                  );
+                });
+                return sql.fragment`(select ${spec.sqlAggregateWrap(
+                  sql.fragment`${tableAlias}.${sql.identifier(attr.name)}`
+                )} from ${sql.identifier(
+                  table.namespaceName,
+                  table.name
+                )} ${tableAlias} where (${sql.join(conditions, " AND ")}))`;
+              },
+              false
+            ),
+            `Adding orderBy ${spec.id} of '${attr.name}' to '${foreignTable.namespaceName}.${foreignTable.name}' using constraint '${constraint.name}'`
+          );
+        });
+      });
+
+      return memo;
     }, {} as OrderSpecs);
 
     return extend(

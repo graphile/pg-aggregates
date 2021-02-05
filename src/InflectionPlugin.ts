@@ -1,4 +1,4 @@
-import { PgClass, PgConstraint } from "graphile-build-pg";
+import { PgAttribute, PgClass, PgConstraint } from "graphile-build-pg";
 import { makeAddInflectorsPlugin } from "graphile-utils";
 import { AggregateSpec } from "./interfaces";
 
@@ -38,5 +38,23 @@ export default makeAddInflectorsPlugin({
       constraint
     );
     return this.constantCase(`${relationName}-count`);
+  },
+  orderByColumnAggregateOfManyRelationByKeys(
+    detailedKeys: Keys,
+    table: PgClass,
+    foreignTable: PgClass,
+    constraint: PgConstraint,
+    aggregateSpec: AggregateSpec,
+    column: PgAttribute
+  ) {
+    const relationName = this.manyRelationByKeys(
+      detailedKeys,
+      table,
+      foreignTable,
+      constraint
+    );
+    return this.constantCase(
+      `${relationName}-${aggregateSpec.id}-${this._columnName(column)}`
+    );
   },
 });
