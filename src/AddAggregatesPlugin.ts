@@ -484,4 +484,5 @@ const AddAggregatesPlugin: Plugin = (builder) => {
     };
   });
 };
+
 export default AddAggregatesPlugin;

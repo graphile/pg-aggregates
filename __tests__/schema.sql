@@ -83,4 +83,5 @@ insert into match_stats (match_id, player_id, team_position, points, goals, save
     (6 + matches.id + players.id) % 7,
     (2 + matches.id + players.id) % 3
   from matches, players
-  where matches.id % 2 = players.id % 2;
+  where matches.id % 2 = players.id % 2
+  and matches.id % (players.id + 1) > 0;
