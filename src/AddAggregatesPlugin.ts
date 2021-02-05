@@ -69,20 +69,23 @@ const AddAggregatesPlugin: Plugin = (builder) => {
             );
             return {
               // This tells the query planner that we want to add an aggregate
-              pgAggregateQuery: (aggregateQueryBuilder: QueryBuilder) => {
-                aggregateQueryBuilder.select(() => {
-                  const query = queryFromResolveData(
-                    sql.identifier(Symbol()),
-                    aggregateQueryBuilder.getTableAlias(), // Keep using our alias down the tree
-                    resolveData,
-                    { onlyJsonField: true },
-                    (innerQueryBuilder: QueryBuilder) => {
-                      innerQueryBuilder.parentQueryBuilder = aggregateQueryBuilder;
-                    },
-                    aggregateQueryBuilder.context
-                  );
-                  return sql.fragment`(${query})`;
-                }, safeAlias);
+              pgNamedQuery: {
+                name: "aggregates",
+                query: (aggregateQueryBuilder: QueryBuilder) => {
+                  aggregateQueryBuilder.select(() => {
+                    const query = queryFromResolveData(
+                      sql.identifier(Symbol()),
+                      aggregateQueryBuilder.getTableAlias(), // Keep using our alias down the tree
+                      resolveData,
+                      { onlyJsonField: true },
+                      (innerQueryBuilder: QueryBuilder) => {
+                        innerQueryBuilder.parentQueryBuilder = aggregateQueryBuilder;
+                      },
+                      aggregateQueryBuilder.context
+                    );
+                    return sql.fragment`(${query})`;
+                  }, safeAlias);
+                },
               },
             };
           });
