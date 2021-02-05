@@ -59,7 +59,10 @@ const AddGroupByAggregateEnumValuesForColumnsPlugin: Plugin = (builder) => {
           );
 
           pgAggregateGroupBySpecs.forEach((spec) => {
-            if (spec.isSuitableType(attr.type)) {
+            if (
+              (!spec.shouldApplyToEntity || spec.shouldApplyToEntity(attr)) &&
+              spec.isSuitableType(attr.type)
+            ) {
               const fieldName = inflection.aggregateGroupByColumnDerivativeEnum(
                 attr,
                 spec

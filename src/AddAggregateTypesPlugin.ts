@@ -169,7 +169,10 @@ const AddAggregateTypesPlugin: Plugin = (builder) => {
       // Figure out the columns that we're allowed to do a `SUM(...)` of
       ...table.attributes.reduce(
         (memo: GraphQLFieldConfigMap<any, any>, attr: PgAttribute) => {
-          if (!spec.isSuitableType(attr.type)) {
+          if (
+            (spec.shouldApplyToEntity && !spec.shouldApplyToEntity(attr)) ||
+            !spec.isSuitableType(attr.type)
+          ) {
             return memo;
           }
           const [pgType, pgTypeModifier] = spec.pgTypeAndModifierModifier
@@ -242,7 +245,10 @@ const AddAggregateTypesPlugin: Plugin = (builder) => {
             return memo;
           }
           const type = pgIntrospectionResultsByKind.typeById[proc.returnTypeId];
-          if (!spec.isSuitableType(type)) {
+          if (
+            (spec.shouldApplyToEntity && !spec.shouldApplyToEntity(proc)) ||
+            !spec.isSuitableType(type)
+          ) {
             return memo;
           }
           const computedColumnDetails = getComputedColumnDetails(

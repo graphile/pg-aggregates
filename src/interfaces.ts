@@ -1,11 +1,14 @@
-import { PgType, SQL } from "graphile-build-pg";
+import { PgAttribute, PgType, SQL, PgProc } from "graphile-build-pg";
 
 export interface AggregateGroupBySpec {
   /** Must not change since it's used in type names/etc */
   id: string; // e.g. 'truncated-to-hour'
 
   /** Return true if we can process this type */
-  isSuitableType: (pgType: PgType) => boolean;
+  isSuitableType: (type: PgType) => boolean;
+
+  /** Return false if we cannot process this attribute (default: true) */
+  shouldApplyToEntity?: (entity: PgAttribute | PgProc) => boolean;
 
   /** Wraps the SQL to return a derivative (e.g. sqlFrag => sql.fragment`date_trunc('hour', ${sqlFrag})`) */
   sqlWrap: (sqlFrag: SQL) => SQL;
@@ -22,7 +25,10 @@ export interface AggregateSpec {
   HumanLabel: string;
 
   /** Return true if we can process this type */
-  isSuitableType: (pgType: PgType) => boolean;
+  isSuitableType: (type: PgType) => boolean;
+
+  /** Return false if we cannot process this attribute (default: true) */
+  shouldApplyToEntity?: (entity: PgAttribute | PgProc) => boolean;
 
   /** Wraps the SQL in an aggregate call */
   sqlAggregateWrap: (sqlFrag: SQL) => SQL;
