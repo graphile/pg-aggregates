@@ -83,7 +83,7 @@ insert into match_stats (match_id, player_id, team_position, points, goals, save
     ((matches.id + 2) * players.id) * 432 % 473,
     (6 + matches.id + players.id) % 7,
     (2 + matches.id + players.id) % 3,
-    '2020-10-22T17:00:00Z'::timestamptz + (floor(matches.id / 6) * interval '1 day' + (matches.id % 6) * interval '17 minutes')
+    '2020-10-22T17:42:24Z'::timestamptz + (floor(matches.id / 6) * interval '1 day' + (matches.id % 6) * interval '17 minutes 53 seconds')
   from matches, players
   where matches.id % 2 = players.id % 2
   and matches.id % (players.id + 1) > 0;
