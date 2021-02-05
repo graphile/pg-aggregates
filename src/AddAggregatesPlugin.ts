@@ -7,16 +7,6 @@ import {
   getComputedColumnDetails,
 } from "graphile-build-pg";
 import { GraphQLResolveInfo, GraphQLFieldConfigMap } from "graphql";
-import { AggregateSpec } from "./interfaces";
-
-/** If there's no args we can use `aggregates`, otherwise we need to alias to allow for groupBy etc */
-function getAggregateAlias(safeAlias: string, args: { [key: string]: any }) {
-  if (!args.groupBy || args.groupBy.length === 0) {
-    return "aggregates";
-  } else {
-    return safeAlias;
-  }
-}
 
 const AddAggregatesPlugin: Plugin = (builder) => {
   // Hook all connections to add the 'aggregates' field
@@ -79,10 +69,7 @@ const AddAggregatesPlugin: Plugin = (builder) => {
             return {
               // This tells the query planner that we want to add an aggregate
               pgNamedQuery: {
-                name: getAggregateAlias(
-                  safeAlias,
-                  parsedResolveInfoFragment.args
-                ),
+                name: "aggregates",
                 query: (aggregateQueryBuilder: QueryBuilder) => {
                   aggregateQueryBuilder.select(() => {
                     const query = queryFromResolveData(
@@ -113,9 +100,8 @@ const AddAggregatesPlugin: Plugin = (builder) => {
             ) {
               // Figure out the unique alias we chose earlier
               const safeAlias = getSafeAliasFromResolveInfo(resolveInfo);
-              const aggregateAlias = getAggregateAlias(safeAlias, args);
               // All aggregates are stored into the aggregates object which is also identified by aggregateAlias, reference ours here
-              return parent[aggregateAlias][safeAlias] || 0;
+              return parent.aggregates[safeAlias] || 0;
             },
           };
         },
