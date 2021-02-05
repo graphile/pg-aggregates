@@ -1,5 +1,6 @@
 import { Plugin } from "graphile-build";
 import {
+  SQL,
   QueryBuilder,
   // @ts-ignore
   getComputedColumnDetails,
@@ -86,6 +87,38 @@ const AddConnectionGroupedAggregatesPlugin: Plugin = (builder) => {
               AggregateContainerType
             );
             return {
+              // Push a query container
+              pgNamedQueryContainer: {
+                name: safeAlias,
+                query: ({
+                  queryBuilder,
+                  innerQueryBuilder,
+                  options,
+                }: {
+                  queryBuilder: QueryBuilder;
+                  innerQueryBuilder: QueryBuilder;
+                  options: any;
+                }) => {
+                  const groupBy: SQL[] = parsedResolveInfoFragment.args.groupBy.map(
+                    (b: any) => b.spec(queryBuilder.getTableAlias())
+                  );
+                  innerQueryBuilder.select(
+                    () =>
+                      sql.fragment`json_build_array(${sql.join(
+                        groupBy.map((b) => sql.fragment`(${b})::text`),
+                        ", "
+                      )})`,
+                    "keys"
+                  );
+                  return sql.fragment`\
+(select json_agg(j.data) from (
+  select ${innerQueryBuilder.build({ onlyJsonField: true })} as data
+  from ${queryBuilder.getTableExpression()} as ${queryBuilder.getTableAlias()}
+  where ${queryBuilder.buildWhereClause(false, false, options)}
+  group by ${sql.join(groupBy, ", ")}
+) j)`;
+                },
+              },
               // This tells the query planner that we want to add an aggregate
               pgNamedQuery: {
                 name: safeAlias,
@@ -112,7 +145,7 @@ const AddConnectionGroupedAggregatesPlugin: Plugin = (builder) => {
 
           return {
             description: `Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)`,
-            type: AggregateContainerType,
+            type: new GraphQLList(new GraphQLNonNull(AggregateContainerType)),
             args: {
               groupBy: {
                 type: new GraphQLNonNull(
@@ -130,10 +163,12 @@ const AddConnectionGroupedAggregatesPlugin: Plugin = (builder) => {
               _context: any,
               resolveInfo: GraphQLResolveInfo
             ) {
-              // Figure out the unique alias we chose earlier
               const safeAlias = getSafeAliasFromResolveInfo(resolveInfo);
-              // All aggregates are stored into the aggregates object which is also identified by safeAlias, reference ours here
-              return parent[safeAlias][safeAlias];
+              return parent[safeAlias].map((entry: any) => ({
+                /* Rewrite the object due to aliasing */
+                ...entry[safeAlias],
+                keys: entry.keys,
+              }));
             },
           };
         },
