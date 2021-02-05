@@ -22,6 +22,9 @@ export default makeAddInflectorsPlugin({
   aggregatesContainerField(_table: PgClass) {
     return "aggregates";
   },
+  groupedAggregatesContainerField(_table: PgClass) {
+    return "groupedAggregates";
+  },
   aggregatesField(_table: PgClass, aggregateSpec: AggregateSpec) {
     return aggregateSpec.id;
   },

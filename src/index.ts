@@ -3,7 +3,9 @@ import InflectionPlugin from "./InflectionPlugin";
 import AggregateSpecsPlugin from "./AggregateSpecsPlugin";
 import AddGroupByAggregateEnumsPlugin from "./AddGroupByAggregateEnumsPlugin";
 import AddGroupByAggregateEnumValuesForColumnsPlugin from "./AddGroupByAggregateEnumValuesForColumnsPlugin";
-import AddAggregatesPlugin from "./AddAggregatesPlugin";
+import AddAggregateTypesPlugin from "./AddAggregateTypesPlugin";
+import AddConnectionAggregatesPlugin from "./AddConnectionAggregatesPlugin";
+import AddConnectionGroupedAggregatesPlugin from "./AddConnectionGroupedAggregatesPlugin";
 import OrderByAggregatesPlugin from "./OrderByAggregatesPlugin";
 
 export default makePluginByCombiningPlugins(
@@ -11,6 +13,8 @@ export default makePluginByCombiningPlugins(
   AggregateSpecsPlugin,
   AddGroupByAggregateEnumsPlugin,
   AddGroupByAggregateEnumValuesForColumnsPlugin,
-  AddAggregatesPlugin,
+  AddAggregateTypesPlugin,
+  AddConnectionAggregatesPlugin,
+  AddConnectionGroupedAggregatesPlugin,
   OrderByAggregatesPlugin
 );

@@ -5,181 +5,141 @@ import {
   PgProc,
   // @ts-ignore
   getComputedColumnDetails,
+  PgClass,
 } from "graphile-build-pg";
 import { GraphQLResolveInfo, GraphQLFieldConfigMap } from "graphql";
+import { AggregateSpec } from "./interfaces";
 
-const AddAggregatesPlugin: Plugin = (builder) => {
-  // Hook all connections to add the 'aggregates' field
-  builder.hook("GraphQLObjectType:fields", (fields, build, context) => {
+const AddAggregateTypesPlugin: Plugin = (builder) => {
+  // Create the aggregates type for each table
+  builder.hook("init", (init, build, _context) => {
     const {
       newWithHooks,
-      graphql: { GraphQLObjectType },
+      graphql: {
+        GraphQLObjectType,
+        GraphQLList,
+        GraphQLNonNull,
+        GraphQLString,
+      },
       inflection,
-      getSafeAliasFromResolveInfo,
-      pgSql: sql,
-      getSafeAliasFromAlias,
-      pgQueryFromResolveData: queryFromResolveData,
+      pgIntrospectionResultsByKind,
+      pgOmit: omit,
     } = build;
-    const {
-      fieldWithHooks,
-      scope: { isPgRowConnectionType, pgIntrospection: table },
-    } = context;
 
-    // If it's not a table connection, abort
-    if (
-      !isPgRowConnectionType ||
-      !table ||
-      table.kind !== "class" ||
-      !table.namespace
-    ) {
-      return fields;
-    }
+    pgIntrospectionResultsByKind.class.forEach((table: PgClass) => {
+      if (!table.namespace) {
+        return;
+      }
+      if (omit(table, "read")) {
+        return;
+      }
+      if (table.tags.enum) {
+        return;
+      }
+      if (!table.isSelectable) {
+        return;
+      }
 
-    const AggregateContainerType = newWithHooks(
-      GraphQLObjectType,
-      {
-        name: inflection.aggregateContainerType(table),
-      },
-      {
-        isPgAggregateContainerType: true,
-        pgIntrospection: table,
-      },
-      true
-    );
-
-    if (!AggregateContainerType) {
-      // No aggregates for this connection, abort
-      return fields;
-    }
-
-    const fieldName = inflection.aggregatesContainerField(table);
-    return {
-      ...fields,
-      [fieldName]: fieldWithHooks(
-        fieldName,
-        ({ addDataGenerator, getDataFromParsedResolveInfoFragment }: any) => {
-          addDataGenerator((parsedResolveInfoFragment: any) => {
-            const safeAlias = getSafeAliasFromAlias(
-              parsedResolveInfoFragment.alias
-            );
-            const resolveData = getDataFromParsedResolveInfoFragment(
-              parsedResolveInfoFragment,
-              AggregateContainerType
-            );
-            return {
-              // This tells the query planner that we want to add an aggregate
-              pgNamedQuery: {
-                name: "aggregates",
-                query: (aggregateQueryBuilder: QueryBuilder) => {
-                  aggregateQueryBuilder.select(() => {
-                    const query = queryFromResolveData(
-                      sql.identifier(Symbol()),
-                      aggregateQueryBuilder.getTableAlias(), // Keep using our alias down the tree
-                      resolveData,
-                      { onlyJsonField: true },
-                      (innerQueryBuilder: QueryBuilder) => {
-                        innerQueryBuilder.parentQueryBuilder = aggregateQueryBuilder;
-                      },
-                      aggregateQueryBuilder.context
-                    );
-                    return sql.fragment`(${query})`;
-                  }, safeAlias);
-                },
+      /* const AggregateContainerType = */
+      newWithHooks(
+        GraphQLObjectType,
+        {
+          name: inflection.aggregateContainerType(table),
+          fields: {
+            keys: {
+              type: new GraphQLNonNull(
+                new GraphQLList(new GraphQLNonNull(GraphQLString))
+              ),
+              resolver(parent: any) {
+                return parent.keys || [];
               },
-            };
-          });
-
-          return {
-            description: `Aggregates across the matching connection (ignoring before/after/first/last/offset)`,
-            type: AggregateContainerType,
-            resolve(
-              parent: any,
-              args: any,
-              _context: any,
-              resolveInfo: GraphQLResolveInfo
-            ) {
-              // Figure out the unique alias we chose earlier
-              const safeAlias = getSafeAliasFromResolveInfo(resolveInfo);
-              // All aggregates are stored into the aggregates object which is also identified by aggregateAlias, reference ours here
-              return parent.aggregates[safeAlias] || 0;
             },
-          };
+          },
         },
-        {}
-      ),
-    };
+        {
+          isPgAggregateContainerType: true,
+          pgIntrospection: table,
+        },
+        true
+      );
+    });
+
+    return init;
   });
 
   // Hook the '*Aggregates' type for each table to add the "sum" operation
-  builder.hook("GraphQLObjectType:fields", (fields, build, context) => {
-    const {
-      pgField,
-      inflection,
-      newWithHooks,
-      graphql: { GraphQLObjectType },
-      getSafeAliasFromResolveInfo,
-    } = build;
-    const {
-      fieldWithHooks,
-      scope: { isPgAggregateContainerType, pgIntrospection: table },
-    } = context;
-    if (!isPgAggregateContainerType) {
-      return fields;
-    }
+  builder.hook(
+    "GraphQLObjectType:fields",
+    function addAggregateFieldsToAggregateType(fields, build, context) {
+      const {
+        pgField,
+        inflection,
+        newWithHooks,
+        graphql: { GraphQLObjectType },
+        getSafeAliasFromResolveInfo,
+      } = build;
+      const {
+        fieldWithHooks,
+        scope: { isPgAggregateContainerType, pgIntrospection: table },
+      } = context;
+      if (!isPgAggregateContainerType) {
+        return fields;
+      }
 
-    return build.extend(
-      fields,
-      (build.pgAggregateSpecs as AggregateSpec[]).reduce(
-        (memo: GraphQLFieldConfigMap<unknown, unknown>, spec) => {
-          const AggregateType = newWithHooks(
-            GraphQLObjectType,
-            {
-              name: inflection.aggregateType(table, spec),
-            },
-            {
-              isPgAggregateType: true,
-              pgAggregateSpec: spec,
-              pgIntrospection: table,
-            },
-            true
-          );
-
-          if (!AggregateType) {
-            // No aggregates for this connection for this spec, abort
-            return memo;
-          }
-          const fieldName = inflection.aggregatesField(table, spec);
-          return build.extend(memo, {
-            ...fields,
-            [fieldName]: pgField(
-              build,
-              fieldWithHooks,
-              fieldName,
+      return build.extend(
+        fields,
+        (build.pgAggregateSpecs as AggregateSpec[]).reduce(
+          (memo: GraphQLFieldConfigMap<unknown, unknown>, spec) => {
+            const AggregateType = newWithHooks(
+              GraphQLObjectType,
               {
-                description: `${spec.HumanLabel} aggregates across the matching connection (ignoring before/after/first/last/offset)`,
-                type: AggregateType,
-                resolve(
-                  parent: any,
-                  _args: any,
-                  _context: any,
-                  resolveInfo: GraphQLResolveInfo
-                ) {
-                  const safeAlias = getSafeAliasFromResolveInfo(resolveInfo);
-                  return parent[safeAlias];
-                },
+                name: inflection.aggregateType(table, spec),
               },
               {
-                isPgAggregateField: true,
+                isPgAggregateType: true,
                 pgAggregateSpec: spec,
-                pgFieldIntrospection: table,
-              } // scope,
-            ),
-          });
-        },
-        {}
-      )
-    );
-  });
+                pgIntrospection: table,
+              },
+              true
+            );
+
+            if (!AggregateType) {
+              // No aggregates for this connection for this spec, abort
+              return memo;
+            }
+            const fieldName = inflection.aggregatesField(table, spec);
+            return build.extend(memo, {
+              ...fields,
+              [fieldName]: pgField(
+                build,
+                fieldWithHooks,
+                fieldName,
+                {
+                  description: `${spec.HumanLabel} aggregates across the matching connection (ignoring before/after/first/last/offset)`,
+                  type: AggregateType,
+                  resolve(
+                    parent: any,
+                    _args: any,
+                    _context: any,
+                    resolveInfo: GraphQLResolveInfo
+                  ) {
+                    const safeAlias = getSafeAliasFromResolveInfo(resolveInfo);
+                    return parent[safeAlias];
+                  },
+                },
+                {
+                  isPgAggregateField: true,
+                  pgAggregateSpec: spec,
+                  pgFieldIntrospection: table,
+                } // scope,
+              ),
+            });
+          },
+          {}
+        )
+      );
+    }
+  );
 
   // Hook the sum aggregates type to add fields for each numeric table column
   builder.hook("GraphQLObjectType:fields", (fields, build, context) => {
@@ -319,4 +279,4 @@ const AddAggregatesPlugin: Plugin = (builder) => {
   });
 };
 
-export default AddAggregatesPlugin;
+export default AddAggregateTypesPlugin;
