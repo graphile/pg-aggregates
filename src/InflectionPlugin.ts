@@ -1,6 +1,6 @@
 import { PgAttribute, PgClass, PgConstraint } from "graphile-build-pg";
 import { makeAddInflectorsPlugin } from "graphile-utils";
-import { AggregateSpec } from "./interfaces";
+import { AggregateGroupBySpec, AggregateSpec } from "./interfaces";
 
 type Keys = Array<{
   column: string;
@@ -33,6 +33,12 @@ export default makeAddInflectorsPlugin({
   },
   aggregateGroupByColumnEnum(attr: PgAttribute) {
     return this.constantCase(`${this._columnName(attr)}`);
+  },
+  aggregateGroupByColumnDerivativeEnum(
+    attr: PgAttribute,
+    spec: AggregateGroupBySpec
+  ) {
+    return this.constantCase(`${this._columnName(attr)}-${spec.id}`);
   },
   orderByCountOfManyRelationByKeys(
     detailedKeys: Keys,

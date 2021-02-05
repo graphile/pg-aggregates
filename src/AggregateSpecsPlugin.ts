@@ -197,6 +197,13 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
           pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
         sqlWrap: (sqlFrag) => sql.fragment`date_trunc('hour', ${sqlFrag})`,
       },
+      {
+        id: "truncated-to-day",
+        isSuitableType: (pgType) =>
+          /* timestamp or timestamptz */
+          pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
+        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('day', ${sqlFrag})`,
+      },
     ];
 
     return build.extend(build, {
