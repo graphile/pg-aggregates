@@ -1,10 +1,5 @@
 import { Plugin } from "graphile-build";
-import {
-  SQL,
-  QueryBuilder,
-  // @ts-ignore
-  getComputedColumnDetails,
-} from "graphile-build-pg";
+import { SQL, QueryBuilder } from "graphile-build-pg";
 import type {
   GraphQLResolveInfo,
   GraphQLEnumType,
@@ -113,11 +108,6 @@ const AddConnectionGroupedAggregatesPlugin: Plugin = (builder) => {
                         { tableAlias: queryBuilder.getTableAlias() }
                       )
                     : null;
-                  /*args.having
-                    ? args.having.map((b: any) =>
-                        b.spec(queryBuilder.getTableAlias())
-                      )
-                    : null;*/
                   innerQueryBuilder.select(
                     () =>
                       sql.fragment`json_build_array(${sql.join(

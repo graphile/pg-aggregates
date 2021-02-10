@@ -1,12 +1,5 @@
 import { Plugin } from "graphile-build";
-import {
-  PgAttribute,
-  QueryBuilder,
-  PgProc,
-  // @ts-ignore
-  getComputedColumnDetails,
-  PgClass,
-} from "graphile-build-pg";
+import { PgAttribute, QueryBuilder, PgProc, PgClass } from "graphile-build-pg";
 import { GraphQLResolveInfo, GraphQLFieldConfigMap } from "graphql";
 import { AggregateSpec } from "./interfaces";
 
@@ -151,6 +144,7 @@ const AddAggregateTypesPlugin: Plugin = (builder) => {
       getSafeAliasFromResolveInfo,
       pgField,
       pgIntrospectionResultsByKind,
+      pgGetComputedColumnDetails: getComputedColumnDetails,
     } = build;
     const {
       fieldWithHooks,

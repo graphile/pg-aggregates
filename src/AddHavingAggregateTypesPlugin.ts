@@ -2,10 +2,6 @@ import type { GraphQLFieldConfigMap, GraphQLInputObjectType } from "graphql";
 import type { Plugin } from "graphile-build";
 import type { PgClass, PgProc, PgType, SQL } from "graphile-build-pg";
 import {
-  // @ts-ignore
-  getComputedColumnDetails,
-} from "graphile-build-pg";
-import {
   INT2_OID,
   INT4_OID,
   BIGINT_OID,
@@ -250,6 +246,7 @@ const AddHavingAggregateTypesPlugin: Plugin = (builder) => {
         newWithHooks,
         pgIntrospectionResultsByKind,
         pgSql: sql,
+        pgGetComputedColumnDetails: getComputedColumnDetails,
       } = build;
       const {
         scope: { isPgAggregateHavingInputType, pgIntrospection },

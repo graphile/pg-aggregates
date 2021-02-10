@@ -1,9 +1,5 @@
 import { Plugin } from "graphile-build";
-import {
-  QueryBuilder,
-  // @ts-ignore
-  getComputedColumnDetails,
-} from "graphile-build-pg";
+import { QueryBuilder } from "graphile-build-pg";
 import type { GraphQLResolveInfo, GraphQLObjectType } from "graphql";
 
 const AddAggregatesPlugin: Plugin = (builder) => {
