@@ -1,6 +1,10 @@
-import type { GraphQLInputObjectType } from "graphql";
+import type { GraphQLFieldConfigMap, GraphQLInputObjectType } from "graphql";
 import type { Plugin } from "graphile-build";
-import type { PgClass, PgType, SQL } from "graphile-build-pg";
+import type { PgClass, PgProc, PgType, SQL } from "graphile-build-pg";
+import {
+  // @ts-ignore
+  getComputedColumnDetails,
+} from "graphile-build-pg";
 import {
   INT2_OID,
   INT4_OID,
@@ -58,12 +62,12 @@ const AddHavingAggregateTypesPlugin: Plugin = (builder) => {
           case BIGINT_OID: {
             return getHavingFilter("bigint");
           }
-          case FLOAT4_OID: {
+          case FLOAT4_OID:
+          case FLOAT8_OID: {
             return getHavingFilter("float");
           }
           case MONEY_OID:
-          case NUMERIC_OID:
-          case FLOAT8_OID: {
+          case NUMERIC_OID: {
             return getHavingFilter("bigfloat");
           }
           case DATE_OID:
@@ -150,6 +154,7 @@ const AddHavingAggregateTypesPlugin: Plugin = (builder) => {
         inflection,
         graphql: { GraphQLInputObjectType },
         newWithHooks,
+        pgIntrospectionResultsByKind,
       } = build;
       const {
         scope: { isPgAggregateHavingInputType, pgIntrospection },
@@ -171,29 +176,126 @@ const AddHavingAggregateTypesPlugin: Plugin = (builder) => {
             {
               name: typeName,
               fields: ({ fieldWithHooks }) => {
-                return table.attributes.reduce((newFields, attr) => {
-                  const fieldName = inflection.column(attr);
-                  const HavingFilterType = build.pgHavingFilterTypeForTypeAndModifier(
-                    attr.type,
-                    attr.typeModifier
-                  );
-                  if (!HavingFilterType) {
-                    console.log(
-                      `No matching filter type for '${attr.type.id}'`
+                let fields = {};
+
+                fields = build.extend(
+                  fields,
+                  table.attributes.reduce((newFields, attr) => {
+                    const fieldName = inflection.column(attr);
+                    const HavingFilterType = build.pgHavingFilterTypeForTypeAndModifier(
+                      attr.type,
+                      attr.typeModifier
                     );
-                    return newFields;
-                  }
-                  const newField = fieldWithHooks(fieldName, {
-                    type: HavingFilterType,
-                  });
-                  return build.extend(
-                    newFields,
-                    { [fieldName]: newField },
-                    `Adding column '${attr.name}' to having filter type for '${table.namespaceName}.${table.name}'`
-                  );
-                }, {});
+                    if (!HavingFilterType) {
+                      console.log(
+                        `No matching filter type for '${attr.type.id}'`
+                      );
+                      return newFields;
+                    }
+                    const newField = fieldWithHooks(
+                      fieldName,
+                      {
+                        type: HavingFilterType,
+                      },
+                      {}
+                    );
+                    return build.extend(
+                      newFields,
+                      { [fieldName]: newField },
+                      `Adding column '${attr.name}' to having filter type for '${table.namespaceName}.${table.name}'`
+                    );
+                  }, {})
+                );
+
+                fields = build.extend(
+                  fields,
+                  pgIntrospectionResultsByKind.procedure.reduce(
+                    (memo: GraphQLFieldConfigMap<any, any>, proc: PgProc) => {
+                      if (proc.returnsSet) {
+                        return memo;
+                      }
+                      const type =
+                        pgIntrospectionResultsByKind.typeById[
+                          proc.returnTypeId
+                        ];
+                      if (
+                        (spec.shouldApplyToEntity &&
+                          !spec.shouldApplyToEntity(proc)) ||
+                        !spec.isSuitableType(type)
+                      ) {
+                        return memo;
+                      }
+                      const computedColumnDetails = getComputedColumnDetails(
+                        build,
+                        table,
+                        proc
+                      );
+                      if (!computedColumnDetails) {
+                        return memo;
+                      }
+                      const { pseudoColumnName } = computedColumnDetails;
+                      const fieldName = inflection.computedColumn(
+                        pseudoColumnName,
+                        proc,
+                        table
+                      );
+
+                      const returnType = pgIntrospectionResultsByKind.type.find(
+                        (t: PgType) => t.id === proc.returnTypeId
+                      );
+                      if (!returnType) {
+                        throw new Error(
+                          `Could not find return type for function '${proc.returnTypeId}'`
+                        );
+                      }
+                      const HavingFilterType = build.pgHavingFilterTypeForTypeAndModifier(
+                        returnType,
+                        null
+                      );
+                      if (!HavingFilterType) {
+                        console.log(
+                          `No matching filter type for '${returnType.id}'`
+                        );
+                        return memo;
+                      }
+                      console.log(returnType.name, HavingFilterType);
+                      const ComputedHavingInput = newWithHooks(
+                        GraphQLInputObjectType,
+                        {
+                          name: inflection.aggregateHavingAggregateComputedColumnInputType(
+                            table,
+                            spec,
+                            proc
+                          ),
+                          fields: {
+                            filter: {
+                              type: HavingFilterType,
+                            },
+                          },
+                        },
+                        {}
+                      );
+                      const newField = fieldWithHooks(
+                        fieldName,
+                        {
+                          type: ComputedHavingInput,
+                        },
+                        {}
+                      );
+                      return build.extend(
+                        memo,
+                        { [fieldName]: newField },
+                        `Adding computed column function '${proc.namespaceName}.${proc.name}' to having filter type for '${table.namespaceName}.${table.name}'`
+                      );
+                    },
+                    {}
+                  )
+                );
+
+                return fields;
               },
             },
+            {},
             true
           );
           if (!SpecInput) {
@@ -201,9 +303,13 @@ const AddHavingAggregateTypesPlugin: Plugin = (builder) => {
           }
           const fieldName = inflection.aggregatesField(spec);
           return build.extend(aggregateFields, {
-            [fieldName]: fieldWithHooks(fieldName, {
-              type: SpecInput,
-            }),
+            [fieldName]: fieldWithHooks(
+              fieldName,
+              {
+                type: SpecInput,
+              },
+              {}
+            ),
           });
         }, {}),
         `Adding columns to having filter for '${table.namespaceName}.${table.name}'`
@@ -220,7 +326,7 @@ const AddHavingAggregateTypesPlugin: Plugin = (builder) => {
     ) {
       const {
         inflection,
-        graphql: { GraphQLInt },
+        graphql: { GraphQLInt, GraphQLFloat },
         pgSql: sql,
         getTypeByName,
       } = build;
@@ -240,7 +346,7 @@ const AddHavingAggregateTypesPlugin: Plugin = (builder) => {
             return getTypeByName(inflection.builtin("BigInt"));
           }
           case "float": {
-            return GraphQLInt;
+            return GraphQLFloat;
           }
           case "bigfloat": {
             return getTypeByName(inflection.builtin("BigFloat"));
@@ -259,9 +365,13 @@ const AddHavingAggregateTypesPlugin: Plugin = (builder) => {
       }
       function addBinaryOp(fieldName: string, infix: SQL) {
         fields = build.extend(fields, {
-          [fieldName]: fieldWithHooks(fieldName, {
-            type: FieldType,
-          }),
+          [fieldName]: fieldWithHooks(
+            fieldName,
+            {
+              type: FieldType,
+            },
+            {}
+          ),
         });
       }
       switch (pgHavingFilterSpec) {

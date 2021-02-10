@@ -1,4 +1,4 @@
-import { PgAttribute, PgClass, PgConstraint } from "graphile-build-pg";
+import { PgAttribute, PgClass, PgConstraint, PgProc } from "graphile-build-pg";
 import { makeAddInflectorsPlugin } from "graphile-utils";
 import { AggregateGroupBySpec, AggregateSpec } from "./interfaces";
 
@@ -43,6 +43,15 @@ export default makeAddInflectorsPlugin({
   ) {
     return this.upperCamelCase(
       `${this._tableName(table)}-having-${aggregateSpec.id}-input`
+    );
+  },
+  aggregateHavingAggregateComputedColumnInputType(
+    table: PgClass,
+    aggregateSpec: AggregateSpec,
+    proc: PgProc
+  ) {
+    return this.upperCamelCase(
+      `${this._tableName(table)}-having-${aggregateSpec.id}-${proc.name}-input`
     );
   },
   aggregateGroupByColumnDerivativeEnum(

@@ -106,11 +106,12 @@ const AddConnectionGroupedAggregatesPlugin: Plugin = (builder) => {
                   const groupBy: SQL[] = args.groupBy.map((b: any) =>
                     b.spec(queryBuilder.getTableAlias())
                   );
-                  const having: SQL[] | null = args.having
+                  const having: SQL[] | null = null;
+                  /*args.having
                     ? args.having.map((b: any) =>
                         b.spec(queryBuilder.getTableAlias())
                       )
-                    : null;
+                    : null;*/
                   innerQueryBuilder.select(
                     () =>
                       sql.fragment`json_build_array(${sql.join(
