@@ -54,6 +54,17 @@ export default makeAddInflectorsPlugin({
       `${this._tableName(table)}-having-${aggregateSpec.id}-${proc.name}-input`
     );
   },
+  aggregateHavingAggregateComputedColumnArgsInputType(
+    table: PgClass,
+    aggregateSpec: AggregateSpec,
+    proc: PgProc
+  ) {
+    return this.upperCamelCase(
+      `${this._tableName(table)}-having-${aggregateSpec.id}-${
+        proc.name
+      }-args-input`
+    );
+  },
   aggregateGroupByColumnDerivativeEnum(
     attr: PgAttribute,
     spec: AggregateGroupBySpec

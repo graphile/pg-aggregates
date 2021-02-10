@@ -247,6 +247,7 @@ const AddHavingAggregateTypesPlugin: Plugin = (builder) => {
         pgIntrospectionResultsByKind,
         pgSql: sql,
         pgGetComputedColumnDetails: getComputedColumnDetails,
+        pgProcFieldDetails: procFieldDetails,
       } = build;
       const {
         scope: { isPgAggregateHavingInputType, pgIntrospection },
@@ -351,6 +352,11 @@ const AddHavingAggregateTypesPlugin: Plugin = (builder) => {
                         if (!computedColumnDetails) {
                           return memo;
                         }
+                        const details = procFieldDetails(proc, build, {
+                          computed: true,
+                        });
+                        console.dir({ proc: proc.name, details });
+                        const { inputs, makeSqlFunctionCall } = details;
                         const { pseudoColumnName } = computedColumnDetails;
                         const fieldName = inflection.computedColumn(
                           pseudoColumnName,
@@ -377,6 +383,19 @@ const AddHavingAggregateTypesPlugin: Plugin = (builder) => {
                           return memo;
                         }
                         console.log(returnType.name, HavingFilterType);
+                        const ArgsType = newWithHooks(
+                          GraphQLInputObjectType,
+                          {
+                            name: inflection.aggregateHavingAggregateComputedColumnArgsInputType(
+                              table,
+                              spec,
+                              proc
+                            ),
+                            fields: inputs,
+                          },
+                          {},
+                          true
+                        );
                         const ComputedHavingInput = newWithHooks(
                           GraphQLInputObjectType,
                           {
@@ -386,6 +405,13 @@ const AddHavingAggregateTypesPlugin: Plugin = (builder) => {
                               proc
                             ),
                             fields: {
+                              ...(ArgsType
+                                ? {
+                                    args: {
+                                      type: ArgsType,
+                                    },
+                                  }
+                                : null),
                               filter: {
                                 type: HavingFilterType,
                               },
@@ -397,6 +423,28 @@ const AddHavingAggregateTypesPlugin: Plugin = (builder) => {
                           fieldName,
                           {
                             type: ComputedHavingInput,
+                            extensions: {
+                              graphile: {
+                                toSql(
+                                  val: { args?: any; filter: any },
+                                  details: any
+                                ) {
+                                  const { tableAlias, aggregateSpec } = details;
+                                  const functionCallExpression = makeSqlFunctionCall(
+                                    val.args,
+                                    { implicitArgs: [tableAlias] }
+                                  );
+                                  const aggregateExpression = aggregateSpec.sqlAggregateWrap(
+                                    functionCallExpression
+                                  );
+                                  console.log(sql.compile(aggregateExpression));
+                                  return HavingFilterType.extensions.graphile.toSql(
+                                    val.filter,
+                                    { ...details, aggregateExpression }
+                                  );
+                                },
+                              },
+                            },
                           },
                           {}
                         );
