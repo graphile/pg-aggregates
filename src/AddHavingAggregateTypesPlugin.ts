@@ -99,6 +99,7 @@ const AddHavingAggregateTypesPlugin: Plugin = (builder) => {
         pgOmit: omit,
         sqlCommentByAddingTags,
         describePgEntity,
+        pgSql: sql,
       } = build;
       introspectionResultsByKind.class.forEach((table: PgClass) => {
         if (!table.isSelectable || omit(table, "order")) return;
@@ -119,13 +120,74 @@ const AddHavingAggregateTypesPlugin: Plugin = (builder) => {
                   type: new GraphQLList(
                     new GraphQLNonNull(TableHavingInputType)
                   ),
+                  extensions: {
+                    graphile: {
+                      toSql(val) {
+                        if (val) {
+                          const children = val.map((item) =>
+                            TableHavingInputType.extensions.graphile.toSql(item)
+                          );
+                          if (children.length > 0) {
+                            return sql.fragment`(${sql.join(
+                              children,
+                              ") AND ("
+                            )})`;
+                          }
+                        }
+                        return sql.true;
+                      },
+                    },
+                  },
                 },
                 OR: {
                   type: new GraphQLList(
                     new GraphQLNonNull(TableHavingInputType)
                   ),
+                  extensions: {
+                    graphile: {
+                      toSql(val) {
+                        if (val) {
+                          const children = val.map((item) =>
+                            TableHavingInputType.extensions.graphile.toSql(item)
+                          );
+                          if (children.length > 0) {
+                            return sql.fragment`(${sql.join(
+                              children,
+                              ") OR ("
+                            )})`;
+                          }
+                        }
+                        return sql.true;
+                      },
+                    },
+                  },
                 },
               };
+            },
+            extensions: {
+              graphile: {
+                toSql(argValue) {
+                  const fragments: SQL[] = [];
+                  if (argValue != null) {
+                    const fields = TableHavingInputType.getFields();
+                    Object.keys(fields).forEach((fieldName) => {
+                      const field = fields[fieldName];
+                      const value = argValue[fieldName];
+                      if (value == null) {
+                        return;
+                      }
+                      const toSql = field.extensions?.graphile?.toSql;
+                      if (typeof toSql === "function") {
+                        fragments.push(toSql(value));
+                      }
+                    });
+                  }
+                  console.dir(fragments, { depth: 8 });
+                  return fragments.length > 0
+                    ? sql.fragment`(${sql.join(fragments, ") AND (")})`
+                    : sql.true;
+                },
+              },
             },
           },
           {

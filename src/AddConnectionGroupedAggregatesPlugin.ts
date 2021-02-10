@@ -106,7 +106,12 @@ const AddConnectionGroupedAggregatesPlugin: Plugin = (builder) => {
                   const groupBy: SQL[] = args.groupBy.map((b: any) =>
                     b.spec(queryBuilder.getTableAlias())
                   );
-                  const having: SQL[] | null = null;
+                  console.log(parsedResolveInfoFragment);
+                  const having: SQL | null = args.having
+                    ? TableHavingInputType.extensions.graphile.toSql(
+                        args.having
+                      )
+                    : null;
                   /*args.having
                     ? args.having.map((b: any) =>
                         b.spec(queryBuilder.getTableAlias())
@@ -126,12 +131,7 @@ coalesce((select json_agg(j.data) from (
   from ${queryBuilder.getTableExpression()} as ${queryBuilder.getTableAlias()}
   where ${queryBuilder.buildWhereClause(false, false, options)}
   group by ${sql.join(groupBy, ", ")}
-  ${
-    having && having.length > 0
-      ? sql.fragment`having (${sql.join(having, ") and (")})`
-      : sql.empty
-  }
-) j)`;
+  ${having ? sql.fragment`having ${having}` : sql.empty}
 ) j), '[]'::json)`;
                 },
               },
