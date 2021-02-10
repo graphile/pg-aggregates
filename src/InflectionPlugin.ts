@@ -25,7 +25,7 @@ export default makeAddInflectorsPlugin({
   groupedAggregatesContainerField(_table: PgClass) {
     return "groupedAggregates";
   },
-  aggregatesField(_table: PgClass, aggregateSpec: AggregateSpec) {
+  aggregatesField(aggregateSpec: AggregateSpec) {
     return aggregateSpec.id;
   },
   aggregateGroupByType(table: PgClass) {
@@ -33,6 +33,17 @@ export default makeAddInflectorsPlugin({
   },
   aggregateGroupByColumnEnum(attr: PgAttribute) {
     return this.constantCase(`${this._columnName(attr)}`);
+  },
+  aggregateHavingInputType(table: PgClass) {
+    return this.upperCamelCase(`${this._tableName(table)}-having-input`);
+  },
+  aggregateHavingAggregateInputType(
+    table: PgClass,
+    aggregateSpec: AggregateSpec
+  ) {
+    return this.upperCamelCase(
+      `${this._tableName(table)}-having-${aggregateSpec.id}-input`
+    );
   },
   aggregateGroupByColumnDerivativeEnum(
     attr: PgAttribute,

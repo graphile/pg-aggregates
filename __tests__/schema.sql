@@ -75,6 +75,10 @@ create table match_stats (
   created_at timestamptz not null default now()
 );
 
+create function match_stats_rating(s match_stats, goal_weight float = 3, save_weight float = 1, position_weight float = 4) returns float as $$
+  select s.goals * goal_weight + s.saves * save_weight + (6 - s.team_position) * position_weight;
+$$ language sql strict stable;
+
 insert into match_stats (match_id, player_id, team_position, points, goals, saves, created_at)
   select
     matches.id,

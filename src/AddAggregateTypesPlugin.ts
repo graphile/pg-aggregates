@@ -107,7 +107,7 @@ const AddAggregateTypesPlugin: Plugin = (builder) => {
               // No aggregates for this connection for this spec, abort
               return memo;
             }
-            const fieldName = inflection.aggregatesField(table, spec);
+            const fieldName = inflection.aggregatesField(spec);
             return build.extend(memo, {
               ...fields,
               [fieldName]: pgField(

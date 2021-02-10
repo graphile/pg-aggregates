@@ -68,6 +68,9 @@ const AddConnectionGroupedAggregatesPlugin: Plugin = (builder) => {
     const TableGroupByType = build.getTypeByName(
       inflection.aggregateGroupByType(table)
     );
+    const TableHavingInputType = build.getTypeByName(
+      inflection.aggregateHavingInputType(table)
+    );
     const tableTypeName = inflection.tableType(table);
     if (!isValidEnum(TableGroupByType)) {
       return fields;
@@ -99,9 +102,15 @@ const AddConnectionGroupedAggregatesPlugin: Plugin = (builder) => {
                   innerQueryBuilder: QueryBuilder;
                   options: any;
                 }) => {
-                  const groupBy: SQL[] = parsedResolveInfoFragment.args.groupBy.map(
-                    (b: any) => b.spec(queryBuilder.getTableAlias())
+                  const args = parsedResolveInfoFragment.args;
+                  const groupBy: SQL[] = args.groupBy.map((b: any) =>
+                    b.spec(queryBuilder.getTableAlias())
                   );
+                  const having: SQL[] | null = args.having
+                    ? args.having.map((b: any) =>
+                        b.spec(queryBuilder.getTableAlias())
+                      )
+                    : null;
                   innerQueryBuilder.select(
                     () =>
                       sql.fragment`json_build_array(${sql.join(
@@ -116,6 +125,11 @@ const AddConnectionGroupedAggregatesPlugin: Plugin = (builder) => {
   from ${queryBuilder.getTableExpression()} as ${queryBuilder.getTableAlias()}
   where ${queryBuilder.buildWhereClause(false, false, options)}
   group by ${sql.join(groupBy, ", ")}
+  ${
+    having && having.length > 0
+      ? sql.fragment`having (${sql.join(having, ") and (")})`
+      : sql.empty
+  }
 ) j)`;
                 },
               },
@@ -156,6 +170,17 @@ const AddConnectionGroupedAggregatesPlugin: Plugin = (builder) => {
                   "arg"
                 ),
               },
+              ...(TableHavingInputType
+                ? {
+                    having: {
+                      type: TableHavingInputType,
+                      description: build.wrapDescription(
+                        `Conditions on the grouped aggregates.`,
+                        "arg"
+                      ),
+                    },
+                  }
+                : null),
             },
             resolve(
               parent: any,
