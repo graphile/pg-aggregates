@@ -121,7 +121,7 @@ const AddConnectionGroupedAggregatesPlugin: Plugin = (builder) => {
                     "keys"
                   );
                   return sql.fragment`\
-(select json_agg(j.data) from (
+coalesce((select json_agg(j.data) from (
   select ${innerQueryBuilder.build({ onlyJsonField: true })} as data
   from ${queryBuilder.getTableExpression()} as ${queryBuilder.getTableAlias()}
   where ${queryBuilder.buildWhereClause(false, false, options)}
@@ -132,6 +132,7 @@ const AddConnectionGroupedAggregatesPlugin: Plugin = (builder) => {
       : sql.empty
   }
 ) j)`;
+) j), '[]'::json)`;
                 },
               },
               // This tells the query planner that we want to add an aggregate
