@@ -109,7 +109,8 @@ const AddConnectionGroupedAggregatesPlugin: Plugin = (builder) => {
                   console.log(parsedResolveInfoFragment);
                   const having: SQL | null = args.having
                     ? TableHavingInputType.extensions.graphile.toSql(
-                        args.having
+                        args.having,
+                        { tableAlias: queryBuilder.getTableAlias() }
                       )
                     : null;
                   /*args.having
