@@ -1,8 +1,22 @@
 import { makePluginByCombiningPlugins } from "graphile-utils";
 import InflectionPlugin from "./InflectionPlugin";
-import AddAggregatesPlugin from "./AddAggregatesPlugin";
+import AggregateSpecsPlugin from "./AggregateSpecsPlugin";
+import AddGroupByAggregateEnumsPlugin from "./AddGroupByAggregateEnumsPlugin";
+import AddGroupByAggregateEnumValuesForColumnsPlugin from "./AddGroupByAggregateEnumValuesForColumnsPlugin";
+import AddHavingAggregateTypesPlugin from "./AddHavingAggregateTypesPlugin";
+import AddAggregateTypesPlugin from "./AddAggregateTypesPlugin";
+import AddConnectionAggregatesPlugin from "./AddConnectionAggregatesPlugin";
+import AddConnectionGroupedAggregatesPlugin from "./AddConnectionGroupedAggregatesPlugin";
+import OrderByAggregatesPlugin from "./OrderByAggregatesPlugin";
 
 export default makePluginByCombiningPlugins(
   InflectionPlugin,
-  AddAggregatesPlugin
+  AggregateSpecsPlugin,
+  AddGroupByAggregateEnumsPlugin,
+  AddGroupByAggregateEnumValuesForColumnsPlugin,
+  AddHavingAggregateTypesPlugin,
+  AddAggregateTypesPlugin,
+  AddConnectionAggregatesPlugin,
+  AddConnectionGroupedAggregatesPlugin,
+  OrderByAggregatesPlugin
 );
