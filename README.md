@@ -7,7 +7,37 @@ aggregates, ordering by relational aggregates, etc.
 **IMPORTANT**: aggregates are added to connections, they do _not_ work with
 "simple collections".
 
+<!-- SPONSORS_BEGIN -->
+
+## Crowd-funded open-source software
+
+To help us develop this software sustainably under the MIT license, we ask all
+individuals and businesses that use it to help support its ongoing maintenance
+and development via sponsorship.
+
+### [Click here to find out more about sponsors and sponsorship.](https://www.graphile.org/sponsor/)
+
+And please give some love to our featured sponsors 🤩:
+
+<table><tr>
+<td align="center"><a href="http://chads.website"><img src="https://graphile.org/images/sponsors/chadf.png" width="90" height="90" alt="Chad Furman" /><br />Chad Furman</a> *</td>
+<td align="center"><a href="https://storyscript.com/?utm_source=postgraphile"><img src="https://graphile.org/images/sponsors/storyscript.png" width="90" height="90" alt="Storyscript" /><br />Storyscript</a> *</td>
+<td align="center"><a href="https://surge.io/"><img src="https://graphile.org/images/sponsors/surge.png" width="90" height="90" alt="Surge.io" /><br />Surge.io</a> *</td>
+<td align="center"><a href="https://postlight.com/?utm_source=graphile"><img src="https://graphile.org/images/sponsors/postlight.jpg" width="90" height="90" alt="Postlight" /><br />Postlight</a> *</td>
+</tr></table>
+
+<em>\* Sponsors the entire Graphile suite</em>
+
+<!-- SPONSORS_END -->
+
+## Status
+
+This module is currently "experimental" status; we may change any part of it in
+a semver minor release.
+
 ## Usage
+
+Requires PostGraphile v4.12.0-alpha.0 or higher.
 
 Install with:
 
@@ -96,9 +126,11 @@ query GroupedAggregatesByDerivative {
 ## Interaction with connection parameters
 
 Aggregates respect the conditions/filters of the connection but are unaffected
-by the pagination of the connection (`first`/`last`/`after`/`before`/`orderBy`).
-You may retrieve (optionally paginated) node data from a connection at the same
-time as retrieving aggregates from it.
+by the pagination of the connection (they ignore the
+`first`/`last`/`after`/`before`/`orderBy` parameters). You may retrieve
+(optionally paginated) node data from a connection at the same time as
+retrieving aggregates from it. Aggregates are supported on connections at any
+level of the GraphQL query.
 
 ## Aggregates
 
@@ -144,27 +176,6 @@ aggregate entries for each column and
 [computed column function](https://www.graphile.org/postgraphile/computed-columns/)
 that appears to be compatible with the aggregate.
 
-## Defining your own aggregates
-
-You can also add your own aggregates by using a plugin to add your own aggregate
-specs. Aggregate specs aren't too complicated, for example here is a spec that
-could define the "min" aggregate:
-
-```ts
-const isNumberLike = (pgType) => pgType.category === "N";
-
-const minSpec = {
-  id: "min",
-  humanLabel: "minimum",
-  HumanLabel: "Minimum",
-  isSuitableType: isNumberLike,
-  sqlAggregateWrap: (sqlFrag) => sql.fragment`min(${sqlFrag})`,
-};
-```
-
-See [src/AggregateSpecsPlugin.ts](src/AggregateSpecsPlugin.ts) for more
-details/examples.
-
 ## Grouped aggregates
 
 We also support grouping your data via the value of one of your columns,
@@ -177,9 +188,9 @@ support two derivatives:
 - `truncated-to-day` (applies to timestamp-like values) - truncates to the
   beginning of the (UTC) day
 
-You may add your own derivatives by adding a group by spec; see
-[src/AggregateSpecsPlugin.ts](src/AggregateSpecsPlugin.ts) for examples and more
-information.
+See
+[Defining your own grouping derivatives](#defining-your-own-grouping-derivatives)
+below for details on how to add your own grouping derivatives.
 
 The aggregates supported over groups are the same as over the connection as a
 whole (see [Aggregates](#aggregates) above), but in addition you may also
@@ -199,6 +210,53 @@ query AverageDurationByYearOfRelease {
 }
 ```
 
-each entry in the `groupedAggregates` result will have a `keys` entry containing
-one value which will be the year of release (as a string). Keys are always
-stringified, this is a known limitation due to interactions with GraphQL.
+each entry in the `groupedAggregates` result will have a `keys` entry that will
+be a list containing one value which will be the year of release (as a string).
+The values in the `keys` list are always stringified, this is a known limitation
+due to interactions with GraphQL.
+
+## Defining your own aggregates
+
+You can add your own aggregates by using a plugin to add your own aggregate
+specs. Aggregate specs aren't too complicated, for example here is a spec that
+could define the "min" aggregate:
+
+```ts
+const isNumberLike = (pgType) => pgType.category === "N";
+
+const minSpec = {
+  id: "min",
+  humanLabel: "minimum",
+  HumanLabel: "Minimum",
+  isSuitableType: isNumberLike,
+  sqlAggregateWrap: (sqlFrag) => sql.fragment`min(${sqlFrag})`,
+};
+```
+
+See [src/AggregateSpecsPlugin.ts](src/AggregateSpecsPlugin.ts) for more
+details/examples.
+
+## Defining your own grouping derivatives
+
+You may add your own derivatives by adding a group by spec; see
+[src/AggregateSpecsPlugin.ts](src/AggregateSpecsPlugin.ts) for examples and more
+information. Derivative specs are also fairly straightforward:
+
+```ts
+const TIMESTAMP_OID = "1114";
+const TIMESTAMPTZ_OID = "1184";
+
+const truncatedToHourSpec = {
+  id: "truncated-to-hour",
+  isSuitableType: (pgType) =>
+    pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
+  sqlWrap: (sqlFrag) => sql.fragment`date_trunc('hour', ${sqlFrag})`,
+};
+```
+
+## Thanks
+
+This plugin was started as a proof of concept in 2019 thanks to sponsorship from
+OneGraph, and was made into fully featured released module thanks to sponsorship
+from Surge in 2021. It is maintained thanks to the support of
+[Graphile's sponsors](https://graphile.org/sponsor/) - thank you sponsors!
