@@ -1,5 +1,5 @@
-import { Plugin } from "graphile-build";
-import { QueryBuilder } from "graphile-build-pg";
+import type { Plugin } from "graphile-build";
+import type { QueryBuilder } from "graphile-build-pg";
 import type { GraphQLResolveInfo, GraphQLObjectType } from "graphql";
 
 const AddAggregatesPlugin: Plugin = (builder) => {

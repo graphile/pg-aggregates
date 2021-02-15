@@ -1,4 +1,9 @@
-import { PgAttribute, PgClass, PgConstraint, PgProc } from "graphile-build-pg";
+import type {
+  PgAttribute,
+  PgClass,
+  PgConstraint,
+  PgProc,
+} from "graphile-build-pg";
 import { makeAddInflectorsPlugin } from "graphile-utils";
 import { AggregateGroupBySpec, AggregateSpec } from "./interfaces";
 

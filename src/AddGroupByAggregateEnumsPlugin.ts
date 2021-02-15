@@ -1,5 +1,5 @@
 import type { Plugin } from "graphile-build";
-import { PgClass } from "graphile-build-pg";
+import type { PgClass } from "graphile-build-pg";
 
 const AddGroupByAggregateEnumsPlugin: Plugin = (builder) => {
   // Create the group by enums for each table

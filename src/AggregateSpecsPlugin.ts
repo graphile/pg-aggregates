@@ -1,5 +1,5 @@
-import { Plugin } from "graphile-build";
-import { PgType } from "graphile-build-pg";
+import type { Plugin } from "graphile-build";
+import type { PgType } from "graphile-build-pg";
 import { AggregateSpec, AggregateGroupBySpec } from "./interfaces";
 
 const TIMESTAMP_OID = "1114";

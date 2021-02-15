@@ -1,4 +1,4 @@
-import { PgAttribute, PgType, SQL, PgProc } from "graphile-build-pg";
+import type { PgAttribute, PgType, SQL, PgProc } from "graphile-build-pg";
 
 export interface AggregateGroupBySpec {
   /** Must not change since it's used in type names/etc */

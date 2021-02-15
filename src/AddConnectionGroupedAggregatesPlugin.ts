@@ -1,5 +1,5 @@
-import { Plugin } from "graphile-build";
-import { SQL, QueryBuilder } from "graphile-build-pg";
+import type { Plugin } from "graphile-build";
+import type { SQL, QueryBuilder } from "graphile-build-pg";
 import type {
   GraphQLResolveInfo,
   GraphQLEnumType,

@@ -1,6 +1,11 @@
-import { Plugin } from "graphile-build";
-import { PgAttribute, QueryBuilder, PgProc, PgClass } from "graphile-build-pg";
-import { GraphQLResolveInfo, GraphQLFieldConfigMap } from "graphql";
+import type { Plugin } from "graphile-build";
+import type {
+  PgAttribute,
+  QueryBuilder,
+  PgProc,
+  PgClass,
+} from "graphile-build-pg";
+import type { GraphQLResolveInfo, GraphQLFieldConfigMap } from "graphql";
 import { AggregateSpec } from "./interfaces";
 
 const AddAggregateTypesPlugin: Plugin = (builder) => {
