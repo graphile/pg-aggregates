@@ -62,7 +62,8 @@ const middleware = postgraphile(DATABASE_URL, SCHEMAS, {
 });
 ```
 
-Then issue a GraphQL query such as:
+If you want you could install our [example schema](__tests__/schema.sql) and
+then issue a GraphQL query such as:
 
 ```graphql
 query GameAggregates {
@@ -176,6 +177,37 @@ aggregate entries for each column and
 [computed column function](https://www.graphile.org/postgraphile/computed-columns/)
 that appears to be compatible with the aggregate.
 
+## Ordering by aggregates
+
+This plugin automatically adds some additional `orderBy` criteria to your graph
+allowing you to order by aggregates over relations; e.g. you could find the top
+5 players ordered by their average points scored in each match, and grab some
+more aggregate information about them too:
+
+```graphql
+query FocussedOrderedAggregate {
+  allPlayers(
+    first: 5
+    orderBy: [MATCH_STATS_BY_PLAYER_ID_AVERAGE_POINTS_DESC]
+  ) {
+    nodes {
+      name
+      matchStatsByPlayerId {
+        totalCount
+        aggregates {
+          sum {
+            goals
+          }
+          average {
+            points
+          }
+        }
+      }
+    }
+  }
+}
+```
+
 ## Grouped aggregates
 
 We also support grouping your data via the value of one of your columns,
@@ -214,6 +246,29 @@ each entry in the `groupedAggregates` result will have a `keys` entry that will
 be a list containing one value which will be the year of release (as a string).
 The values in the `keys` list are always stringified, this is a known limitation
 due to interactions with GraphQL.
+
+### Having
+
+If these grouped aggregates are returning too much data, you can filter the
+groups down by applying a `having` clause against them; for example you could
+see the average number of goals on days where the average points score was over
+200:
+
+```graphql
+query AverageGoalsOnDaysWithAveragePointsOver200 {
+  allMatchStats {
+    byDay: groupedAggregates(
+      groupBy: [CREATED_AT_TRUNCATED_TO_DAY]
+      having: { average: { points: { greaterThan: 200 } } }
+    ) {
+      keys
+      average {
+        goals
+      }
+    }
+  }
+}
+```
 
 ## Defining your own aggregates
 
