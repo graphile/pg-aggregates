@@ -108,6 +108,11 @@ const AddConnectionGroupedAggregatesPlugin: Plugin = (builder) => {
                         { tableAlias: queryBuilder.getTableAlias() }
                       )
                     : null;
+                  if (having && groupBy.length === 0) {
+                    throw new Error(
+                      "Must not provide having without also providing groupBy"
+                    );
+                  }
                   innerQueryBuilder.select(
                     () =>
                       sql.fragment`json_build_array(${sql.join(
@@ -121,7 +126,11 @@ coalesce((select json_agg(j.data) from (
   select ${innerQueryBuilder.build({ onlyJsonField: true })} as data
   from ${queryBuilder.getTableExpression()} as ${queryBuilder.getTableAlias()}
   where ${queryBuilder.buildWhereClause(false, false, options)}
-  group by ${sql.join(groupBy, ", ")}
+  ${
+    groupBy.length > 0
+      ? sql.fragment`group by ${sql.join(groupBy, ", ")}`
+      : sql.blank
+  }
   ${having ? sql.fragment`having ${having}` : sql.empty}
 ) j), '[]'::json)`;
                 },
