@@ -101,7 +101,6 @@ const AddConnectionGroupedAggregatesPlugin: Plugin = (builder) => {
                   const groupBy: SQL[] = args.groupBy.map((b: any) =>
                     b.spec(queryBuilder.getTableAlias())
                   );
-                  console.log(parsedResolveInfoFragment);
                   const having: SQL | null = args.having
                     ? TableHavingInputType.extensions.graphile.toSql(
                         args.having,

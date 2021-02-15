@@ -281,9 +281,6 @@ const AddHavingAggregateTypesPlugin: Plugin = (builder) => {
                         attr.typeModifier
                       );
                       if (!HavingFilterType) {
-                        console.log(
-                          `No matching filter type for '${attr.type.id}'`
-                        );
                         return newFields;
                       }
                       const newField = fieldWithHooks(
@@ -355,7 +352,6 @@ const AddHavingAggregateTypesPlugin: Plugin = (builder) => {
                         const details = procFieldDetails(proc, build, {
                           computed: true,
                         });
-                        console.dir({ proc: proc.name, details });
                         const { inputs, makeSqlFunctionCall } = details;
                         const { pseudoColumnName } = computedColumnDetails;
                         const fieldName = inflection.computedColumn(
@@ -377,12 +373,8 @@ const AddHavingAggregateTypesPlugin: Plugin = (builder) => {
                           null
                         );
                         if (!HavingFilterType) {
-                          console.log(
-                            `No matching filter type for '${returnType.id}'`
-                          );
                           return memo;
                         }
-                        console.log(returnType.name, HavingFilterType);
                         const ArgsType = newWithHooks(
                           GraphQLInputObjectType,
                           {
@@ -437,7 +429,6 @@ const AddHavingAggregateTypesPlugin: Plugin = (builder) => {
                                   const aggregateExpression = aggregateSpec.sqlAggregateWrap(
                                     functionCallExpression
                                   );
-                                  console.log(sql.compile(aggregateExpression));
                                   return HavingFilterType.extensions.graphile.toSql(
                                     val.filter,
                                     { ...details, aggregateExpression }
