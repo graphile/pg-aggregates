@@ -68,6 +68,10 @@ const AddAggregatesPlugin: Plugin = (builder) => {
                       { onlyJsonField: true },
                       (innerQueryBuilder: QueryBuilder) => {
                         innerQueryBuilder.parentQueryBuilder = aggregateQueryBuilder;
+                        innerQueryBuilder.select(
+                          sql.fragment`sum(1)`,
+                          "__force_aggregate__"
+                        );
                       },
                       aggregateQueryBuilder.context
                     );
