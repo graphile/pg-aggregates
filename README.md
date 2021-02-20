@@ -284,9 +284,14 @@ const minSpec = {
   humanLabel: "minimum",
   HumanLabel: "Minimum",
   isSuitableType: isNumberLike,
-  sqlAggregateWrap: (sqlFrag) => sql.fragment`min(${sqlFrag})`,
+  sqlAggregateWrap: (sqlFrag, pgType) => sql.fragment`min(${sqlFrag})`,
 };
 ```
+
+Note that the attribute's pgType is passed to `sqlAggregateWrap` so the
+query fragment can be altered depending on the attribute. This is useful for
+making decisions about suitable default values, or to even use different
+aggregate functions for different types.
 
 See [src/AggregateSpecsPlugin.ts](src/AggregateSpecsPlugin.ts) for more
 details/examples.

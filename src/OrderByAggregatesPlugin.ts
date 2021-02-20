@@ -143,7 +143,8 @@ const OrderByAggregatesPlugin: Plugin = (builder) => {
                   );
                 });
                 return sql.fragment`(select ${spec.sqlAggregateWrap(
-                  sql.fragment`${tableAlias}.${sql.identifier(attr.name)}`
+                  sql.fragment`${tableAlias}.${sql.identifier(attr.name)}`,
+                  attr.type
                 )} from ${sql.identifier(
                   table.namespaceName,
                   table.name

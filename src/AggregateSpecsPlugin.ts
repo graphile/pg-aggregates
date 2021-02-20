@@ -14,10 +14,48 @@ const DOUBLE_PRECISION_OID = "701";
 const INTERVAL_OID = "1186";
 const MONEY_OID = "790";
 
+const NUMERIC_CATEGORY = "N";
+const DATE_TIME_CATEGORY = "D";
+const NETWORK_ADDRESS_CATEGORY = "I";
+const STRING_CATEGORY = "S";
+
+const ENUM_TYPE = "p";
+
+const SUM_DEFAULTS = Object.freeze({
+  [MONEY_OID]: "0::money",
+  [INTERVAL_OID]: "INTERVAL '0 DAY'",
+});
+
+function isNumberLike(pgType: PgType): boolean {
+  return pgType.category === NUMERIC_CATEGORY;
+}
+
+function isDateLike(pgType: PgType): boolean {
+  return pgType.category === DATE_TIME_CATEGORY;
+}
+
+function isNumberOrDateLike(pgType: PgType): boolean {
+  return isNumberLike(pgType) || isDateLike(pgType);
+}
+
+function isInterval(pgType: PgType): boolean {
+  return pgType.id === INTERVAL_OID;
+}
+
+function isMinMaxable(pgType: PgType): boolean {
+  return (
+    isNumberOrDateLike(pgType) ||
+    pgType.category === NETWORK_ADDRESS_CATEGORY ||
+    pgType.category === STRING_CATEGORY ||
+    pgType.type === ENUM_TYPE ||
+    (!!pgType.arrayItemType && isMinMaxable(pgType.arrayItemType))
+  );
+}
+
 const AggregateSpecsPlugin: Plugin = (builder) => {
   builder.hook("build", (build) => {
     const { pgSql: sql } = build;
-    const isNumberLike = (pgType: PgType): boolean => pgType.category === "N";
+
     /** Maps from the data type of the column to the data type of the sum aggregate */
     /** BigFloat is our fallback type; it should be valid for almost all numeric types */
     const convertWithMapAndFallback = (
@@ -48,10 +86,12 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
         id: "sum",
         humanLabel: "sum",
         HumanLabel: "Sum",
-        isSuitableType: isNumberLike,
+        isSuitableType: (pgType) => isNumberLike(pgType) || isInterval(pgType),
         // I've wrapped it in `coalesce` so that it cannot be null
-        sqlAggregateWrap: (sqlFrag) =>
-          sql.fragment`coalesce(sum(${sqlFrag}), 0)`,
+        sqlAggregateWrap: (sqlFrag, pgType) =>
+          sql.fragment`coalesce(sum(${sqlFrag}), ${
+            SUM_DEFAULTS[pgType.id] || "0"
+          })`,
         isNonNull: true,
 
         // A SUM(...) often ends up significantly larger than any individual
@@ -86,21 +126,21 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
         id: "min",
         humanLabel: "minimum",
         HumanLabel: "Minimum",
-        isSuitableType: isNumberLike,
+        isSuitableType: isMinMaxable,
         sqlAggregateWrap: (sqlFrag) => sql.fragment`min(${sqlFrag})`,
       },
       {
         id: "max",
         humanLabel: "maximum",
         HumanLabel: "Maximum",
-        isSuitableType: isNumberLike,
+        isSuitableType: isMinMaxable,
         sqlAggregateWrap: (sqlFrag) => sql.fragment`max(${sqlFrag})`,
       },
       {
         id: "average",
         humanLabel: "mean average",
         HumanLabel: "Mean average",
-        isSuitableType: isNumberLike,
+        isSuitableType: isNumberOrDateLike,
         sqlAggregateWrap: (sqlFrag) => sql.fragment`avg(${sqlFrag})`,
 
         // An AVG(...) ends up more precise than any individual value; see
@@ -108,15 +148,11 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
         // how the avg aggregate changes result type.
         pgTypeAndModifierModifier: convertWithMapAndFallback(
           {
-            [SMALLINT_OID]: NUMERIC_OID, // smallint -> numeric
-            [INTEGER_OID]: NUMERIC_OID, // integer -> numeric
-            [BIGINT_OID]: NUMERIC_OID, // bigint -> numeric
-            [NUMERIC_OID]: NUMERIC_OID, // numeric -> numeric
             [REAL_OID]: DOUBLE_PRECISION_OID, // real -> double precision
             [DOUBLE_PRECISION_OID]: DOUBLE_PRECISION_OID, // double precision -> double precision
             [INTERVAL_OID]: INTERVAL_OID, // interval -> interval
           },
-          "1700" /* numeric */
+          NUMERIC_OID
         ),
       },
       {
@@ -133,7 +169,7 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
             [REAL_OID]: DOUBLE_PRECISION_OID, // real -> double precision
             [DOUBLE_PRECISION_OID]: DOUBLE_PRECISION_OID, // double precision -> double precision
           },
-          NUMERIC_OID /* numeric */
+          NUMERIC_OID
         ),
       },
       {
@@ -150,7 +186,7 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
             [REAL_OID]: DOUBLE_PRECISION_OID, // real -> double precision
             [DOUBLE_PRECISION_OID]: DOUBLE_PRECISION_OID, // double precision -> double precision
           },
-          NUMERIC_OID /* numeric */
+          NUMERIC_OID
         ),
       },
       {
@@ -167,7 +203,7 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
             [REAL_OID]: DOUBLE_PRECISION_OID, // real -> double precision
             [DOUBLE_PRECISION_OID]: DOUBLE_PRECISION_OID, // double precision -> double precision
           },
-          NUMERIC_OID /* numeric */
+          NUMERIC_OID
         ),
       },
       {
@@ -184,7 +220,7 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
             [REAL_OID]: DOUBLE_PRECISION_OID, // real -> double precision
             [DOUBLE_PRECISION_OID]: DOUBLE_PRECISION_OID, // double precision -> double precision
           },
-          NUMERIC_OID /* numeric */
+          NUMERIC_OID
         ),
       },
     ];
