@@ -148,6 +148,10 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
         // how the avg aggregate changes result type.
         pgTypeAndModifierModifier: convertWithMapAndFallback(
           {
+            [SMALLINT_OID]: NUMERIC_OID, // smallint -> numeric
+            [INTEGER_OID]: NUMERIC_OID, // integer -> numeric
+            [BIGINT_OID]: NUMERIC_OID, // bigint -> numeric
+            [NUMERIC_OID]: NUMERIC_OID, // numeric -> numeric
             [REAL_OID]: DOUBLE_PRECISION_OID, // real -> double precision
             [DOUBLE_PRECISION_OID]: DOUBLE_PRECISION_OID, // double precision -> double precision
             [INTERVAL_OID]: INTERVAL_OID, // interval -> interval
