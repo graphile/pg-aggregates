@@ -9,5 +9,5 @@ node \
   --allow-explain \
   --watch \
   --dynamic-json \
-  --show-error-stack \
+  --show-error-stack=json \
   --extended-errors severity,code,detail,hint,position,internalPosition,internalQuery,where,schema,table,column,dataType,constraint,file,line,routine
