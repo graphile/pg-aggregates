@@ -8,7 +8,7 @@
     "watch": "tsc --watch",
     "test": "jest -i",
     "tslint": "prettier --list-different 'src/**/*' && tslint --config tslint.json --project tsconfig.json",
-    "postgraphile": "nodemon --watch dist -x 'node --inspect ../build/postgraphile/cli.js --append-plugins `pwd`/dist/index.js -c graphile_aggregates -s test --enhance-graphiql --allow-explain --watch --dynamic-json --show-error-stack --extended-errors severity,code,detail,hint,position,internalPosition,internalQuery,where,schema,table,column,dataType,constraint,file,line,routine'",
+    "postgraphile": "nodemon --watch dist -x './postgraphile.sh'",
     "dev": "psql -X1v ON_ERROR_STOP=1 -f __tests__/schema.sql graphile_aggregates && concurrently --kill-others 'npm run watch' 'npm run postgraphile'",
     "prepack": "rm -Rf dist && npm run build"
   },
@@ -45,6 +45,7 @@
     "nodemon": "^2.0.7",
     "pg": "^8.5.1",
     "postgraphile": "^4.12.0-alpha.0",
+    "postgraphile-plugin-connection-filter": "^2.2.0",
     "prettier": "^2.2.1",
     "tslint": "^6.1.3",
     "tslint-config-prettier": "^1.18.0",
@@ -56,7 +57,5 @@
     "debug": "^4.3.1",
     "graphile-utils": "^4.12.0-alpha.0"
   },
-  "files": [
-    "dist"
-  ]
+  "files": ["dist"]
 }

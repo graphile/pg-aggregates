@@ -2,7 +2,8 @@
 
 Adds a powerful suite of aggregate functionality to a PostGraphile schema:
 calculating aggregates, grouped aggregates, applying conditions to grouped
-aggregates, ordering by relational aggregates, etc.
+aggregates, ordering by relational aggregates, filtering by the results of
+aggregates on related connections, etc.
 
 **IMPORTANT**: aggregates are added to connections, they do _not_ work with
 "simple collections".
@@ -124,6 +125,21 @@ query GroupedAggregatesByDerivative {
 }
 ```
 
+To filter by aggregates on related tables, you will also need
+[postgraphile-plugin-connection-filter](https://github.com/graphile-contrib/postgraphile-plugin-connection-filter),
+and you will need to enable `graphileBuildOptions.connectionFilterRelations`
+[as documented here](https://github.com/graphile-contrib/postgraphile-plugin-connection-filter#connectionfilterrelations).
+
+```js
+app.use(
+  postgraphile(DATABASE_URL, SCHEMA_NAME, {
+    graphileBuildOptions: {
+      connectionFilterRelations: true,
+    },
+  })
+);
+```
+
 ## Interaction with connection parameters
 
 Aggregates respect the conditions/filters of the connection but are unaffected
@@ -200,6 +216,38 @@ query FocussedOrderedAggregate {
           }
           average {
             points
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+## Filtering by aggregates
+
+(You will need `postgraphile-plugin-connection-filter` for this; see above.)
+
+```graphql
+query PlayersWith9OrMoreSavesInMatchesTheyScoredIn {
+  allPlayers(
+    filter: {
+      matchStatsByPlayerId: {
+        aggregates: {
+          sum: { saves: { greaterThan: "9" }, rating: { lessThan: 143 } }
+          filter: { goals: { greaterThan: 0 } }
+        }
+      }
+    }
+  ) {
+    nodes {
+      name
+      matchStatsByPlayerId(filter: { goals: { greaterThan: 0 } }) {
+        aggregates {
+          sum {
+            saves
+            rating
+            goals
           }
         }
       }

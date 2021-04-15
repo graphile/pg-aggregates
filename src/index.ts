@@ -8,6 +8,7 @@ import AddAggregateTypesPlugin from "./AddAggregateTypesPlugin";
 import AddConnectionAggregatesPlugin from "./AddConnectionAggregatesPlugin";
 import AddConnectionGroupedAggregatesPlugin from "./AddConnectionGroupedAggregatesPlugin";
 import OrderByAggregatesPlugin from "./OrderByAggregatesPlugin";
+import FilterRelationalAggregatesPlugin from "./FilterRelationalAggregatesPlugin";
 
 export default makePluginByCombiningPlugins(
   InflectionPlugin,
@@ -18,5 +19,6 @@ export default makePluginByCombiningPlugins(
   AddAggregateTypesPlugin,
   AddConnectionAggregatesPlugin,
   AddConnectionGroupedAggregatesPlugin,
-  OrderByAggregatesPlugin
+  OrderByAggregatesPlugin,
+  FilterRelationalAggregatesPlugin
 );
