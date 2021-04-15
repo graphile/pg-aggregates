@@ -1,7 +1,7 @@
 import type { Plugin } from "graphile-build";
 import type { ConnectionFilterResolver } from "postgraphile-plugin-connection-filter/dist/PgConnectionArgFilterPlugin";
 import type { BackwardRelationSpec } from "postgraphile-plugin-connection-filter/dist/PgConnectionArgFilterBackwardRelationsPlugin";
-import type { PgEntity } from "graphile-build-pg";
+import type { PgEntity, PgIntrospectionResultsByKind } from "graphile-build-pg";
 import type {
   GraphQLInputFieldConfigMap,
   GraphQLInputObjectType,
@@ -250,7 +250,10 @@ const FilterRelationalAggregatesPlugin: Plugin = (builder) => {
       pgSql: sql,
       connectionFilterResolve,
       connectionFilterRegisterResolver,
+      pgGetComputedColumnDetails: getComputedColumnDetails,
     } = build;
+    const pgIntrospectionResultsByKind: PgIntrospectionResultsByKind =
+      build.pgIntrospectionResultsByKind;
     const {
       scope: { isPgConnectionAggregateAggregateFilter },
       Self,
@@ -281,12 +284,19 @@ const FilterRelationalAggregatesPlugin: Plugin = (builder) => {
         const [pgType, pgTypeModifier] = spec.pgTypeAndModifierModifier
           ? spec.pgTypeAndModifierModifier(attr.type, attr.typeModifier)
           : [attr.type, attr.typeModifier];
-        const OperatorsType: GraphQLInputObjectType = connectionFilterOperatorsType(
+        const fieldName = inflection.column(attr);
+
+        const OperatorsType:
+          | GraphQLInputObjectType
+          | undefined = connectionFilterOperatorsType(
           newWithHooks,
           pgType.id,
           pgTypeModifier
         );
-        const fieldName = inflection.column(attr);
+
+        if (!OperatorsType) {
+          return memo;
+        }
 
         const resolve: ConnectionFilterResolver = ({
           sourceAlias,
@@ -306,6 +316,77 @@ const FilterRelationalAggregatesPlugin: Plugin = (builder) => {
             queryBuilder,
             pgType,
             pgTypeModifier,
+            fieldName
+          );
+          console.dir(frag);
+          return frag;
+        };
+        connectionFilterRegisterResolver(Self.name, fieldName, resolve);
+
+        return build.extend(memo, {
+          [fieldName]: {
+            type: OperatorsType,
+          },
+        });
+      }, {} as GraphQLInputFieldConfigMap),
+
+      ...pgIntrospectionResultsByKind.procedure.reduce((memo, proc) => {
+        if (proc.returnsSet) {
+          return memo;
+        }
+        const type = pgIntrospectionResultsByKind.typeById[proc.returnTypeId];
+        if (
+          (spec.shouldApplyToEntity && !spec.shouldApplyToEntity(proc)) ||
+          !spec.isSuitableType(type)
+        ) {
+          return memo;
+        }
+        const computedColumnDetails = getComputedColumnDetails(
+          build,
+          table,
+          proc
+        );
+        if (!computedColumnDetails) {
+          return memo;
+        }
+        const { pseudoColumnName } = computedColumnDetails;
+        const fieldName = inflection.computedColumn(
+          pseudoColumnName,
+          proc,
+          table
+        );
+
+        const OperatorsType:
+          | GraphQLInputObjectType
+          | undefined = connectionFilterOperatorsType(
+          newWithHooks,
+          type.id,
+          null
+        );
+
+        if (!OperatorsType) {
+          return memo;
+        }
+
+        const resolve: ConnectionFilterResolver = ({
+          sourceAlias,
+          fieldName,
+          fieldValue,
+          queryBuilder,
+        }) => {
+          if (fieldValue == null) return null;
+          const sqlComputedColumnCall = sql.query`${sql.identifier(
+            proc.namespaceName,
+            proc.name
+          )}(${sourceAlias})`;
+          const sqlAggregate = spec.sqlAggregateWrap(sqlComputedColumnCall);
+          const frag = connectionFilterResolve(
+            fieldValue,
+            sqlAggregate,
+            OperatorsType.name,
+            queryBuilder,
+            type,
+            null,
             fieldName
           );
           console.dir(frag);
