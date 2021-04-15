@@ -165,7 +165,6 @@ const FilterRelationalAggregatesPlugin: Plugin = (builder) => {
       graphql,
       newWithHooks,
       inflection,
-      pgSql: sql,
       connectionFilterResolve,
       connectionFilterRegisterResolver,
     } = build;
@@ -222,7 +221,6 @@ const FilterRelationalAggregatesPlugin: Plugin = (builder) => {
           filterTypeName,
           queryBuilder
         );
-        console.log(sql.compile(sqlFrag));
         return sqlFrag;
       };
       connectionFilterRegisterResolver(Self.name, fieldName, resolve);
@@ -318,7 +316,6 @@ const FilterRelationalAggregatesPlugin: Plugin = (builder) => {
             pgTypeModifier,
             fieldName
           );
-          console.dir(frag);
           return frag;
         };
         connectionFilterRegisterResolver(Self.name, fieldName, resolve);
@@ -389,7 +386,6 @@ const FilterRelationalAggregatesPlugin: Plugin = (builder) => {
             null,
             fieldName
           );
-          console.dir(frag);
           return frag;
         };
         connectionFilterRegisterResolver(Self.name, fieldName, resolve);
