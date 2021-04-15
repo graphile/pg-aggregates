@@ -1,8 +1,11 @@
 import type { Plugin } from "graphile-build";
 import type { ConnectionFilterResolver } from "postgraphile-plugin-connection-filter/dist/PgConnectionArgFilterPlugin";
 import type { BackwardRelationSpec } from "postgraphile-plugin-connection-filter/dist/PgConnectionArgFilterBackwardRelationsPlugin";
-import { PgEntity, PgEntityKind } from "graphile-build-pg";
-import { GraphQLInputFieldConfigMap } from "graphql";
+import type { PgEntity } from "graphile-build-pg";
+import type {
+  GraphQLInputFieldConfigMap,
+  GraphQLInputObjectType,
+} from "graphql";
 import { AggregateSpec } from "./interfaces";
 
 const FilterRelationalAggregatesPlugin: Plugin = (builder) => {
@@ -39,7 +42,7 @@ const FilterRelationalAggregatesPlugin: Plugin = (builder) => {
       foreignTableTypeName + "Aggregates"
     );
 
-    const FilterType = connectionFilterType(
+    const FilterType: GraphQLInputObjectType = connectionFilterType(
       newWithHooks,
       foreignTableFilterTypeName,
       foreignTable,
@@ -84,7 +87,6 @@ const FilterRelationalAggregatesPlugin: Plugin = (builder) => {
 
     const resolve: ConnectionFilterResolver = ({
       sourceAlias,
-      // fieldName,
       fieldValue,
       queryBuilder,
       parentFieldInfo,
@@ -126,7 +128,7 @@ const FilterRelationalAggregatesPlugin: Plugin = (builder) => {
       const sqlAggregateConditions = connectionFilterResolve(
         rest,
         foreignTableAlias,
-        foreignTableFilterTypeName,
+        foreignTableAggregateFilterTypeName,
         queryBuilder
       );
       //const sqlAggregateConditions = [sql.fragment`sum(saves) > 9`];
@@ -139,12 +141,12 @@ const FilterRelationalAggregatesPlugin: Plugin = (builder) => {
       return sqlSelectWhereKeysMatch;
     };
 
-    const aggregatesFieldName = "aggregates";
-    connectionFilterRegisterResolver(Self.name, aggregatesFieldName, resolve);
+    const fieldName = "aggregates";
+    connectionFilterRegisterResolver(Self.name, fieldName, resolve);
 
     return extend(fields, {
-      [aggregatesFieldName]: fieldWithHooks(
-        aggregatesFieldName,
+      [fieldName]: fieldWithHooks(
+        fieldName,
         {
           description: `Aggregates across related \`${foreignTableTypeName}\` match the filter criteria.`,
           type: AggregateType,
@@ -163,15 +165,14 @@ const FilterRelationalAggregatesPlugin: Plugin = (builder) => {
       graphql,
       newWithHooks,
       inflection,
-      //pgSql: sql,
-      //connectionFilterResolve,
-      //connectionFilterRegisterResolver,
-      //connectionFilterTypesByTypeName,
-      //connectionFilterType,
+      pgSql: sql,
+      connectionFilterResolve,
+      connectionFilterRegisterResolver,
     } = build;
     const {
       fieldWithHooks,
       scope: { isPgConnectionAggregateFilter },
+      Self,
     } = context;
     const pgIntrospection: PgEntity | undefined = context.scope.pgIntrospection;
     const pgAggregateSpecs: AggregateSpec[] = build.pgAggregateSpecs;
@@ -179,9 +180,10 @@ const FilterRelationalAggregatesPlugin: Plugin = (builder) => {
     if (
       !isPgConnectionAggregateFilter ||
       !pgIntrospection ||
-      pgIntrospection.kind !== PgEntityKind.CLASS
-    )
+      pgIntrospection.kind !== "class"
+    ) {
       return fields;
+    }
     const foreignTable = pgIntrospection;
 
     const foreignTableTypeName = inflection.tableType(foreignTable);
@@ -206,6 +208,25 @@ const FilterRelationalAggregatesPlugin: Plugin = (builder) => {
         return memo;
       }
       const fieldName = inflection.camelCase(spec.id);
+
+      const resolve: ConnectionFilterResolver = ({
+        sourceAlias,
+        fieldValue,
+        queryBuilder,
+        //parentFieldInfo,
+      }) => {
+        if (fieldValue == null) return null;
+        const sqlFrag = connectionFilterResolve(
+          fieldValue,
+          sourceAlias,
+          filterTypeName,
+          queryBuilder
+        );
+        console.log(sql.compile(sqlFrag));
+        return sqlFrag;
+      };
+      connectionFilterRegisterResolver(Self.name, fieldName, resolve);
+
       return extend(
         memo,
         {
@@ -226,10 +247,15 @@ const FilterRelationalAggregatesPlugin: Plugin = (builder) => {
       inflection,
       connectionFilterOperatorsType,
       newWithHooks,
+      pgSql: sql,
+      connectionFilterResolve,
+      connectionFilterRegisterResolver,
     } = build;
     const {
       scope: { isPgConnectionAggregateAggregateFilter },
+      Self,
     } = context;
+
     const spec: AggregateSpec | undefined =
       context.scope.pgConnectionAggregateFilterAggregateSpec;
     const pgIntrospection: PgEntity | undefined = context.scope.pgIntrospection;
@@ -238,7 +264,7 @@ const FilterRelationalAggregatesPlugin: Plugin = (builder) => {
       !isPgConnectionAggregateAggregateFilter ||
       !spec ||
       !pgIntrospection ||
-      pgIntrospection.kind !== PgEntityKind.CLASS
+      pgIntrospection.kind !== "class"
     ) {
       return fields;
     }
@@ -255,12 +281,38 @@ const FilterRelationalAggregatesPlugin: Plugin = (builder) => {
         const [pgType, pgTypeModifier] = spec.pgTypeAndModifierModifier
           ? spec.pgTypeAndModifierModifier(attr.type, attr.typeModifier)
           : [attr.type, attr.typeModifier];
-        const OperatorsType = connectionFilterOperatorsType(
+        const OperatorsType: GraphQLInputObjectType = connectionFilterOperatorsType(
           newWithHooks,
           pgType.id,
           pgTypeModifier
         );
         const fieldName = inflection.column(attr);
+
+        const resolve: ConnectionFilterResolver = ({
+          sourceAlias,
+          fieldName,
+          fieldValue,
+          queryBuilder,
+        }) => {
+          if (fieldValue == null) return null;
+          const sqlColumn = sql.query`${sourceAlias}.${sql.identifier(
+            attr.name
+          )}`;
+          const sqlAggregate = spec.sqlAggregateWrap(sqlColumn);
+          const frag = connectionFilterResolve(
+            fieldValue,
+            sqlAggregate,
+            OperatorsType.name,
+            queryBuilder,
+            pgType,
+            pgTypeModifier,
+            fieldName
+          );
+          console.dir(frag);
+          return frag;
+        };
+        connectionFilterRegisterResolver(Self.name, fieldName, resolve);
+
         return build.extend(memo, {
           [fieldName]: {
             type: OperatorsType,
