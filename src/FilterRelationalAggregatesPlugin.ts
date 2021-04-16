@@ -49,7 +49,9 @@ const FilterRelationalAggregatesPlugin: Plugin = (builder) => {
       foreignTableTypeName
     );
 
-    const AggregateType = (() => {
+    const filterFieldName = "filter";
+
+    const AggregateType: GraphQLInputObjectType | undefined = (() => {
       if (
         !(
           foreignTableAggregateFilterTypeName in connectionFilterTypesByTypeName
@@ -63,7 +65,7 @@ const FilterRelationalAggregatesPlugin: Plugin = (builder) => {
             description: `A filter to be used against aggregates of \`${foreignTableTypeName}\` object types.`,
             name: foreignTableAggregateFilterTypeName,
             fields: {
-              filter: {
+              [filterFieldName]: {
                 description: `A filter that must pass for the relevant \`${foreignTableTypeName}\` object to be included within the aggregate.`,
                 type: FilterType,
               },
@@ -118,13 +120,26 @@ const FilterRelationalAggregatesPlugin: Plugin = (builder) => {
       // Since we want `aggregates: {filter: {...}, sum: {...}}` at the same
       // level, we extract the filter for the `where` clause whilst
       // extracting all the other fields for the `select` clause.
-      const { filter, ...rest } = fieldValue as any;
-      const sqlFragment = connectionFilterResolve(
-        filter,
-        foreignTableAlias,
-        foreignTableFilterTypeName,
-        queryBuilder
-      );
+      const { [filterFieldName]: filter, ...rest } = fieldValue as any;
+      if (Object.keys(rest).length === 0) {
+        const fieldNames = Object.keys(AggregateType.getFields()).filter(
+          (n) => n !== filterFieldName
+        );
+        const lastFieldName = fieldNames.pop();
+        throw new Error(
+          `'aggregates' filter must specify at least one aggregate: ${
+            fieldNames.length > 0 ? `'${fieldNames.join("', '")}' or ` : ""
+          }'${lastFieldName}').`
+        );
+      }
+      const sqlFragment = filter
+        ? connectionFilterResolve(
+            filter,
+            foreignTableAlias,
+            foreignTableFilterTypeName,
+            queryBuilder
+          )
+        : sql.fragment`true`;
       const sqlAggregateConditions = connectionFilterResolve(
         rest,
         foreignTableAlias,
