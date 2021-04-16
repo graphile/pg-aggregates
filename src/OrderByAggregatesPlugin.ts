@@ -1,4 +1,4 @@
-import type { SQL, QueryBuilder, PgClass } from "graphile-build-pg";
+import type { SQL, QueryBuilder, PgClass, PgEntity } from "graphile-build-pg";
 import type { Plugin } from "graphile-build";
 import { AggregateSpec } from "./interfaces";
 
@@ -31,8 +31,10 @@ const OrderByAggregatesPlugin: Plugin = (builder) => {
     } = build;
     const pgAggregateSpecs: AggregateSpec[] = build.pgAggregateSpecs;
     const {
-      scope: { isPgRowSortEnum, pgIntrospection },
+      scope: { isPgRowSortEnum },
     } = context;
+
+    const pgIntrospection: PgEntity | undefined = context.scope.pgIntrospection;
 
     if (
       !isPgRowSortEnum ||
