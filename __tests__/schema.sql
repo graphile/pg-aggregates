@@ -75,6 +75,10 @@ create table match_stats (
   created_at timestamptz not null default now()
 );
 
+create view view_match_stats as (select * from match_stats);
+comment on view view_match_stats is E'@foreignKey (match_id) references matches|@fieldName match|@foreignFieldName viewMatchStats
+@foreignKey (player_id) references players|@fieldName player|@foreignFieldName viewMatchStats';
+
 create function match_stats_rating(s match_stats, goal_weight float = 3, save_weight float = 1, position_weight float = 4) returns float as $$
   select s.goals * goal_weight + s.saves * save_weight + (6 - s.team_position) * position_weight;
 $$ language sql strict stable;
