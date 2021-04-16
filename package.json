@@ -1,6 +1,6 @@
 {
   "name": "@graphile/pg-aggregates",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "description": "Aggregates support for PostGraphile",
   "main": "dist/index.js",
   "scripts": {
