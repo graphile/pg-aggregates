@@ -52,7 +52,7 @@ CLI usage via `--append-plugins`:
 postgraphile --append-plugins @graphile/pg-aggregates -c postgres://localhost/my_db ...
 ```
 
-Library usage via `applyPlugins`:
+Library usage via `appendPlugins`:
 
 ```ts
 import PgAggregatesPlugin from "@graphile/pg-aggregates";
