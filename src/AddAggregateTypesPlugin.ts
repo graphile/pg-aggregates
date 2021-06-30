@@ -198,7 +198,10 @@ const AddAggregateTypesPlugin: Plugin = (builder) => {
                       const sqlColumn = sql.fragment`${queryBuilder.getTableAlias()}.${sql.identifier(
                         attr.name
                       )}`;
-                      const sqlAggregate = spec.sqlAggregateWrap(sqlColumn);
+                      const sqlAggregate = spec.sqlAggregateWrap(
+                        sqlColumn,
+                        attr.type
+                      );
                       queryBuilder.select(
                         sqlAggregate,
                         // We need a unique alias that we can later reference in the resolver

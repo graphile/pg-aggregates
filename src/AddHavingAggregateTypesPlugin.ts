@@ -301,7 +301,8 @@ const AddHavingAggregateTypesPlugin: Plugin = (builder) => {
                                   attr.name
                                 )}`;
                                 const aggregateExpression = aggregateSpec.sqlAggregateWrap(
-                                  columnExpression
+                                  columnExpression,
+                                  attr.type
                                 );
                                 return (
                                   HavingFilterType.extensions?.graphile?.toSql?.(
@@ -427,7 +428,8 @@ const AddHavingAggregateTypesPlugin: Plugin = (builder) => {
                                     { implicitArgs: [tableAlias] }
                                   );
                                   const aggregateExpression = aggregateSpec.sqlAggregateWrap(
-                                    functionCallExpression
+                                    functionCallExpression,
+                                    type
                                   );
                                   return HavingFilterType.extensions.graphile.toSql(
                                     val.filter,

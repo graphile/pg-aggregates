@@ -31,7 +31,7 @@ export interface AggregateSpec {
   shouldApplyToEntity?: (entity: PgAttribute | PgProc) => boolean;
 
   /** Wraps the SQL in an aggregate call */
-  sqlAggregateWrap: (sqlFrag: SQL) => SQL;
+  sqlAggregateWrap: (sqlFrag: SQL, pgType: PgType) => SQL;
 
   /**
    * Used to translate the PostgreSQL return type for the aggregate; for example:
