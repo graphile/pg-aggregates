@@ -190,20 +190,79 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
     ];
 
     const pgAggregateGroupBySpecs: AggregateGroupBySpec[] = [
-      {
-        id: "truncated-to-hour",
+     {
+        id: "truncated-to-millennium",
         isSuitableType: (pgType) =>
-          /* timestamp or timestamptz */
           pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
-        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('hour', ${sqlFrag})`,
+        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('millennium', ${sqlFrag})`,
+      },
+      {
+        id: "truncated-to-century",
+        isSuitableType: (pgType) =>
+          pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
+        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('century', ${sqlFrag})`,
+      },
+      {
+        id: "truncated-to-decade",
+        isSuitableType: (pgType) =>
+          pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
+        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('decade', ${sqlFrag})`,
+      },
+      {
+        id: "truncated-to-year",
+        isSuitableType: (pgType) =>
+          pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
+        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('year', ${sqlFrag})`,
+      },
+      {
+        id: "truncated-to-month",
+        isSuitableType: (pgType) =>
+          pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
+        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('month', ${sqlFrag})`,
+      },
+      {
+        id: "truncated-to-week",
+        isSuitableType: (pgType) =>
+          pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
+        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('week', ${sqlFrag})`,
       },
       {
         id: "truncated-to-day",
         isSuitableType: (pgType) =>
-          /* timestamp or timestamptz */
           pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
         sqlWrap: (sqlFrag) => sql.fragment`date_trunc('day', ${sqlFrag})`,
       },
+      // WARNING: grouping by hour or less can easily create high cost queries, returning many rows
+      {
+        id: "truncated-to-hour",
+        isSuitableType: (pgType) =>
+          pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
+        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('hour', ${sqlFrag})`,
+      },
+      {
+        id: "truncated-to-minute",
+        isSuitableType: (pgType) =>
+          pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
+        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('minute', ${sqlFrag})`,
+      },
+      {
+        id: "truncated-to-second",
+        isSuitableType: (pgType) =>
+          pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
+        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('second', ${sqlFrag})`,
+      },
+      {
+        id: "truncated-to-milliseconds",
+        isSuitableType: (pgType) =>
+          pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
+        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('milliseconds', ${sqlFrag})`,
+      },
+      {
+        id: "truncated-to-microseconds",
+        isSuitableType: (pgType) =>
+          pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
+        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('microseconds', ${sqlFrag})`,
+      }
     ];
 
     return build.extend(build, {
