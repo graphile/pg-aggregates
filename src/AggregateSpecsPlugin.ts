@@ -190,24 +190,6 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
     ];
 
     const pgAggregateGroupBySpecs: AggregateGroupBySpec[] = [
-     {
-        id: "truncated-to-millennium",
-        isSuitableType: (pgType) =>
-          pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
-        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('millennium', ${sqlFrag})`,
-      },
-      {
-        id: "truncated-to-century",
-        isSuitableType: (pgType) =>
-          pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
-        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('century', ${sqlFrag})`,
-      },
-      {
-        id: "truncated-to-decade",
-        isSuitableType: (pgType) =>
-          pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
-        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('decade', ${sqlFrag})`,
-      },
       {
         id: "truncated-to-year",
         isSuitableType: (pgType) =>
@@ -239,30 +221,6 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
           pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
         sqlWrap: (sqlFrag) => sql.fragment`date_trunc('hour', ${sqlFrag})`,
       },
-      {
-        id: "truncated-to-minute",
-        isSuitableType: (pgType) =>
-          pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
-        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('minute', ${sqlFrag})`,
-      },
-      {
-        id: "truncated-to-second",
-        isSuitableType: (pgType) =>
-          pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
-        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('second', ${sqlFrag})`,
-      },
-      {
-        id: "truncated-to-milliseconds",
-        isSuitableType: (pgType) =>
-          pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
-        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('milliseconds', ${sqlFrag})`,
-      },
-      {
-        id: "truncated-to-microseconds",
-        isSuitableType: (pgType) =>
-          pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
-        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('microseconds', ${sqlFrag})`,
-      }
     ];
 
     return build.extend(build, {
