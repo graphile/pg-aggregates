@@ -197,6 +197,12 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
         sqlWrap: (sqlFrag) => sql.fragment`date_trunc('year', ${sqlFrag})`,
       },
       {
+        id: "truncated-to-quarter",
+        isSuitableType: (pgType) =>
+          pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
+        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('quarter', ${sqlFrag})`,
+      },
+      {
         id: "truncated-to-month",
         isSuitableType: (pgType) =>
           pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
