@@ -341,21 +341,91 @@ details/examples.
 
 ## Defining your own grouping derivatives
 
-You may add your own derivatives by adding a group by spec; see
-[src/AggregateSpecsPlugin.ts](src/AggregateSpecsPlugin.ts) for examples and more
-information. Derivative specs are also fairly straightforward:
+You may add your own derivatives by adding a group by spec to
+`build.pgAggregateGroupBySpecs` via a plugin. Derivative specs are fairly
+straightforward, for example here's the spec for "truncated-to-hour":
 
 ```ts
 const TIMESTAMP_OID = "1114";
 const TIMESTAMPTZ_OID = "1184";
 
 const truncatedToHourSpec = {
+  // A unique identifier for this spec, will be used to generate its name:
   id: "truncated-to-hour",
+
+  // A filter to determine which column/function return types this derivative
+  // is valid against:
   isSuitableType: (pgType) =>
     pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
+
+  // The actual derivative - given the SQL fragment `sqlFrag` which represents
+  // the column/function call, return a new SQL fragment that represents the
+  // derived value, in this case a truncated timestamp:
   sqlWrap: (sqlFrag) => sql.fragment`date_trunc('hour', ${sqlFrag})`,
 };
 ```
+
+Building that up with a few more different intervals into a full PostGraphile
+plugin, you might write something like:
+
+```ts
+// Constants from PostgreSQL
+const TIMESTAMP_OID = "1114";
+const TIMESTAMPTZ_OID = "1184";
+
+// Determine if a given type is a timestamp/timestamptz
+const isTimestamp = (pgType) =>
+  pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID;
+
+// Build a spec that truncates to the given interval
+const tsTruncateSpec = (sql, interval) => ({
+  // `id` has to be unique, derive it from the `interval`:
+  id: `truncated-to-${interval}`,
+
+  // Only apply to timestamp fields:
+  isSuitableType: isTimestamp,
+
+  // Given the column value represented by the SQL fragment `sqlFrag`, wrap it
+  // with a `date_trunc()` call, passing the relevant interval.
+  sqlWrap: (sqlFrag) =>
+    sql.fragment`date_trunc(${sql.literal(interval)}, ${sqlFrag})`,
+});
+
+// This is the PostGraphile plugin; see:
+// https://www.graphile.org/postgraphile/extending/
+const DateTruncAggregateGroupSpecsPlugin = (builder) => {
+  builder.hook("build", (build) => {
+    const { pgSql: sql } = build;
+
+    build.pgAggregateGroupBySpecs = [
+      // Copy all existing specs, except the ones we're replacing
+      ...build.pgAggregateGroupBySpecs.filter(
+        (spec) => !["truncated-to-day", "truncated-to-hour"].includes(spec.id)
+      ),
+
+      // Add our timestamp specs
+      tsTruncateSpec(sql, "year"),
+      tsTruncateSpec(sql, "month"),
+      tsTruncateSpec(sql, "week"),
+      tsTruncateSpec(sql, "day"),
+      tsTruncateSpec(sql, "hour"),
+      // Other values: microseconds, milliseconds, second, minute, quarter,
+      // decade, century, millennium.
+      // See https://www.postgresql.org/docs/current/functions-datetime.html#FUNCTIONS-DATETIME-TRUNC
+    ];
+
+    return build;
+  });
+};
+
+module.exports = DateTruncAggregateGroupSpecsPlugin;
+```
+
+Finally pass this plugin into PostGraphile via `--append-plugins` or
+`appendPlugins: [...]` - see https://www.graphile.org/postgraphile/extending/
+
+See [src/AggregateSpecsPlugin.ts](src/AggregateSpecsPlugin.ts) for examples and
+more information.
 
 ## Thanks
 
