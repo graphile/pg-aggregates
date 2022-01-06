@@ -258,10 +258,9 @@ query PlayersWith9OrMoreSavesInMatchesTheyScoredIn {
 
 ## Grouped aggregates
 
-We also support grouping your data via the value of one of your columns,
-no-additional-arguments computed columns, or a derivative thereof; and
-calculating aggregates over each of the matching groups. Out of the box we
-support two derivatives:
+We also support grouping your data via the value of one of your columns or a
+derivative thereof; and calculating aggregates over each of the matching groups.
+Out of the box we support two derivatives:
 
 - `truncated-to-hour` (applies to timestamp-like values) - truncates to the
   beginning of the (UTC) hour
