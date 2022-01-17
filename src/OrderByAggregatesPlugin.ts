@@ -1,4 +1,4 @@
-import type { SQL, QueryBuilder, PgClass, PgEntity } from "graphile-build-pg";
+import type { SQL, QueryBuilder, PgClass, PgEntity, PgProc } from "graphile-build-pg";
 import type { Plugin } from "graphile-build";
 import { AggregateSpec } from "./interfaces";
 
@@ -28,10 +28,11 @@ const OrderByAggregatesPlugin: Plugin = (builder) => {
       pgIntrospectionResultsByKind: introspectionResultsByKind,
       pgSql: sql,
       inflection,
+      pgGetComputedColumnDetails: getComputedColumnDetails,
     } = build;
     const pgAggregateSpecs: AggregateSpec[] = build.pgAggregateSpecs;
     const {
-      scope: { isPgRowSortEnum },
+      scope: { isPgRowSortEnum }
     } = context;
 
     const pgIntrospection: PgEntity | undefined = context.scope.pgIntrospection;
@@ -157,6 +158,70 @@ const OrderByAggregatesPlugin: Plugin = (builder) => {
           );
         });
       });
+
+      // proc aggregates
+      pgAggregateSpecs.forEach((spec) => {
+        introspectionResultsByKind.procedure.forEach((proc: PgProc) => {
+          if (proc.returnsSet) return
+
+          const type = introspectionResultsByKind.typeById[proc.returnTypeId];
+          if (
+            (spec.shouldApplyToEntity && !spec.shouldApplyToEntity(proc)) ||
+            !spec.isSuitableType(type)
+          ) return;
+          const computedColumnDetails = getComputedColumnDetails(
+            build,
+            table,
+            proc
+          );
+          if (!computedColumnDetails) return;
+          const { pseudoColumnName } = computedColumnDetails;
+          const fieldName = inflection.computedColumn(
+            pseudoColumnName,
+            proc,
+            table
+          );
+          
+          memo = build.extend(
+            memo,
+            orderByAscDesc(
+              inflection.orderByProcAggregateOfManyRelationByKeys(
+                keys,
+                table,
+                foreignTable,
+                constraint,
+                spec,
+                fieldName
+              ),
+              ({ queryBuilder }) => {
+                const foreignTableAlias = queryBuilder.getTableAlias();
+                const conditions: SQL[] = [];
+                keys.forEach((key, i) => {
+                  conditions.push(
+                    sql.fragment`${tableAlias}.${sql.identifier(
+                      key.name
+                    )} = ${foreignTableAlias}.${sql.identifier(
+                      foreignKeys[i].name
+                    )}`
+                  );
+                });
+                
+                return sql.fragment`(select ${spec.sqlAggregateWrap(
+                  sql.fragment`(${sql.identifier(
+                    proc.namespaceName,
+                    proc.name
+                  )}(${tableAlias}))`
+                )} from ${sql.identifier(
+                  table.namespaceName,
+                  table.name
+                )} ${tableAlias} where (${sql.join(conditions, " AND ")}))`;
+              },
+              false
+            ),
+            `Adding orderBy ${spec.id} of '${fieldName}' to '${foreignTable.namespaceName}.${foreignTable.name}' using constraint '${constraint.name}'`
+          );
+        })
+      })
 
       return memo;
     }, {} as OrderSpecs);

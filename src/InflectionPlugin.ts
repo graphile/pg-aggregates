@@ -108,4 +108,22 @@ export default makeAddInflectorsPlugin({
       `${relationName}-${aggregateSpec.id}-${this._columnName(column)}`
     );
   },
+  orderByProcAggregateOfManyRelationByKeys(
+    detailedKeys: Keys,
+    table: PgClass,
+    foreignTable: PgClass,
+    constraint: PgConstraint,
+    aggregateSpec: AggregateSpec,
+    name: string
+  ) {
+    const relationName = this.manyRelationByKeys(
+      detailedKeys,
+      table,
+      foreignTable,
+      constraint
+    );
+    return this.constantCase(
+      `${relationName}-${aggregateSpec.id}-${name}`
+    );
+  },
 });
