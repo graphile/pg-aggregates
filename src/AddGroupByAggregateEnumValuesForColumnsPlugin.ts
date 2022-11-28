@@ -1,4 +1,5 @@
 import { PgSourceUnique, PgTypeColumn } from "@dataplan/pg";
+import { SQL } from "pg-sql2";
 import { AggregateGroupBySpec } from "./interfaces";
 
 const { version } = require("../package.json");
@@ -11,13 +12,7 @@ const Plugin: GraphileConfig.Plugin = {
   schema: {
     hooks: {
       GraphQLEnumType_values(values, build, context) {
-        const {
-          extend,
-          inflection,
-          sqlCommentByAddingTags,
-          sql,
-          pgAggregateGroupBySpecs,
-        } = build;
+        const { extend, inflection, sql, pgAggregateGroupBySpecs } = build;
         const {
           scope: { isPgAggregateGroupEnum, pgTypeSource: table },
         } = context;
@@ -54,53 +49,45 @@ const Plugin: GraphileConfig.Plugin = {
                     value: {
                       spec: (tableAlias: SQL) =>
                         sql.fragment`${tableAlias}.${sql.identifier(
-                          attr.name
+                          columnName
                         )}`,
                     },
                   },
                 },
-                `Adding groupBy enum value for ${describePgEntity(
-                  attr
-                )}. You can rename this field with a 'Smart Comment':\n\n  ${sqlCommentByAddingTags(
-                  attr,
-                  {
-                    name: "newNameHere",
-                  }
-                )}`
+                `Adding groupBy enum value for ${table.name}.${columnName}.`
               );
 
-              pgAggregateGroupBySpecs.forEach((spec) => {
+              pgAggregateGroupBySpecs.forEach((aggregateGroupBySpec) => {
                 if (
-                  (!spec.shouldApplyToEntity ||
-                    spec.shouldApplyToEntity(attr)) &&
-                  spec.isSuitableType(attr.type)
+                  (!aggregateGroupBySpec.shouldApplyToEntity ||
+                    aggregateGroupBySpec.shouldApplyToEntity({
+                      type: "column",
+                      codec: table.codec,
+                      columnName,
+                    })) &&
+                  aggregateGroupBySpec.isSuitableType(column.codec)
                 ) {
                   const fieldName =
-                    inflection.aggregateGroupByColumnDerivativeEnum(attr, spec);
+                    inflection.aggregateGroupByColumnDerivativeEnum({
+                      source: table,
+                      columnName,
+                      aggregateGroupBySpec,
+                    });
                   memo = extend(
                     memo,
                     {
                       [fieldName]: {
                         value: {
-                          spec: (tableAlias: SQL) =>
-                            spec.sqlWrap(
+                          aggregateGroupBySpec: (tableAlias: SQL) =>
+                            aggregateGroupBySpec.sqlWrap(
                               sql.fragment`${tableAlias}.${sql.identifier(
-                                attr.name
+                                columnName
                               )}`
                             ),
                         },
                       },
                     },
-                    `Adding groupBy enum value for '${
-                      spec.id
-                    }' derivative of ${describePgEntity(
-                      attr
-                    )}. You can rename this field with a 'Smart Comment':\n\n  ${sqlCommentByAddingTags(
-                      attr,
-                      {
-                        name: "newNameHere",
-                      }
-                    )}`
+                    `Adding groupBy enum value for '${aggregateGroupBySpec.id}' derivative of ${table.name}.${columnName}.`
                   );
                 }
               });

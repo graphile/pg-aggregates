@@ -35,7 +35,9 @@ declare global {
 export type AggregateTargetEntity =
   | {
       type: "column";
+      /** table codec - NOT column codec! */
       codec: PgTypeCodec<any, any, any, any>;
+      /** column name available on this codec */
       columnName: string;
       source?: never;
     }

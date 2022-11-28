@@ -96,7 +96,7 @@ declare global {
         details: {
           source: PgSource<any, any, any, any>;
           columnName: string;
-          spec: AggregateGroupBySpec;
+          aggregateGroupBySpec: AggregateGroupBySpec;
         }
       ): string;
       orderByCountOfManyRelationByKeys(
@@ -190,7 +190,7 @@ export const PgAggregatesInflectorsPlugin: GraphileConfig.Plugin = {
           `${this._columnName({
             columnName: details.columnName,
             codec: details.source.codec,
-          })}-${details.spec.id}`
+          })}-${details.aggregateGroupBySpec.id}`
         );
       },
       orderByCountOfManyRelationByKeys(preset, details) {

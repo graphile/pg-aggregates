@@ -11,7 +11,6 @@ const Plugin: GraphileConfig.Plugin = {
         const {
           graphql: { GraphQLEnumType },
           inflection,
-          sqlCommentByAddingTags,
         } = build;
 
         for (const source of build.input.pgSources) {
@@ -34,14 +33,6 @@ const Plugin: GraphileConfig.Plugin = {
           build.registerEnumType(
             inflection.aggregateGroupByType({ source }),
             {
-              __origin: `Adding connection "groupBy" enum type for ${
-                source.name
-              }. You can rename the table's GraphQL type via a 'Smart Comment':\n\n  ${sqlCommentByAddingTags(
-                source,
-                {
-                  name: "newNameHere",
-                }
-              )}`,
               pgTypeSource: source,
               isPgAggregateGroupEnum: true,
             },
@@ -55,7 +46,7 @@ const Plugin: GraphileConfig.Plugin = {
                 /* no default values, these will be added via hooks */
               },
             }),
-            `PgAggregatesAddGroupByAggregateEnumsPlugin for ${source.name}`
+            `Adding connection "groupBy" enum type for ${source.name}.`
           );
         }
         return _;
