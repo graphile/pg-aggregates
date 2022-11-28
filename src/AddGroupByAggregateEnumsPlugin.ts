@@ -1,57 +1,67 @@
-import type { Plugin } from "graphile-build";
-import type { PgClass } from "graphile-build-pg";
+const { version } = require("../package.json");
 
-const AddGroupByAggregateEnumsPlugin: Plugin = (builder) => {
-  // Create the group by enums for each table
-  builder.hook(
-    "init",
-    (_, build) => {
-      const {
-        newWithHooks,
-        pgIntrospectionResultsByKind: introspectionResultsByKind,
-        graphql: { GraphQLEnumType },
-        inflection,
-        pgOmit: omit,
-        sqlCommentByAddingTags,
-        describePgEntity,
-      } = build;
-      introspectionResultsByKind.class.forEach((table: PgClass) => {
-        if (!table.isSelectable || omit(table, "order")) return;
-        if (!table.namespace) return;
+const Plugin: GraphileConfig.Plugin = {
+  name: "PgAggregatesAddGroupByAggregateEnumsPlugin",
+  version,
 
-        const tableTypeName = inflection.tableType(table);
-        /* const TableGroupByType = */
-        newWithHooks(
-          GraphQLEnumType,
-          {
-            name: inflection.aggregateGroupByType(table),
-            description: build.wrapDescription(
-              `Grouping methods for \`${tableTypeName}\` for usage during aggregation.`,
-              "type"
-            ),
-            values: {
-              /* no default values, these will be added via hooks */
+  schema: {
+    hooks: {
+      // Create the group by enums for each table
+      init(_, build) {
+        const {
+          graphql: { GraphQLEnumType },
+          inflection,
+          sqlCommentByAddingTags,
+        } = build;
+
+        for (const source of build.input.pgSources) {
+          if (source.parameters || !source.codec.columns || source.isUnique) {
+            continue;
+          }
+          const behavior = build.pgGetBehavior([
+            source.codec.extensions,
+            source.extensions,
+          ]);
+          if (!build.behavior.matches(behavior, "select", "select")) {
+            continue;
+          }
+          if (!build.behavior.matches(behavior, "order", "order")) {
+            continue;
+          }
+
+          const tableTypeName = inflection.tableType(source.codec);
+          /* const TableGroupByType = */
+          build.registerEnumType(
+            inflection.aggregateGroupByType({ source }),
+            {
+              __origin: `Adding connection "groupBy" enum type for ${
+                source.name
+              }. You can rename the table's GraphQL type via a 'Smart Comment':\n\n  ${sqlCommentByAddingTags(
+                source,
+                {
+                  name: "newNameHere",
+                }
+              )}`,
+              pgTypeSource: source,
+              isPgAggregateGroupEnum: true,
             },
-          },
-          {
-            __origin: `Adding connection "groupBy" enum type for ${describePgEntity(
-              table
-            )}. You can rename the table's GraphQL type via a 'Smart Comment':\n\n  ${sqlCommentByAddingTags(
-              table,
-              {
-                name: "newNameHere",
-              }
-            )}`,
-            pgIntrospection: table,
-            isPgAggregateGroupEnum: true,
-          },
-          true /* ignore type if no values */
-        );
-      });
-      return _;
+            () => ({
+              name: inflection.aggregateGroupByType({ source }),
+              description: build.wrapDescription(
+                `Grouping methods for \`${tableTypeName}\` for usage during aggregation.`,
+                "type"
+              ),
+              values: {
+                /* no default values, these will be added via hooks */
+              },
+            }),
+            `PgAggregatesAddGroupByAggregateEnumsPlugin for ${source.name}`
+          );
+        }
+        return _;
+      },
     },
-    ["AddGroupByAggregateEnumsPlugin"]
-  );
+  },
 };
 
-export default AddGroupByAggregateEnumsPlugin;
+export { Plugin as PgAggregatesAddGroupByAggregateEnumsPlugin };

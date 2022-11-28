@@ -16,13 +16,6 @@ import {
 
 const { version } = require("../package.json");
 
-declare module "@dataplan/pg" {
-  interface PgTypeCodecExtensions {
-    isNumberLike?: boolean;
-    oid?: string;
-  }
-}
-
 export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
   name: "PgAggregatesSpecsPlugin",
   version,

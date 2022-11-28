@@ -1,15 +1,60 @@
-import { PgTypeCodec } from "@dataplan/pg";
-import type { PgAttribute, PgType, SQL, PgProc } from "graphile-build-pg";
+import type { PgSource, PgTypeCodec } from "@dataplan/pg";
+import type { SQL } from "pg-sql2";
+
+declare module "@dataplan/pg" {
+  interface PgTypeCodecExtensions {
+    isNumberLike?: boolean;
+    oid?: string;
+  }
+}
+
+declare global {
+  namespace GraphileBuild {
+    interface Build {
+      pgAggregateSpecs: AggregateSpec[];
+      pgAggregateGroupBySpecs: AggregateGroupBySpec[];
+    }
+    interface ScopeObject {
+      isPgAggregateContainerType?: boolean;
+      isPgAggregateType?: boolean;
+      pgAggregateSpec?: AggregateSpec;
+    }
+    interface ScopeObjectFieldsField {
+      isPgAggregateField?: boolean;
+      isPgConnectionAggregateField?: boolean;
+      // TODO: remove this, it's redundant vs pgTypeSource?
+      pgFieldSource?: PgSource<any, any, any, any>;
+    }
+    interface ScopeEnum {
+      pgTypeSource?: PgSource<any, any, any, any>;
+      isPgAggregateGroupEnum?: boolean;
+    }
+  }
+}
+
+export type AggregateTargetEntity =
+  | {
+      type: "column";
+      codec: PgTypeCodec<any, any, any, any>;
+      columnName: string;
+      source?: never;
+    }
+  | {
+      type: "computedColumn";
+      source: PgSource<any, any, any, any>;
+      codec?: never;
+      columnName?: never;
+    };
 
 export interface AggregateGroupBySpec {
   /** Must not change since it's used in type names/etc */
   id: string; // e.g. 'truncated-to-hour'
 
   /** Return true if we can process this type */
-  isSuitableType: (type: PgType) => boolean;
+  isSuitableType: (codec: PgTypeCodec<any, any, any, any>) => boolean;
 
   /** Return false if we cannot process this attribute (default: true) */
-  shouldApplyToEntity?: (entity: PgAttribute | PgProc) => boolean;
+  shouldApplyToEntity?: (entity: AggregateTargetEntity) => boolean;
 
   /** Wraps the SQL to return a derivative (e.g. sqlFrag => sql.fragment`date_trunc('hour', ${sqlFrag})`) */
   sqlWrap: (sqlFrag: SQL) => SQL;
@@ -26,10 +71,10 @@ export interface AggregateSpec {
   HumanLabel: string;
 
   /** Return true if we can process this type */
-  isSuitableType: (type: PgType) => boolean;
+  isSuitableType: (codec: PgTypeCodec<any, any, any, any>) => boolean;
 
   /** Return false if we cannot process this attribute (default: true) */
-  shouldApplyToEntity?: (entity: PgAttribute | PgProc) => boolean;
+  shouldApplyToEntity?: (entity: AggregateTargetEntity) => boolean;
 
   /** Wraps the SQL in an aggregate call */
   sqlAggregateWrap: (sqlFrag: SQL) => SQL;
