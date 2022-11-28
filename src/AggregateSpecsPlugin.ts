@@ -16,6 +16,9 @@ import {
 
 const { version } = require("../package.json");
 
+const isNumberLike = (codec: PgTypeCodec<any, any, any, any>): boolean =>
+  !!codec.extensions?.isNumberLike;
+
 export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
   name: "PgAggregatesSpecsPlugin",
   version,
@@ -42,10 +45,6 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
         if (!sql) {
           throw new Error(`build.sql is required!`);
         }
-
-        const isNumberLike = (
-          codec: PgTypeCodec<any, any, any, any>
-        ): boolean => !!codec.extensions?.isTableLike;
 
         /** Maps from the data type of the column to the data type of the sum aggregate */
         /** BigFloat is our fallback type; it should be valid for almost all numeric types */
@@ -214,16 +213,14 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
         const pgAggregateGroupBySpecs: AggregateGroupBySpec[] = [
           {
             id: "truncated-to-hour",
-            isSuitableType: (pgType) =>
-              /* timestamp or timestamptz */
-              pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
+            isSuitableType: (codec) =>
+              codec === TYPES.timestamp || codec === TYPES.timestamptz,
             sqlWrap: (sqlFrag) => sql`date_trunc('hour', ${sqlFrag})`,
           },
           {
             id: "truncated-to-day",
-            isSuitableType: (pgType) =>
-              /* timestamp or timestamptz */
-              pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
+            isSuitableType: (codec) =>
+              codec === TYPES.timestamp || codec === TYPES.timestamptz,
             sqlWrap: (sqlFrag) => sql`date_trunc('day', ${sqlFrag})`,
           },
         ];
