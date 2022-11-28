@@ -1,3 +1,4 @@
+import { PgTypeCodec } from "@dataplan/pg";
 import type { PgAttribute, PgType, SQL, PgProc } from "graphile-build-pg";
 
 export interface AggregateGroupBySpec {
@@ -40,10 +41,9 @@ export interface AggregateSpec {
    * - Average of int should be float
    * - Median of int should be int
    */
-  pgTypeAndModifierModifier?: (
-    pgType: PgType,
-    pgTypeModifier: null | string | number
-  ) => [PgType, null | string | number];
+  pgTypeCodecModifier?: (
+    codec: PgTypeCodec<any, any, any, any>
+  ) => PgTypeCodec<any, any, any, any>;
 
   /** Set true if the result is guaranteed to be non-null */
   isNonNull?: boolean;

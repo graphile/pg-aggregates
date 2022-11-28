@@ -1,216 +1,249 @@
-import type { Plugin } from "graphile-build";
-import type { PgType } from "graphile-build-pg";
-import { AggregateSpec, AggregateGroupBySpec } from "./interfaces";
+import { PgTypeCodec, TYPES } from "@dataplan/pg";
+import {
+  AggregateSpec,
+  AggregateGroupBySpec,
+  BIGINT_OID,
+  INT2_OID,
+  INT4_OID,
+  NUMERIC_OID,
+  FLOAT4_OID,
+  FLOAT8_OID,
+  INTERVAL_OID,
+  MONEY_OID,
+  TIMESTAMP_OID,
+  TIMESTAMPTZ_OID,
+} from "./interfaces";
 
-const TIMESTAMP_OID = "1114";
-const TIMESTAMPTZ_OID = "1184";
+const { version } = require("../package.json");
 
-const SMALLINT_OID = "21";
-const BIGINT_OID = "20";
-const INTEGER_OID = "23";
-const NUMERIC_OID = "1700";
-const REAL_OID = "700";
-const DOUBLE_PRECISION_OID = "701";
-const INTERVAL_OID = "1186";
-const MONEY_OID = "790";
+declare module "@dataplan/pg" {
+  interface PgTypeCodecExtensions {
+    isNumberLike?: boolean;
+    oid?: string;
+  }
+}
 
-const AggregateSpecsPlugin: Plugin = (builder) => {
-  builder.hook("build", (build) => {
-    const { pgSql: sql } = build;
-    const isNumberLike = (pgType: PgType): boolean => pgType.category === "N";
-    /** Maps from the data type of the column to the data type of the sum aggregate */
-    /** BigFloat is our fallback type; it should be valid for almost all numeric types */
-    const convertWithMapAndFallback = (
-      dataTypeToAggregateTypeMap: { [key: string]: string },
-      fallback: string
-    ) => {
-      return (
-        pgType: PgType,
-        _pgTypeModifier: number | string | null
-      ): [PgType, null | number | string] => {
-        const targetTypeId = dataTypeToAggregateTypeMap[pgType.id] || fallback;
+export const AggregateSpecsPlugin: GraphileConfig.Plugin = {
+  name: "AggregateSpecsPlugin",
+  version,
 
-        const targetType = build.pgIntrospectionResultsByKind.type.find(
-          (t: PgType) => t.id === targetTypeId
-        );
+  gather: {
+    hooks: {
+      pgCodecs_PgTypeCodec(_info, event) {
+        const { pgType, pgCodec } = event;
+        if (pgType.typcategory === "N") {
+          if (pgCodec.extensions) {
+            pgCodec.extensions = Object.create(null);
+          }
+          pgCodec.extensions!.isNumberLike = true;
+          pgCodec.extensions!.oid = pgType._id;
+        }
+      },
+    },
+  },
 
-        if (!targetType) {
-          throw new Error(
-            `Could not find PostgreSQL type with oid '${targetTypeId}' whilst processing aggregate.`
-          );
+  schema: {
+    hooks: {
+      build(build) {
+        const { sql } = build;
+        if (!sql) {
+          throw new Error(`build.sql is required!`);
         }
 
-        return [targetType, null];
-      };
-    };
-    const pgAggregateSpecs: AggregateSpec[] = [
-      {
-        id: "sum",
-        humanLabel: "sum",
-        HumanLabel: "Sum",
-        isSuitableType: isNumberLike,
-        // I've wrapped it in `coalesce` so that it cannot be null
-        sqlAggregateWrap: (sqlFrag) =>
-          sql.fragment`coalesce(sum(${sqlFrag}), 0)`,
-        isNonNull: true,
+        const isNumberLike = (
+          codec: PgTypeCodec<any, any, any, any>
+        ): boolean => !!codec.extensions?.isTableLike;
 
-        // A SUM(...) often ends up significantly larger than any individual
-        // value; see
-        // https://www.postgresql.org/docs/current/functions-aggregate.html for
-        // how the sum aggregate changes result type.
-        pgTypeAndModifierModifier: convertWithMapAndFallback(
-          {
-            [SMALLINT_OID]: BIGINT_OID, // smallint -> bigint
-            [INTEGER_OID]: BIGINT_OID, // integer -> bigint
-            [BIGINT_OID]: NUMERIC_OID, // bigint -> numeric
-            [REAL_OID]: REAL_OID, // real -> real
-            [DOUBLE_PRECISION_OID]: DOUBLE_PRECISION_OID, // double precision -> double precision
-            [INTERVAL_OID]: INTERVAL_OID, // interval -> interval
-            [MONEY_OID]: MONEY_OID, // money -> money
+        /** Maps from the data type of the column to the data type of the sum aggregate */
+        /** BigFloat is our fallback type; it should be valid for almost all numeric types */
+        const convertWithMapAndFallback = (
+          dataTypeToAggregateTypeMap: {
+            [key: string]: PgTypeCodec<any, any, any, any>;
           },
-          NUMERIC_OID /* numeric */
-        ),
-      },
-      {
-        id: "distinctCount",
-        humanLabel: "distinct count",
-        HumanLabel: "Distinct count",
-        isSuitableType: () => true,
-        sqlAggregateWrap: (sqlFrag) => sql.fragment`count(distinct ${sqlFrag})`,
-        pgTypeAndModifierModifier: convertWithMapAndFallback(
-          {},
-          BIGINT_OID /* always use bigint */
-        ),
-      },
-      {
-        id: "min",
-        humanLabel: "minimum",
-        HumanLabel: "Minimum",
-        isSuitableType: isNumberLike,
-        sqlAggregateWrap: (sqlFrag) => sql.fragment`min(${sqlFrag})`,
-      },
-      {
-        id: "max",
-        humanLabel: "maximum",
-        HumanLabel: "Maximum",
-        isSuitableType: isNumberLike,
-        sqlAggregateWrap: (sqlFrag) => sql.fragment`max(${sqlFrag})`,
-      },
-      {
-        id: "average",
-        humanLabel: "mean average",
-        HumanLabel: "Mean average",
-        isSuitableType: isNumberLike,
-        sqlAggregateWrap: (sqlFrag) => sql.fragment`avg(${sqlFrag})`,
+          fallback: PgTypeCodec<any, any, any, any>
+        ) => {
+          return (
+            codec: PgTypeCodec<any, any, any, any>
+          ): PgTypeCodec<any, any, any, any> => {
+            const oid = codec.extensions?.oid;
+            const targetType =
+              (oid ? dataTypeToAggregateTypeMap[oid] : null) ?? fallback;
 
-        // An AVG(...) ends up more precise than any individual value; see
-        // https://www.postgresql.org/docs/current/functions-aggregate.html for
-        // how the avg aggregate changes result type.
-        pgTypeAndModifierModifier: convertWithMapAndFallback(
+            return targetType;
+          };
+        };
+
+        const pgAggregateSpecs: AggregateSpec[] = [
           {
-            [SMALLINT_OID]: NUMERIC_OID, // smallint -> numeric
-            [INTEGER_OID]: NUMERIC_OID, // integer -> numeric
-            [BIGINT_OID]: NUMERIC_OID, // bigint -> numeric
-            [NUMERIC_OID]: NUMERIC_OID, // numeric -> numeric
-            [REAL_OID]: DOUBLE_PRECISION_OID, // real -> double precision
-            [DOUBLE_PRECISION_OID]: DOUBLE_PRECISION_OID, // double precision -> double precision
-            [INTERVAL_OID]: INTERVAL_OID, // interval -> interval
-          },
-          "1700" /* numeric */
-        ),
-      },
-      {
-        id: "stddevSample",
-        humanLabel: "sample standard deviation",
-        HumanLabel: "Sample standard deviation",
-        isSuitableType: isNumberLike,
-        sqlAggregateWrap: (sqlFrag) => sql.fragment`stddev_samp(${sqlFrag})`,
+            id: "sum",
+            humanLabel: "sum",
+            HumanLabel: "Sum",
+            isSuitableType: isNumberLike,
+            // I've wrapped it in `coalesce` so that it cannot be null
+            sqlAggregateWrap: (sqlFrag) => sql`coalesce(sum(${sqlFrag}), 0)`,
+            isNonNull: true,
 
-        // See https://www.postgresql.org/docs/current/functions-aggregate.html
-        // for how this aggregate changes result type.
-        pgTypeAndModifierModifier: convertWithMapAndFallback(
+            // A SUM(...) often ends up significantly larger than any individual
+            // value; see
+            // https://www.postgresql.org/docs/current/functions-aggregate.html for
+            // how the sum aggregate changes result type.
+            pgTypeCodecModifier: convertWithMapAndFallback(
+              {
+                [INT2_OID]: TYPES.bigint, // smallint -> bigint
+                [INT4_OID]: TYPES.bigint, // integer -> bigint
+                [BIGINT_OID]: TYPES.numeric, // bigint -> numeric
+                [FLOAT4_OID]: TYPES.float4, // real -> real
+                [FLOAT8_OID]: TYPES.float, // double precision -> double precision
+                [INTERVAL_OID]: TYPES.interval, // interval -> interval
+                [MONEY_OID]: TYPES.money, // money -> money
+              },
+              TYPES.numeric /* numeric */
+            ),
+          },
           {
-            [REAL_OID]: DOUBLE_PRECISION_OID, // real -> double precision
-            [DOUBLE_PRECISION_OID]: DOUBLE_PRECISION_OID, // double precision -> double precision
+            id: "distinctCount",
+            humanLabel: "distinct count",
+            HumanLabel: "Distinct count",
+            isSuitableType: () => true,
+            sqlAggregateWrap: (sqlFrag) => sql`count(distinct ${sqlFrag})`,
+            pgTypeCodecModifier: convertWithMapAndFallback(
+              {},
+              TYPES.bigint /* always use bigint */
+            ),
           },
-          NUMERIC_OID /* numeric */
-        ),
-      },
-      {
-        id: "stddevPopulation",
-        humanLabel: "population standard deviation",
-        HumanLabel: "Population standard deviation",
-        isSuitableType: isNumberLike,
-        sqlAggregateWrap: (sqlFrag) => sql.fragment`stddev_pop(${sqlFrag})`,
-
-        // See https://www.postgresql.org/docs/current/functions-aggregate.html
-        // for how this aggregate changes result type.
-        pgTypeAndModifierModifier: convertWithMapAndFallback(
           {
-            [REAL_OID]: DOUBLE_PRECISION_OID, // real -> double precision
-            [DOUBLE_PRECISION_OID]: DOUBLE_PRECISION_OID, // double precision -> double precision
+            id: "min",
+            humanLabel: "minimum",
+            HumanLabel: "Minimum",
+            isSuitableType: isNumberLike,
+            sqlAggregateWrap: (sqlFrag) => sql`min(${sqlFrag})`,
           },
-          NUMERIC_OID /* numeric */
-        ),
-      },
-      {
-        id: "varianceSample",
-        humanLabel: "sample variance",
-        HumanLabel: "Sample variance",
-        isSuitableType: isNumberLike,
-        sqlAggregateWrap: (sqlFrag) => sql.fragment`var_samp(${sqlFrag})`,
-
-        // See https://www.postgresql.org/docs/current/functions-aggregate.html
-        // for how this aggregate changes result type.
-        pgTypeAndModifierModifier: convertWithMapAndFallback(
           {
-            [REAL_OID]: DOUBLE_PRECISION_OID, // real -> double precision
-            [DOUBLE_PRECISION_OID]: DOUBLE_PRECISION_OID, // double precision -> double precision
+            id: "max",
+            humanLabel: "maximum",
+            HumanLabel: "Maximum",
+            isSuitableType: isNumberLike,
+            sqlAggregateWrap: (sqlFrag) => sql`max(${sqlFrag})`,
           },
-          NUMERIC_OID /* numeric */
-        ),
-      },
-      {
-        id: "variancePopulation",
-        humanLabel: "population variance",
-        HumanLabel: "Population variance",
-        isSuitableType: isNumberLike,
-        sqlAggregateWrap: (sqlFrag) => sql.fragment`var_pop(${sqlFrag})`,
-
-        // See https://www.postgresql.org/docs/current/functions-aggregate.html
-        // for how this aggregate changes result type.
-        pgTypeAndModifierModifier: convertWithMapAndFallback(
           {
-            [REAL_OID]: DOUBLE_PRECISION_OID, // real -> double precision
-            [DOUBLE_PRECISION_OID]: DOUBLE_PRECISION_OID, // double precision -> double precision
+            id: "average",
+            humanLabel: "mean average",
+            HumanLabel: "Mean average",
+            isSuitableType: isNumberLike,
+            sqlAggregateWrap: (sqlFrag) => sql`avg(${sqlFrag})`,
+
+            // An AVG(...) ends up more precise than any individual value; see
+            // https://www.postgresql.org/docs/current/functions-aggregate.html for
+            // how the avg aggregate changes result type.
+            pgTypeCodecModifier: convertWithMapAndFallback(
+              {
+                [INT2_OID]: TYPES.numeric, // smallint -> numeric
+                [INT4_OID]: TYPES.numeric, // integer -> numeric
+                [BIGINT_OID]: TYPES.numeric, // bigint -> numeric
+                [NUMERIC_OID]: TYPES.numeric, // numeric -> numeric
+                [FLOAT4_OID]: TYPES.float, // real -> double precision
+                [FLOAT8_OID]: TYPES.float, // double precision -> double precision
+                [INTERVAL_OID]: TYPES.interval, // interval -> interval
+              },
+              TYPES.numeric /* numeric */
+            ),
           },
-          NUMERIC_OID /* numeric */
-        ),
-      },
-    ];
+          {
+            id: "stddevSample",
+            humanLabel: "sample standard deviation",
+            HumanLabel: "Sample standard deviation",
+            isSuitableType: isNumberLike,
+            sqlAggregateWrap: (sqlFrag) => sql`stddev_samp(${sqlFrag})`,
 
-    const pgAggregateGroupBySpecs: AggregateGroupBySpec[] = [
-      {
-        id: "truncated-to-hour",
-        isSuitableType: (pgType) =>
-          /* timestamp or timestamptz */
-          pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
-        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('hour', ${sqlFrag})`,
-      },
-      {
-        id: "truncated-to-day",
-        isSuitableType: (pgType) =>
-          /* timestamp or timestamptz */
-          pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
-        sqlWrap: (sqlFrag) => sql.fragment`date_trunc('day', ${sqlFrag})`,
-      },
-    ];
+            // See https://www.postgresql.org/docs/current/functions-aggregate.html
+            // for how this aggregate changes result type.
+            pgTypeCodecModifier: convertWithMapAndFallback(
+              {
+                [FLOAT4_OID]: TYPES.float, // real -> double precision
+                [FLOAT8_OID]: TYPES.float, // double precision -> double precision
+              },
+              TYPES.numeric /* numeric */
+            ),
+          },
+          {
+            id: "stddevPopulation",
+            humanLabel: "population standard deviation",
+            HumanLabel: "Population standard deviation",
+            isSuitableType: isNumberLike,
+            sqlAggregateWrap: (sqlFrag) => sql`stddev_pop(${sqlFrag})`,
 
-    return build.extend(build, {
-      pgAggregateSpecs,
-      pgAggregateGroupBySpecs,
-    });
-  });
+            // See https://www.postgresql.org/docs/current/functions-aggregate.html
+            // for how this aggregate changes result type.
+            pgTypeCodecModifier: convertWithMapAndFallback(
+              {
+                [FLOAT4_OID]: TYPES.float, // real -> double precision
+                [FLOAT8_OID]: TYPES.float, // double precision -> double precision
+              },
+              TYPES.numeric /* numeric */
+            ),
+          },
+          {
+            id: "varianceSample",
+            humanLabel: "sample variance",
+            HumanLabel: "Sample variance",
+            isSuitableType: isNumberLike,
+            sqlAggregateWrap: (sqlFrag) => sql`var_samp(${sqlFrag})`,
+
+            // See https://www.postgresql.org/docs/current/functions-aggregate.html
+            // for how this aggregate changes result type.
+            pgTypeCodecModifier: convertWithMapAndFallback(
+              {
+                [FLOAT4_OID]: TYPES.float, // real -> double precision
+                [FLOAT8_OID]: TYPES.float, // double precision -> double precision
+              },
+              TYPES.numeric /* numeric */
+            ),
+          },
+          {
+            id: "variancePopulation",
+            humanLabel: "population variance",
+            HumanLabel: "Population variance",
+            isSuitableType: isNumberLike,
+            sqlAggregateWrap: (sqlFrag) => sql`var_pop(${sqlFrag})`,
+
+            // See https://www.postgresql.org/docs/current/functions-aggregate.html
+            // for how this aggregate changes result type.
+            pgTypeCodecModifier: convertWithMapAndFallback(
+              {
+                [FLOAT4_OID]: TYPES.float, // real -> double precision
+                [FLOAT8_OID]: TYPES.float, // double precision -> double precision
+              },
+              TYPES.numeric /* numeric */
+            ),
+          },
+        ];
+
+        const pgAggregateGroupBySpecs: AggregateGroupBySpec[] = [
+          {
+            id: "truncated-to-hour",
+            isSuitableType: (pgType) =>
+              /* timestamp or timestamptz */
+              pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
+            sqlWrap: (sqlFrag) => sql`date_trunc('hour', ${sqlFrag})`,
+          },
+          {
+            id: "truncated-to-day",
+            isSuitableType: (pgType) =>
+              /* timestamp or timestamptz */
+              pgType.id === TIMESTAMP_OID || pgType.id === TIMESTAMPTZ_OID,
+            sqlWrap: (sqlFrag) => sql`date_trunc('day', ${sqlFrag})`,
+          },
+        ];
+
+        return build.extend(
+          build,
+          {
+            pgAggregateSpecs,
+            pgAggregateGroupBySpecs,
+          },
+          "Adding aggregate specs to build"
+        );
+      },
+    },
+  },
 };
-
-export default AggregateSpecsPlugin;
