@@ -7,7 +7,11 @@ import {
   PgTypeCodec,
   PgTypeColumn,
 } from "@dataplan/pg";
-import { AggregateGroupBySpec, AggregateSpec } from "./interfaces";
+import {
+  AggregateGroupBySpec,
+  AggregateSpec,
+  CORE_HAVING_FILTER_SPECS,
+} from "./interfaces";
 
 const { version } = require("../package.json");
 
@@ -115,6 +119,11 @@ declare global {
           columnName: string;
         }
       ): string;
+
+      aggregateHavingFilterInputType(
+        this: Inflection,
+        spec: typeof CORE_HAVING_FILTER_SPECS[number]
+      ): string;
     }
   }
 }
@@ -208,6 +217,9 @@ export const PgAggregatesInflectorsPlugin: GraphileConfig.Plugin = {
             columnName: details.columnName,
           })}`
         );
+      },
+      aggregateHavingFilterInputType(spec) {
+        return this.upperCamelCase(`having-${spec}-filter`);
       },
     },
   },

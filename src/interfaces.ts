@@ -19,6 +19,12 @@ declare global {
       isPgAggregateType?: boolean;
       pgAggregateSpec?: AggregateSpec;
     }
+    interface ScopeInputObject {
+      pgTypeSource?: PgSource<any, any, any, any>;
+      isPgHavingFilterInputType?: boolean;
+      isPgAggregateHavingInputType?: boolean;
+      pgHavingFilterSpec?: string;
+    }
     interface ScopeObjectFieldsField {
       isPgAggregateField?: boolean;
       isPgConnectionAggregateField?: boolean;
@@ -132,3 +138,12 @@ export const REG_ROLE_OID = "4096";
 export const REG_NAMESPACE_OID = "4089";
 export const REG_CONFIG_OID = "3734";
 export const REG_DICTIONARY_OID = "3769";
+
+export const CORE_HAVING_FILTER_SPECS = [
+  "int",
+  "bigint",
+  "float",
+  "bigfloat",
+  "datetime",
+  "string",
+] as const;

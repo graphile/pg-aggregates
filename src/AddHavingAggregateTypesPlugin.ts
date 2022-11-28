@@ -1,3 +1,5 @@
+import { PgTypeCodec, TYPES } from "@dataplan/pg";
+import { getBehavior } from "graphile-build-pg/dist/behavior";
 import type { GraphQLFieldConfigMap, GraphQLInputObjectType } from "graphql";
 import {
   INT2_OID,
@@ -14,6 +16,7 @@ import {
   TEXT_OID,
   VARCHAR_OID,
   AggregateSpec,
+  CORE_HAVING_FILTER_SPECS,
 } from "./interfaces";
 
 const { version } = require("../package.json");
@@ -26,91 +29,48 @@ const Plugin: GraphileConfig.Plugin = {
 
   schema: {
     hooks: {
-      build(build, _build, _context) {
-        const havingFilterByName: {
-          [name: string]: GraphQLInputObjectType;
-        } = {};
-        function getHavingFilter(spec: string): GraphQLInputObjectType {
-          const {
-            newWithHooks,
-            graphql: { GraphQLInputObjectType },
-            pgSql: sql,
-          } = build;
-
-          const name = build.inflection.upperCamelCase(`having-${spec}-filter`);
-          if (!(name in havingFilterByName)) {
-            const HavingFilterType = newWithHooks(
-              GraphQLInputObjectType,
-              {
-                name,
-                fields: {},
-                extensions: {
-                  graphile: {
-                    toSql(argValue: any, details: any) {
-                      const fragments: SQL[] = [];
-                      if (argValue != null) {
-                        const fields = HavingFilterType.getFields();
-                        Object.keys(fields).forEach((fieldName) => {
-                          const field = fields[fieldName];
-                          const value = argValue[fieldName];
-                          if (value == null) {
-                            return;
-                          }
-                          const toSql = field.extensions?.graphile?.toSql;
-                          if (typeof toSql === "function") {
-                            fragments.push(toSql(value, details));
-                          }
-                        });
-                      }
-                      return fragments.length > 0
-                        ? sql.fragment`(${sql.join(fragments, ") AND (")})`
-                        : sql.true;
-                    },
-                  },
-                },
-              },
-              {
-                isPgHavingFilterInputType: true,
-                pgHavingFilterSpec: spec,
-              },
-              true
-            );
-            havingFilterByName[name] = HavingFilterType;
-          }
-          return havingFilterByName[name];
-        }
+      build(build) {
         return build.extend(
           build,
           {
-            pgHavingFilterTypeForTypeAndModifier(
-              type: PgType,
-              _modifier: null | number | string
+            pgHavingFilterTypeNameForCodec(
+              codec: PgTypeCodec<any, any, any, any>
             ) {
-              switch (type.id) {
-                case INT2_OID:
-                case INT4_OID: {
-                  return getHavingFilter("int");
+              switch (codec) {
+                case TYPES.int2:
+                case TYPES.int: {
+                  return build.inflection.aggregateHavingFilterInputType("int");
                 }
-                case BIGINT_OID: {
-                  return getHavingFilter("bigint");
+                case TYPES.bigint: {
+                  return build.inflection.aggregateHavingFilterInputType(
+                    "bigint"
+                  );
                 }
-                case FLOAT4_OID:
-                case FLOAT8_OID: {
-                  return getHavingFilter("float");
+                case TYPES.float4:
+                case TYPES.float: {
+                  return build.inflection.aggregateHavingFilterInputType(
+                    "float"
+                  );
                 }
-                case MONEY_OID:
-                case NUMERIC_OID: {
-                  return getHavingFilter("bigfloat");
+                case TYPES.money:
+                case TYPES.numeric: {
+                  return build.inflection.aggregateHavingFilterInputType(
+                    "bigfloat"
+                  );
                 }
-                case DATE_OID:
-                case TIMESTAMP_OID:
-                case TIMESTAMPTZ_OID: {
-                  return getHavingFilter("datetime");
+                case TYPES.date:
+                case TYPES.timestamp:
+                case TYPES.timestamptz: {
+                  return build.inflection.aggregateHavingFilterInputType(
+                    "datetime"
+                  );
                 }
-                case CHAR_OID:
-                case TEXT_OID:
-                case VARCHAR_OID: {
-                  return getHavingFilter("string");
+                case TYPES.char:
+                case TYPES.text:
+                case TYPES.varchar: {
+                  return build.inflection.aggregateHavingFilterInputType(
+                    "string"
+                  );
                 }
                 default: {
                   return null;
@@ -122,26 +82,80 @@ const Plugin: GraphileConfig.Plugin = {
         );
       },
 
-      init(_, build) {
+      init(_, build, _context) {
         const {
-          newWithHooks,
-          pgIntrospectionResultsByKind: introspectionResultsByKind,
           graphql: { GraphQLInputObjectType, GraphQLList, GraphQLNonNull },
           inflection,
-          pgOmit: omit,
-          sqlCommentByAddingTags,
-          describePgEntity,
-          pgSql: sql,
+          sql,
         } = build;
-        introspectionResultsByKind.class.forEach((table: PgClass) => {
-          if (!table.isSelectable || omit(table, "order")) return;
-          if (!table.namespace) return;
 
-          const tableTypeName = inflection.tableType(table);
-          const TableHavingInputType = newWithHooks(
-            GraphQLInputObjectType,
+        for (const spec of CORE_HAVING_FILTER_SPECS) {
+          const name = build.inflection.aggregateHavingFilterInputType(spec);
+          build.registerInputObjectType(
+            name,
             {
-              name: inflection.aggregateHavingInputType(table),
+              isPgHavingFilterInputType: true,
+              pgHavingFilterSpec: spec,
+            },
+            () => ({
+              name,
+              fields: {},
+              // TODO: plan
+              /*
+              extensions: {
+                graphile: {
+                  toSql(argValue: any, details: any) {
+                    const fragments: SQL[] = [];
+                    if (argValue != null) {
+                      const fields = Self.getFields();
+                      Object.keys(fields).forEach((fieldName) => {
+                        const field = fields[fieldName];
+                        const value = argValue[fieldName];
+                        if (value == null) {
+                          return;
+                        }
+                        const toSql = field.extensions?.graphile?.toSql;
+                        if (typeof toSql === "function") {
+                          fragments.push(toSql(value, details));
+                        }
+                      });
+                    }
+                    return fragments.length > 0
+                      ? sql.fragment`(${sql.join(fragments, ") AND (")})`
+                      : sql.true;
+                  },
+                },
+              },
+              */
+            }),
+            ""
+          );
+        }
+
+        for (const source of build.input.pgSources) {
+          if (source.parameters || !source.codec.columns || source.isUnique) {
+            continue;
+          }
+          const behavior = getBehavior([
+            source.codec.extensions,
+            source.extensions,
+          ]);
+          if (!build.behavior.matches(behavior, "order", "order")) {
+            continue;
+          }
+
+          const tableTypeName = inflection.tableType(source.codec);
+          const tableHavingInputTypeName = inflection.aggregateHavingInputType({
+            source,
+          });
+          build.registerInputObjectType(
+            tableHavingInputTypeName,
+            {
+              pgTypeSource: source,
+              isPgAggregateHavingInputType: true,
+            },
+            () => ({
+              name: inflection.aggregateHavingInputType({ source }),
               description: build.wrapDescription(
                 `Conditions for \`${tableTypeName}\` aggregates.`,
                 "type"
@@ -150,8 +164,11 @@ const Plugin: GraphileConfig.Plugin = {
                 return {
                   AND: {
                     type: new GraphQLList(
-                      new GraphQLNonNull(TableHavingInputType)
+                      new GraphQLNonNull(
+                        build.getInputTypeByName(tableHavingInputTypeName)
+                      )
                     ),
+                    /*
                     extensions: {
                       graphile: {
                         toSql(val: any, details: any) {
@@ -173,11 +190,15 @@ const Plugin: GraphileConfig.Plugin = {
                         },
                       },
                     },
+                    */
                   },
                   OR: {
                     type: new GraphQLList(
-                      new GraphQLNonNull(TableHavingInputType)
+                      new GraphQLNonNull(
+                        build.getInputTypeByName(tableHavingInputTypeName)
+                      )
                     ),
+                    /*
                     extensions: {
                       graphile: {
                         toSql(val: any, details: any) {
@@ -199,9 +220,11 @@ const Plugin: GraphileConfig.Plugin = {
                         },
                       },
                     },
+                    */
                   },
                 };
               },
+              /*
               extensions: {
                 graphile: {
                   toSql(argValue: any, details: any) {
@@ -226,21 +249,12 @@ const Plugin: GraphileConfig.Plugin = {
                   },
                 },
               },
-            },
-            {
-              __origin: `Adding connection "groupBy" having input type for ${describePgEntity(
-                table
-              )}. You can rename the table's GraphQL type via a 'Smart Comment':\n\n  ${sqlCommentByAddingTags(
-                table,
-                {
-                  name: "newNameHere",
-                }
-              )}`,
-              pgIntrospection: table,
-              isPgAggregateHavingInputType: true,
-            }
+              */
+            }),
+            `Adding connection "groupBy" having input type for ${source.name}.`
           );
-        });
+        }
+
         return _;
       },
 
@@ -250,23 +264,20 @@ const Plugin: GraphileConfig.Plugin = {
           const {
             inflection,
             graphql: { GraphQLInputObjectType },
-            newWithHooks,
-            pgIntrospectionResultsByKind,
-            pgSql: sql,
-            pgGetComputedColumnDetails: getComputedColumnDetails,
-            pgProcFieldDetails: procFieldDetails,
+            sql,
           } = build;
           const {
-            scope: { isPgAggregateHavingInputType, pgIntrospection },
+            scope: { isPgAggregateHavingInputType, pgTypeSource: table },
             fieldWithHooks,
           } = context;
           if (
             !isPgAggregateHavingInputType ||
-            pgIntrospection.kind !== "class"
+            !table ||
+            table.parameters ||
+            !table.codec.columns
           ) {
             return fields;
           }
-          const table: PgClass = pgIntrospection;
           return build.extend(
             fields,
             build.pgAggregateSpecs.reduce(
