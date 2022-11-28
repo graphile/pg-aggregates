@@ -23,8 +23,8 @@ declare module "@dataplan/pg" {
   }
 }
 
-export const AggregateSpecsPlugin: GraphileConfig.Plugin = {
-  name: "AggregateSpecsPlugin",
+export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
+  name: "PgAggregatesSpecsPlugin",
   version,
 
   gather: {

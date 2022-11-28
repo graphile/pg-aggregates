@@ -1,24 +1,25 @@
-import { makePluginByCombiningPlugins } from "graphile-utils";
-import InflectionPlugin from "./InflectionPlugin";
-import AggregateSpecsPlugin from "./AggregateSpecsPlugin";
-import AddGroupByAggregateEnumsPlugin from "./AddGroupByAggregateEnumsPlugin";
-import AddGroupByAggregateEnumValuesForColumnsPlugin from "./AddGroupByAggregateEnumValuesForColumnsPlugin";
-import AddHavingAggregateTypesPlugin from "./AddHavingAggregateTypesPlugin";
-import AddAggregateTypesPlugin from "./AddAggregateTypesPlugin";
-import AddConnectionAggregatesPlugin from "./AddConnectionAggregatesPlugin";
-import AddConnectionGroupedAggregatesPlugin from "./AddConnectionGroupedAggregatesPlugin";
-import OrderByAggregatesPlugin from "./OrderByAggregatesPlugin";
-import FilterRelationalAggregatesPlugin from "./FilterRelationalAggregatesPlugin";
+import { PgAggregatesInflectorsPlugin } from "./InflectionPlugin";
+import { PgAggregatesSpecsPlugin } from "./AggregateSpecsPlugin";
+import { PgAggregatesAddGroupByAggregateEnumsPlugin } from "./AddGroupByAggregateEnumsPlugin";
+import { PgAggregatesAddGroupByAggregateEnumValuesForColumnsPlugin } from "./AddGroupByAggregateEnumValuesForColumnsPlugin";
+import { PgAggregatesAddHavingAggregateTypesPlugin } from "./AddHavingAggregateTypesPlugin";
+import { PgAggregatesAddAggregateTypesPlugin } from "./AddAggregateTypesPlugin";
+import { PgAggregatesAddConnectionAggregatesPlugin } from "./AddConnectionAggregatesPlugin";
+import { PgAggregatesAddConnectionGroupedAggregatesPlugin } from "./AddConnectionGroupedAggregatesPlugin";
+import { PgAggregatesOrderByAggregatesPlugin } from "./OrderByAggregatesPlugin";
+import { PgAggregatesFilterRelationalAggregatesPlugin } from "./FilterRelationalAggregatesPlugin";
 
-export default makePluginByCombiningPlugins(
-  InflectionPlugin,
-  AggregateSpecsPlugin,
-  AddGroupByAggregateEnumsPlugin,
-  AddGroupByAggregateEnumValuesForColumnsPlugin,
-  AddHavingAggregateTypesPlugin,
-  AddAggregateTypesPlugin,
-  AddConnectionAggregatesPlugin,
-  AddConnectionGroupedAggregatesPlugin,
-  OrderByAggregatesPlugin,
-  FilterRelationalAggregatesPlugin
-);
+export const PgAggregatesPreset: GraphileConfig.Preset = {
+  plugins: [
+    PgAggregatesInflectorsPlugin,
+    PgAggregatesSpecsPlugin,
+    PgAggregatesAddGroupByAggregateEnumsPlugin,
+    PgAggregatesAddGroupByAggregateEnumValuesForColumnsPlugin,
+    PgAggregatesAddHavingAggregateTypesPlugin,
+    PgAggregatesAddAggregateTypesPlugin,
+    PgAggregatesAddConnectionAggregatesPlugin,
+    PgAggregatesAddConnectionGroupedAggregatesPlugin,
+    PgAggregatesOrderByAggregatesPlugin,
+    PgAggregatesFilterRelationalAggregatesPlugin,
+  ],
+};
