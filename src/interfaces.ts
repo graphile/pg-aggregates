@@ -13,6 +13,9 @@ declare global {
     interface Build {
       pgAggregateSpecs: AggregateSpec[];
       pgAggregateGroupBySpecs: AggregateGroupBySpec[];
+      pgHavingFilterTypeNameForCodec(
+        codec: PgTypeCodec<any, any, any, any>
+      ): string | null;
     }
     interface ScopeObject {
       isPgAggregateContainerType?: boolean;

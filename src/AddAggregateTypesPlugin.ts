@@ -8,6 +8,7 @@ import type {
 import { AggregateSpec } from "./interfaces";
 import { ExecutableStep } from "grafast";
 import { PgSource, PgSourceParameter, PgTypeColumn } from "@dataplan/pg";
+import { getComputedColumnSources } from "./utils";
 
 // @ts-ignore
 const { version } = require("../package.json");
@@ -259,26 +260,7 @@ const Plugin: GraphileConfig.Plugin = {
             "Add columns compatible with this aggregate"
           );
 
-          const computedColumnSources = build.input.pgSources.filter((s) => {
-            if (!s.parameters) {
-              return false;
-            }
-            if (s.codec.columns) {
-              return false;
-            }
-            if (!s.isUnique) {
-              return false;
-            }
-            if (s.codec.arrayOfCodec) {
-              return false;
-            }
-            const firstParameter = s.parameters[0] as PgSourceParameter;
-            if (firstParameter.codec !== source.codec) {
-              return false;
-            }
-            return true;
-          });
-
+          const computedColumnSources = getComputedColumnSources(build, source);
           fields = build.extend(
             fields,
             computedColumnSources.reduce((memo, computedColumnSource) => {
