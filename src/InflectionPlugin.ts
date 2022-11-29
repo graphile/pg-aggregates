@@ -218,7 +218,7 @@ export const PgAggregatesInflectorsPlugin: GraphileConfig.Plugin = {
           })}`
         );
       },
-      aggregateHavingFilterInputType(spec) {
+      aggregateHavingFilterInputType(preset, spec) {
         return this.upperCamelCase(`having-${spec}-filter`);
       },
     },

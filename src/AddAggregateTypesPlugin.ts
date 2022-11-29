@@ -25,7 +25,7 @@ const isSuitableSource = (
     source.extensions,
   ]);
 
-  if (build.behavior.matches(behavior, "select", "select")) {
+  if (!build.behavior.matches(behavior, "select", "select")) {
     return false;
   }
 

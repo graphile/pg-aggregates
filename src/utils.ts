@@ -7,7 +7,7 @@ export function getComputedColumnSources(
   source: PgSource<any, any, any, any>
 ) {
   const computedColumnSources = build.input.pgSources.filter((s) => {
-    if (!s.parameters) {
+    if (!s.parameters || s.parameters.length < 1) {
       return false;
     }
     if (s.codec.columns) {

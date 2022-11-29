@@ -14,11 +14,18 @@ const Plugin: GraphileConfig.Plugin = {
         const {
           fieldWithHooks,
           scope: {
-            pgTypeSource: table,
+            pgCodec,
+            pgTypeSource,
             isConnectionType,
             isPgConnectionRelated,
           },
         } = context;
+
+        const table =
+          pgTypeSource ??
+          build.input.pgSources.find(
+            (s) => s.codec === pgCodec && !s.parameters
+          );
 
         // If it's not a table connection, abort
         if (

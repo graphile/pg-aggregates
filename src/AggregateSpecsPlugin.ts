@@ -28,7 +28,7 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
       pgCodecs_PgTypeCodec(_info, event) {
         const { pgType, pgCodec } = event;
         if (pgType.typcategory === "N") {
-          if (pgCodec.extensions) {
+          if (!pgCodec.extensions) {
             pgCodec.extensions = Object.create(null);
           }
           pgCodec.extensions!.isNumberLike = true;

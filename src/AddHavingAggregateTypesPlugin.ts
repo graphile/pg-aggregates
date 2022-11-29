@@ -1,6 +1,5 @@
 import { PgTypeCodec, PgTypeColumn, TYPES } from "@dataplan/pg";
 import { GraphileFieldConfig, GraphileInputFieldConfigMap } from "grafast";
-import { getBehavior } from "graphile-build-pg/dist/behavior";
 import type {
   GraphQLFieldConfigMap,
   GraphQLInputObjectType,
@@ -141,7 +140,7 @@ const Plugin: GraphileConfig.Plugin = {
           if (source.parameters || !source.codec.columns || source.isUnique) {
             continue;
           }
-          const behavior = getBehavior([
+          const behavior = build.pgGetBehavior([
             source.codec.extensions,
             source.extensions,
           ]);
@@ -270,24 +269,26 @@ const Plugin: GraphileConfig.Plugin = {
                   aggregateSpec,
                   computedColumnSource,
                 });
-              const argDetails = build.pgGetArgDetailsFromParameters(
-                computedColumnSource,
-                computedColumnSource.parameters.slice(1)
-              );
               build.registerInputObjectType(
                 argsTypeName,
                 {},
-                () => ({
-                  fields: argDetails.reduce(
-                    (memo, { inputType, graphqlArgName }) => {
-                      memo[graphqlArgName] = {
-                        type: inputType,
-                      };
-                      return memo;
-                    },
-                    {} as GraphileInputFieldConfigMap<any, any>
-                  ),
-                }),
+                () => {
+                  const argDetails = build.pgGetArgDetailsFromParameters(
+                    computedColumnSource,
+                    computedColumnSource.parameters.slice(1)
+                  );
+                  return {
+                    fields: argDetails.reduce(
+                      (memo, { inputType, graphqlArgName }) => {
+                        memo[graphqlArgName] = {
+                          type: inputType,
+                        };
+                        return memo;
+                      },
+                      {} as GraphileInputFieldConfigMap<any, any>
+                    ),
+                  };
+                },
                 ""
               );
               const computedHavingInputName =
