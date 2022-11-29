@@ -146,6 +146,7 @@ const Plugin: GraphileConfig.Plugin = {
                     () => ({
                       description: `${aggregateSpec.HumanLabel} aggregates across the matching connection (ignoring before/after/first/last/offset)`,
                       type: AggregateType,
+                      /*
                       resolve(
                         parent: any,
                         _args: any,
@@ -156,6 +157,7 @@ const Plugin: GraphileConfig.Plugin = {
                           getSafeAliasFromResolveInfo(resolveInfo);
                         return parent[safeAlias];
                       },
+                      */
                     })
                   ),
                 },
@@ -178,7 +180,11 @@ const Plugin: GraphileConfig.Plugin = {
               ) => {
                 if (
                   (spec.shouldApplyToEntity &&
-                    !spec.shouldApplyToEntity(column)) ||
+                    !spec.shouldApplyToEntity({
+                      type: "column",
+                      codec: source.codec,
+                      columnName,
+                    })) ||
                   !spec.isSuitableType(column.codec)
                 ) {
                   return memo;
@@ -238,6 +244,7 @@ const Plugin: GraphileConfig.Plugin = {
                           type: spec.isNonNull
                             ? new GraphQLNonNull(Type)
                             : Type,
+                          /*
                           resolve(
                             parent: any,
                             _args: any,
@@ -248,6 +255,7 @@ const Plugin: GraphileConfig.Plugin = {
                               getSafeAliasFromResolveInfo(resolveInfo);
                             return parent[safeAlias];
                           },
+                          */
                         };
                       }
                     ),
@@ -278,10 +286,33 @@ const Plugin: GraphileConfig.Plugin = {
               const fieldName = inflection.computedColumnField({
                 source: computedColumnSource,
               });
+              const targetCodec = spec.pgTypeCodecModifier?.(codec) ?? codec;
+              const targetType = build.getGraphQLTypeByPgCodec(
+                targetCodec,
+                "output"
+              ) as GraphQLOutputType | undefined;
+              if (!targetType) {
+                return memo;
+              }
               return build.extend(
                 memo,
                 {
-                  [fieldName]: build.pgMakeProcField(fieldName, proc, build, {
+                  [fieldName]: fieldWithHooks(
+                    {
+                      fieldName,
+                    },
+                    () => ({
+                      type: targetType,
+                      description: `${
+                        spec.HumanLabel
+                      } of this field across the matching connection.${
+                        computedColumnSource.description
+                          ? `\n\n---\n\n${computedColumnSource.description}`
+                          : ""
+                      }`,
+                    })
+                  ),
+                  /*build.pgMakeProcField(fieldName, proc, build, {
                     fieldWithHooks,
                     computed: true,
                     aggregateWrapper: spec.sqlAggregateWrap,
@@ -291,7 +322,7 @@ const Plugin: GraphileConfig.Plugin = {
                     } of this field across the matching connection.${
                       proc.description ? `\n\n---\n\n${proc.description}` : ""
                     }`,
-                  }),
+                  }),*/
                 },
                 ""
               );
