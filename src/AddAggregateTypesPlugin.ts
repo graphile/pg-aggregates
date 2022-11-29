@@ -6,8 +6,9 @@ import type {
   GraphQLOutputType,
 } from "graphql";
 import { AggregateSpec } from "./interfaces";
-import { constant, error, ExecutableStep } from "grafast";
+import { constant, error, ExecutableStep, FieldArgs } from "grafast";
 import {
+  digestsFromArgumentSpecs,
   PgSelectSingleStep,
   PgSource,
   PgSourceParameter,
@@ -290,16 +291,64 @@ const Plugin: GraphileConfig.Plugin = {
                     {
                       fieldName,
                     },
-                    () => ({
-                      type: targetType,
-                      description: `${
-                        spec.HumanLabel
-                      } of this field across the matching connection.${
-                        computedColumnSource.description
-                          ? `\n\n---\n\n${computedColumnSource.description}`
-                          : ""
-                      }`,
-                    })
+                    () => {
+                      const { argDetails, makeFieldArgs, makeArgs } =
+                        build.pgGetArgDetailsFromParameters(
+                          computedColumnSource,
+                          computedColumnSource.parameters.slice(1)
+                        );
+                      return {
+                        type: targetType,
+                        description: `${
+                          spec.HumanLabel
+                        } of this field across the matching connection.${
+                          computedColumnSource.description
+                            ? `\n\n---\n\n${computedColumnSource.description}`
+                            : ""
+                        }`,
+                        args: makeFieldArgs(),
+                        plan(
+                          $pgSelectSingle: PgSelectSingleStep<
+                            any,
+                            any,
+                            any,
+                            any
+                          >,
+                          fieldArgs: FieldArgs
+                        ) {
+                          // Because we require that the computed column is
+                          // evaluated inline, we have to convert it to an
+                          // expression here; this is only needed because of the
+                          // aggregation.
+
+                          const args = makeArgs(fieldArgs);
+                          const { digests } = digestsFromArgumentSpecs(
+                            $pgSelectSingle,
+                            args,
+                            [
+                              {
+                                placeholder:
+                                  $pgSelectSingle.getClassStep().alias,
+                                position: 0,
+                              },
+                            ],
+                            1
+                          );
+                          if (
+                            typeof computedColumnSource.source !== "function"
+                          ) {
+                            throw new Error("!function");
+                          }
+                          const src = computedColumnSource.source(...digests);
+
+                          const sqlAggregate = spec.sqlAggregateWrap(src);
+                          return $pgSelectSingle.select(
+                            sqlAggregate,
+                            targetCodec
+                          );
+                        },
+                      };
+                    }
                   ),
                   /*build.pgMakeProcField(fieldName, proc, build, {
                     fieldWithHooks,

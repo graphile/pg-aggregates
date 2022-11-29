@@ -273,7 +273,7 @@ const Plugin: GraphileConfig.Plugin = {
                 argsTypeName,
                 {},
                 () => {
-                  const argDetails = build.pgGetArgDetailsFromParameters(
+                  const { argDetails } = build.pgGetArgDetailsFromParameters(
                     computedColumnSource,
                     computedColumnSource.parameters.slice(1)
                   );
