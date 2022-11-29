@@ -6,8 +6,14 @@ import type {
   GraphQLOutputType,
 } from "graphql";
 import { AggregateSpec } from "./interfaces";
-import { ExecutableStep } from "grafast";
-import { PgSource, PgSourceParameter, PgTypeColumn } from "@dataplan/pg";
+import { constant, error, ExecutableStep } from "grafast";
+import {
+  PgSelectSingleStep,
+  PgSource,
+  PgSourceParameter,
+  PgTypeColumn,
+  TYPES,
+} from "@dataplan/pg";
 import { getComputedColumnSources } from "./utils";
 
 // @ts-ignore
@@ -68,8 +74,16 @@ const Plugin: GraphileConfig.Plugin = {
               fields: {
                 keys: {
                   type: new GraphQLList(new GraphQLNonNull(GraphQLString)),
-                  resolver(parent: any) {
-                    return parent.keys || [];
+                  plan(
+                    $pgSelectSingle: PgSelectSingleStep<any, any, any, any>
+                  ) {
+                    const $pgSelect = $pgSelectSingle.getClassStep();
+                    const groups = $pgSelect.getGroups();
+                    if (groups.length > 0) {
+                      return error(new Error(`TODO: group keys`));
+                    } else {
+                      return constant(null);
+                    }
                   },
                 },
               },
@@ -146,18 +160,11 @@ const Plugin: GraphileConfig.Plugin = {
                     () => ({
                       description: `${aggregateSpec.HumanLabel} aggregates across the matching connection (ignoring before/after/first/last/offset)`,
                       type: AggregateType,
-                      /*
-                      resolve(
-                        parent: any,
-                        _args: any,
-                        _context: any,
-                        resolveInfo: GraphQLResolveInfo
+                      plan(
+                        $pgSelectSingle: PgSelectSingleStep<any, any, any, any>
                       ) {
-                        const safeAlias =
-                          getSafeAliasFromResolveInfo(resolveInfo);
-                        return parent[safeAlias];
+                        return $pgSelectSingle;
                       },
-                      */
                     })
                   ),
                 },
@@ -209,53 +216,35 @@ const Plugin: GraphileConfig.Plugin = {
                     [fieldName]: fieldWithHooks(
                       {
                         fieldName,
-
                         // In case anyone wants to hook us, describe ourselves
                         isPgConnectionAggregateField: true,
                         //pgFieldIntrospection: attr,
                         //TODO: add more details here
                       },
                       () => {
-                        /*
-                        addDataGenerator((parsedResolveInfoFragment: any) => {
-                          return {
-                            pgQuery: (queryBuilder: QueryBuilder) => {
-                              // Note this expression is just an sql fragment, so you
-                              // could add CASE statements, function calls, or whatever
-                              // you need here
-                              const sqlColumn = sql.fragment`${queryBuilder.getTableAlias()}.${sql.identifier(
-                                attr.name
-                              )}`;
-                              const sqlAggregate =
-                                spec.sqlAggregateWrap(sqlColumn);
-                              queryBuilder.select(
-                                sqlAggregate,
-                                // We need a unique alias that we can later reference in the resolver
-                                getSafeAliasFromAlias(
-                                  parsedResolveInfoFragment.alias
-                                )
-                              );
-                            },
-                          };
-                        });
-                        */
                         return {
                           description: `${spec.HumanLabel} of ${fieldName} across the matching connection`,
                           type: spec.isNonNull
                             ? new GraphQLNonNull(Type)
                             : Type,
-                          /*
-                          resolve(
-                            parent: any,
-                            _args: any,
-                            _context: any,
-                            resolveInfo: GraphQLResolveInfo
+                          plan(
+                            $pgSelectSingle: PgSelectSingleStep<
+                              any,
+                              any,
+                              any,
+                              any
+                            >
                           ) {
-                            const safeAlias =
-                              getSafeAliasFromResolveInfo(resolveInfo);
-                            return parent[safeAlias];
+                            // Note this expression is just an sql fragment, so you
+                            // could add CASE statements, function calls, or whatever
+                            // you need here
+                            const sqlColumn = sql.fragment`${
+                              $pgSelectSingle.getClassStep().alias
+                            }.${sql.identifier(columnName)}`;
+                            const sqlAggregate =
+                              spec.sqlAggregateWrap(sqlColumn);
+                            return $pgSelectSingle.select(sqlAggregate, codec);
                           },
-                          */
                         };
                       }
                     ),
