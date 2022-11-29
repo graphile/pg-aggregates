@@ -83,12 +83,8 @@ const Plugin: GraphileConfig.Plugin = {
 
         return {
           ...fields,
-          [fieldName]: fieldWithHooks(
-            fieldName,
-            ({
-              addDataGenerator,
-              getDataFromParsedResolveInfoFragment,
-            }: any) => {
+          [fieldName]: fieldWithHooks({ fieldName }, () => {
+            /*
               addDataGenerator((parsedResolveInfoFragment: any) => {
                 const safeAlias = getSafeAliasFromAlias(
                   parsedResolveInfoFragment.alias
@@ -175,34 +171,34 @@ coalesce((select json_agg(j.data) from (
                   },
                 };
               });
+              */
 
-              return {
-                description: `Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)`,
-                type: new GraphQLList(
-                  new GraphQLNonNull(AggregateContainerType)
-                ),
-                args: {
-                  groupBy: {
-                    type: new GraphQLNonNull(
-                      new GraphQLList(new GraphQLNonNull(TableGroupByType))
-                    ),
-                    description: build.wrapDescription(
-                      `The method to use when grouping \`${tableTypeName}\` for these aggregates.`,
-                      "arg"
-                    ),
-                  },
-                  ...(TableHavingInputType
-                    ? {
-                        having: {
-                          type: TableHavingInputType,
-                          description: build.wrapDescription(
-                            `Conditions on the grouped aggregates.`,
-                            "arg"
-                          ),
-                        },
-                      }
-                    : null),
+            return {
+              description: `Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)`,
+              type: new GraphQLList(new GraphQLNonNull(AggregateContainerType)),
+              args: {
+                groupBy: {
+                  type: new GraphQLNonNull(
+                    new GraphQLList(new GraphQLNonNull(TableGroupByType))
+                  ),
+                  description: build.wrapDescription(
+                    `The method to use when grouping \`${tableTypeName}\` for these aggregates.`,
+                    "arg"
+                  ),
                 },
+                ...(TableHavingInputType
+                  ? {
+                      having: {
+                        type: TableHavingInputType,
+                        description: build.wrapDescription(
+                          `Conditions on the grouped aggregates.`,
+                          "arg"
+                        ),
+                      },
+                    }
+                  : null),
+              },
+              /*
                 resolve(
                   parent: any,
                   _args: any,
@@ -211,15 +207,14 @@ coalesce((select json_agg(j.data) from (
                 ) {
                   const safeAlias = getSafeAliasFromResolveInfo(resolveInfo);
                   return parent[safeAlias].map((entry: any) => ({
-                    /* Rewrite the object due to aliasing */
+                    /* Rewrite the object due to aliasing * /
                     ...entry[safeAlias],
                     keys: entry.keys,
                   }));
                 },
-              };
-            },
-            {}
-          ),
+                */
+            };
+          }),
         };
       },
     },

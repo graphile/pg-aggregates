@@ -48,12 +48,8 @@ const Plugin: GraphileConfig.Plugin = {
         });
         return {
           ...fields,
-          [fieldName]: fieldWithHooks(
-            fieldName,
-            ({
-              addDataGenerator,
-              getDataFromParsedResolveInfoFragment,
-            }: any) => {
+          [fieldName]: fieldWithHooks({ fieldName }, () => {
+            /*
               addDataGenerator((parsedResolveInfoFragment: any) => {
                 const safeAlias = getSafeAliasFromAlias(
                   parsedResolveInfoFragment.alias
@@ -89,10 +85,12 @@ const Plugin: GraphileConfig.Plugin = {
                   },
                 };
               });
+              */
 
-              return {
-                description: `Aggregates across the matching connection (ignoring before/after/first/last/offset)`,
-                type: AggregateContainerType,
+            return {
+              description: `Aggregates across the matching connection (ignoring before/after/first/last/offset)`,
+              type: AggregateContainerType,
+              /*
                 resolve(
                   parent: any,
                   _args: any,
@@ -104,10 +102,9 @@ const Plugin: GraphileConfig.Plugin = {
                   // All aggregates are stored into the aggregates object which is also identified by aggregateAlias, reference ours here
                   return parent.aggregates[safeAlias] || 0;
                 },
-              };
-            },
-            {}
-          ),
+                */
+            };
+          }),
         };
       },
     },
