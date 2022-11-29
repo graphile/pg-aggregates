@@ -1,5 +1,5 @@
-import type { ConnectionFilterResolver } from "postgraphile-plugin-connection-filter/dist/PgConnectionArgFilterPlugin";
-import type { BackwardRelationSpec } from "postgraphile-plugin-connection-filter/dist/PgConnectionArgFilterBackwardRelationsPlugin";
+// import type { ConnectionFilterResolver } from "postgraphile-plugin-connection-filter/dist/PgConnectionArgFilterPlugin";
+// import type { BackwardRelationSpec } from "postgraphile-plugin-connection-filter/dist/PgConnectionArgFilterBackwardRelationsPlugin";
 import type {
   GraphQLInputFieldConfigMap,
   GraphQLInputObjectType,
@@ -12,6 +12,7 @@ export const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesFilterRelationalAggregatesPlugin",
   version,
 
+  /*
   schema: {
     hooks: {
       // This hook adds 'aggregates' under a "backwards" relation, siblings of
@@ -22,9 +23,8 @@ export const Plugin: GraphileConfig.Plugin = {
         fields = (() => {
           const {
             extend,
-            newWithHooks,
             inflection,
-            pgSql: sql,
+            sql,
             connectionFilterResolve,
             connectionFilterRegisterResolver,
             connectionFilterTypesByTypeName,
@@ -427,6 +427,7 @@ export const Plugin: GraphileConfig.Plugin = {
       },
     },
   },
+  */
 };
 
 export { Plugin as PgAggregatesFilterRelationalAggregatesPlugin };
