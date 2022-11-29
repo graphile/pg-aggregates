@@ -1,11 +1,10 @@
+import { PgSourceRelation } from "@dataplan/pg";
+import { SQL } from "pg-sql2";
 import { AggregateSpec } from "./interfaces";
 
 const { version } = require("../package.json");
 
-type OrderBySpecIdentity =
-  | string
-  | SQL
-  | ((options: { queryBuilder: QueryBuilder }) => SQL);
+type OrderBySpecIdentity = string | SQL | ((options: {}) => SQL);
 
 type OrderSpec =
   | [OrderBySpecIdentity, boolean]
@@ -27,150 +26,137 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
   schema: {
     hooks: {
       GraphQLEnumType_values(values, build, context) {
-        const {
-          extend,
-          pgOmit: omit,
-          pgIntrospectionResultsByKind: introspectionResultsByKind,
-          pgSql: sql,
-          inflection,
-        } = build;
+        const { extend, sql, inflection } = build;
         const pgAggregateSpecs: AggregateSpec[] = build.pgAggregateSpecs;
         const {
-          scope: { isPgRowSortEnum },
+          scope: { isPgRowSortEnum, pgTypeSource: foreignTable },
         } = context;
-
-        const pgIntrospection: PgEntity | undefined =
-          context.scope.pgIntrospection;
 
         if (
           !isPgRowSortEnum ||
-          !pgIntrospection ||
-          pgIntrospection.kind !== "class"
+          !foreignTable ||
+          foreignTable.parameters ||
+          !foreignTable.codec.columns
         ) {
           return values;
         }
 
-        const foreignTable: PgClass = pgIntrospection;
-
-        const foreignKeyConstraints = foreignTable.foreignConstraints.filter(
-          (con) => con.type === "f"
+        const relations = foreignTable.getRelations() as {
+          [relName: string]: PgSourceRelation<any, any>;
+        };
+        const referenceeRelations = Object.entries(relations).filter(
+          ([_, rel]) => rel.isReferencee
         );
 
-        const newValues = foreignKeyConstraints.reduce((memo, constraint) => {
-          if (omit(constraint, "read")) {
-            return memo;
-          }
-          const table: PgClass | undefined =
-            introspectionResultsByKind.classById[constraint.classId];
-          if (!table) {
-            throw new Error(
-              `Could not find the table that referenced us (constraint: ${constraint.name})`
+        const newValues = referenceeRelations.reduce(
+          (memo, [relationName, relation]) => {
+            const behavior = build.pgGetBehavior([
+              relation.extensions,
+              relation.source.extensions,
+            ]);
+            if (!build.behavior.matches(behavior, "select", "select")) {
+              return memo;
+            }
+            const table = relation.source;
+            const isUnique = !!relation.isUnique;
+            if (isUnique) {
+              // No point aggregating over a relation that's unique
+              return memo;
+            }
+            /*
+            const tableAlias = sql.identifier(
+              Symbol(`${foreignTable.namespaceName}.${foreignTable.name}`)
             );
-          }
-          const keys = constraint.keyAttributes;
-          const foreignKeys = constraint.foreignKeyAttributes;
-          if (!keys.every((_) => _) || !foreignKeys.every((_) => _)) {
-            throw new Error("Could not find key columns!");
-          }
-          if (keys.some((key) => omit(key, "read"))) {
-            return memo;
-          }
-          if (foreignKeys.some((key) => omit(key, "read"))) {
-            return memo;
-          }
-          const isUnique = !!table.constraints.find(
-            (c) =>
-              (c.type === "p" || c.type === "u") &&
-              c.keyAttributeNums.length === keys.length &&
-              c.keyAttributeNums.every((n, i) => keys[i].num === n)
-          );
-          if (isUnique) {
-            // No point aggregating over a relation that's unique
-            return memo;
-          }
-          const tableAlias = sql.identifier(
-            Symbol(`${foreignTable.namespaceName}.${foreignTable.name}`)
-          );
+            */
 
-          // Add count
-          memo = build.extend(
-            memo,
-            orderByAscDesc(
-              inflection.orderByCountOfManyRelationByKeys(
-                keys,
-                table,
-                foreignTable,
-                constraint
+            // Add count
+            memo = build.extend(
+              memo,
+              orderByAscDesc(
+                inflection.orderByCountOfManyRelationByKeys({
+                  source: foreignTable,
+                  relationName,
+                }),
+                /*
+                ({ queryBuilder }) => {
+                  const foreignTableAlias = queryBuilder.getTableAlias();
+                  const conditions: SQL[] = [];
+                  keys.forEach((key, i) => {
+                    conditions.push(
+                      sql.fragment`${tableAlias}.${sql.identifier(
+                        key.name
+                      )} = ${foreignTableAlias}.${sql.identifier(
+                        foreignKeys[i].name
+                      )}`
+                    );
+                  });
+                  return sql.fragment`(select count(*) from ${sql.identifier(
+                    table.namespaceName,
+                    table.name
+                  )} ${tableAlias} where (${sql.join(conditions, " AND ")}))`;
+                },
+                */
+                sql`(1 + 1) /* TODO */`,
+                false
               ),
-              ({ queryBuilder }) => {
-                const foreignTableAlias = queryBuilder.getTableAlias();
-                const conditions: SQL[] = [];
-                keys.forEach((key, i) => {
-                  conditions.push(
-                    sql.fragment`${tableAlias}.${sql.identifier(
-                      key.name
-                    )} = ${foreignTableAlias}.${sql.identifier(
-                      foreignKeys[i].name
-                    )}`
-                  );
-                });
-                return sql.fragment`(select count(*) from ${sql.identifier(
-                  table.namespaceName,
-                  table.name
-                )} ${tableAlias} where (${sql.join(conditions, " AND ")}))`;
-              },
-              false
-            ),
-            `Adding orderBy count to '${foreignTable.namespaceName}.${foreignTable.name}' using constraint '${constraint.name}'`
-          );
+              `Adding orderBy count to '${foreignTable.name}' using relation '${relationName}'`
+            );
 
-          // Add other aggregates
-          pgAggregateSpecs.forEach((spec) => {
-            table.attributes.forEach((attr) => {
-              memo = build.extend(
-                memo,
-                orderByAscDesc(
-                  inflection.orderByColumnAggregateOfManyRelationByKeys(
-                    keys,
-                    table,
-                    foreignTable,
-                    constraint,
-                    spec,
-                    attr
+            // Add other aggregates
+            pgAggregateSpecs.forEach((aggregateSpec) => {
+              for (const [columnName, column] of Object.entries(
+                table.codec.columns
+              )) {
+                memo = build.extend(
+                  memo,
+                  orderByAscDesc(
+                    inflection.orderByColumnAggregateOfManyRelationByKeys({
+                      source: foreignTable,
+                      relationName,
+                      columnName,
+                      aggregateSpec,
+                    }),
+                    /*
+                    ({ queryBuilder }) => {
+                      const foreignTableAlias = queryBuilder.getTableAlias();
+                      const conditions: SQL[] = [];
+                      keys.forEach((key, i) => {
+                        conditions.push(
+                          sql.fragment`${tableAlias}.${sql.identifier(
+                            key.name
+                          )} = ${foreignTableAlias}.${sql.identifier(
+                            foreignKeys[i].name
+                          )}`
+                        );
+                      });
+                      return sql.fragment`(select ${aggregateSpec.sqlAggregateWrap(
+                        sql.fragment`${tableAlias}.${sql.identifier(attr.name)}`
+                      )} from ${sql.identifier(
+                        table.namespaceName,
+                        table.name
+                      )} ${tableAlias} where (${sql.join(
+                        conditions,
+                        " AND "
+                      )}))`;
+                    },
+                    */
+                    sql`(1 + 1) /* TODO */`,
+                    false
                   ),
-                  ({ queryBuilder }) => {
-                    const foreignTableAlias = queryBuilder.getTableAlias();
-                    const conditions: SQL[] = [];
-                    keys.forEach((key, i) => {
-                      conditions.push(
-                        sql.fragment`${tableAlias}.${sql.identifier(
-                          key.name
-                        )} = ${foreignTableAlias}.${sql.identifier(
-                          foreignKeys[i].name
-                        )}`
-                      );
-                    });
-                    return sql.fragment`(select ${spec.sqlAggregateWrap(
-                      sql.fragment`${tableAlias}.${sql.identifier(attr.name)}`
-                    )} from ${sql.identifier(
-                      table.namespaceName,
-                      table.name
-                    )} ${tableAlias} where (${sql.join(conditions, " AND ")}))`;
-                  },
-                  false
-                ),
-                `Adding orderBy ${spec.id} of '${attr.name}' to '${foreignTable.namespaceName}.${foreignTable.name}' using constraint '${constraint.name}'`
-              );
+                  `Adding orderBy ${aggregateSpec.id} of '${columnName}' to '${foreignTable.name}' using constraint '${relationName}'`
+                );
+              }
             });
-          });
 
-          return memo;
-        }, {} as OrderSpecs);
+            return memo;
+          },
+          {} as OrderSpecs
+        );
 
         return extend(
           values,
           newValues,
-          `Adding aggregate orders to '${foreignTable.namespaceName}.${foreignTable.name}'`
+          `Adding aggregate orders to '${foreignTable.name}'`
         );
       },
     },
