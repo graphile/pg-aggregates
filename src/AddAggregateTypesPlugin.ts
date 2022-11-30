@@ -6,7 +6,7 @@ import type {
   GraphQLOutputType,
 } from "graphql";
 import { AggregateSpec } from "./interfaces";
-import { constant, error, ExecutableStep, FieldArgs } from "grafast";
+import { constant, error, ExecutableStep, FieldArgs, lambda } from "grafast";
 import {
   digestsFromArgumentSpecs,
   PgSelectSingleStep,
@@ -47,6 +47,7 @@ const Plugin: GraphileConfig.Plugin = {
     hooks: {
       init(init, build, _context) {
         const {
+          sql,
           graphql: {
             GraphQLObjectType,
             GraphQLList,
@@ -81,7 +82,16 @@ const Plugin: GraphileConfig.Plugin = {
                     const $pgSelect = $pgSelectSingle.getClassStep();
                     const groups = $pgSelect.getGroups();
                     if (groups.length > 0) {
-                      return error(new Error(`TODO: group keys`));
+                      return lambda(
+                        $pgSelectSingle.select(
+                          sql`json_build_array(${sql.join(
+                            groups.map((g) => g.fragment),
+                            ", "
+                          )})`,
+                          TYPES.json
+                        ),
+                        (str) => (str ? JSON.parse(str) : null)
+                      );
                     } else {
                       return constant(null);
                     }
@@ -350,17 +360,6 @@ const Plugin: GraphileConfig.Plugin = {
                       };
                     }
                   ),
-                  /*build.pgMakeProcField(fieldName, proc, build, {
-                    fieldWithHooks,
-                    computed: true,
-                    aggregateWrapper: spec.sqlAggregateWrap,
-                    pgTypeCodecModifier: spec.pgTypeCodecModifier,
-                    description: `${
-                      spec.HumanLabel
-                    } of this field across the matching connection.${
-                      proc.description ? `\n\n---\n\n${proc.description}` : ""
-                    }`,
-                  }),*/
                 },
                 ""
               );

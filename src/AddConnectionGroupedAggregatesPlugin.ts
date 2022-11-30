@@ -1,3 +1,5 @@
+import { PgSelectStep } from "@dataplan/pg";
+import { getEnumValueConfig, InputStep } from "grafast";
 import {
   GraphQLResolveInfo,
   GraphQLEnumType,
@@ -38,11 +40,18 @@ const Plugin: GraphileConfig.Plugin = {
         const {
           fieldWithHooks,
           scope: {
+            pgCodec,
+            pgTypeSource,
             isConnectionType,
             isPgConnectionRelated,
-            pgTypeSource: table,
           },
         } = context;
+
+        const table =
+          pgTypeSource ??
+          build.input.pgSources.find(
+            (s) => s.codec === pgCodec && !s.parameters
+          );
 
         // If it's not a table connection, abort
         if (
@@ -84,95 +93,6 @@ const Plugin: GraphileConfig.Plugin = {
         return {
           ...fields,
           [fieldName]: fieldWithHooks({ fieldName }, () => {
-            /*
-              addDataGenerator((parsedResolveInfoFragment: any) => {
-                const safeAlias = getSafeAliasFromAlias(
-                  parsedResolveInfoFragment.alias
-                );
-                const resolveData = getDataFromParsedResolveInfoFragment(
-                  parsedResolveInfoFragment,
-                  AggregateContainerType
-                );
-                return {
-                  // Push a query container
-                  pgNamedQueryContainer: {
-                    name: safeAlias,
-                    query: ({
-                      queryBuilder,
-                      innerQueryBuilder,
-                      options,
-                    }: {
-                      queryBuilder: QueryBuilder;
-                      innerQueryBuilder: QueryBuilder;
-                      options: any;
-                    }) => {
-                      const args = parsedResolveInfoFragment.args;
-                      const groupBy: SQL[] = args.groupBy.map((b: any) =>
-                        b.spec(queryBuilder.getTableAlias())
-                      );
-                      const having: SQL | null = args.having
-                        ? TableHavingInputType.extensions.graphile.toSql(
-                            args.having,
-                            { tableAlias: queryBuilder.getTableAlias() }
-                          )
-                        : null;
-                      if (having && groupBy.length === 0) {
-                        throw new Error(
-                          "Must not provide having without also providing groupBy"
-                        );
-                      }
-                      innerQueryBuilder.select(
-                        () =>
-                          sql.fragment`json_build_array(${sql.join(
-                            groupBy.map((b) => sql.fragment`(${b})::text`),
-                            ", "
-                          )})`,
-                        "keys"
-                      );
-                      return sql.fragment`\
-coalesce((select json_agg(j.data) from (
-  select ${innerQueryBuilder.build({ onlyJsonField: true })} as data
-  from ${queryBuilder.getTableExpression()} as ${queryBuilder.getTableAlias()}
-  where ${queryBuilder.buildWhereClause(false, false, options)}
-  ${
-    groupBy.length > 0
-      ? sql.fragment`group by ${sql.join(groupBy, ", ")}`
-      : sql.blank
-  }
-  ${having ? sql.fragment`having ${having}` : sql.empty}
-) j), '[]'::json)`;
-                    },
-                  },
-                  // This tells the query planner that we want to add an aggregate
-                  pgNamedQuery: {
-                    name: safeAlias,
-                    query: (aggregateQueryBuilder: QueryBuilder) => {
-                      // TODO: aggregateQueryBuilder.groupBy();
-                      // TODO: aggregateQueryBuilder.select();
-                      aggregateQueryBuilder.select(() => {
-                        const query = queryFromResolveData(
-                          sql.identifier(Symbol()),
-                          aggregateQueryBuilder.getTableAlias(), // Keep using our alias down the tree
-                          resolveData,
-                          { onlyJsonField: true },
-                          (innerQueryBuilder: QueryBuilder) => {
-                            innerQueryBuilder.parentQueryBuilder =
-                              aggregateQueryBuilder;
-                            innerQueryBuilder.select(
-                              sql.fragment`sum(1)`,
-                              "__force_aggregate__"
-                            );
-                          },
-                          aggregateQueryBuilder.context
-                        );
-                        return sql.fragment`(${query})`;
-                      }, safeAlias);
-                    },
-                  },
-                };
-              });
-              */
-
             return {
               description: `Grouped aggregates across the matching connection (ignoring before/after/first/last/offset)`,
               type: new GraphQLList(new GraphQLNonNull(AggregateContainerType)),
@@ -185,6 +105,31 @@ coalesce((select json_agg(j.data) from (
                     `The method to use when grouping \`${tableTypeName}\` for these aggregates.`,
                     "arg"
                   ),
+                  applyPlan(
+                    $parent,
+                    $pgSelect: PgSelectStep<any, any, any, any>,
+                    input,
+                    info
+                  ) {
+                    const $value = input.getRaw();
+                    const val = $value.eval();
+                    if (!Array.isArray(val)) {
+                      throw new Error("Invalid!");
+                    }
+                    for (const group of val) {
+                      const config = getEnumValueConfig(
+                        TableGroupByType,
+                        group
+                      );
+                      const plan = config?.extensions?.graphile?.applyPlan;
+                      if (typeof plan === "function") {
+                        plan($pgSelect);
+                      } else {
+                        // TODO: consider logging this lack of plan?
+                      }
+                    }
+                    return null;
+                  },
                 },
                 ...(TableHavingInputType
                   ? {
@@ -198,21 +143,9 @@ coalesce((select json_agg(j.data) from (
                     }
                   : null),
               },
-              /*
-                resolve(
-                  parent: any,
-                  _args: any,
-                  _context: any,
-                  resolveInfo: GraphQLResolveInfo
-                ) {
-                  const safeAlias = getSafeAliasFromResolveInfo(resolveInfo);
-                  return parent[safeAlias].map((entry: any) => ({
-                    /* Rewrite the object due to aliasing * /
-                    ...entry[safeAlias],
-                    keys: entry.keys,
-                  }));
-                },
-                */
+              plan($connection) {
+                return $connection.cloneSubplanWithoutPagination("aggregate");
+              },
             };
           }),
         };

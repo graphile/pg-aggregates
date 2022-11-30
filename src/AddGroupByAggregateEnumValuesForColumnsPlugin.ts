@@ -1,4 +1,5 @@
-import { PgSourceUnique, PgTypeColumn } from "@dataplan/pg";
+import { PgSelectStep, PgSourceUnique, PgTypeColumn } from "@dataplan/pg";
+import { GraphQLEnumValueConfig, GraphQLEnumValueConfigMap } from "graphql";
 import { SQL } from "pg-sql2";
 import { AggregateGroupBySpec } from "./interfaces";
 
@@ -46,11 +47,16 @@ const Plugin: GraphileConfig.Plugin = {
                 memo,
                 {
                   [fieldName]: {
-                    value: {
-                      spec: (tableAlias: SQL) =>
-                        sql.fragment`${tableAlias}.${sql.identifier(
-                          columnName
-                        )}`,
+                    extensions: {
+                      graphile: {
+                        applyPlan($pgSelect: PgSelectStep<any, any, any, any>) {
+                          $pgSelect.groupBy({
+                            fragment: sql.fragment`${
+                              $pgSelect.alias
+                            }.${sql.identifier(columnName)}`,
+                          });
+                        },
+                      },
                     },
                   },
                 },
@@ -77,15 +83,22 @@ const Plugin: GraphileConfig.Plugin = {
                     memo,
                     {
                       [fieldName]: {
-                        value: {
-                          aggregateGroupBySpec: (tableAlias: SQL) =>
-                            aggregateGroupBySpec.sqlWrap(
-                              sql.fragment`${tableAlias}.${sql.identifier(
-                                columnName
-                              )}`
-                            ),
+                        extensions: {
+                          graphile: {
+                            applyPlan(
+                              $pgSelect: PgSelectStep<any, any, any, any>
+                            ) {
+                              $pgSelect.groupBy({
+                                fragment: aggregateGroupBySpec.sqlWrap(
+                                  sql`${$pgSelect.alias}.${sql.identifier(
+                                    columnName
+                                  )}`
+                                ),
+                              });
+                            },
+                          },
                         },
-                      },
+                      } as GraphQLEnumValueConfig,
                     },
                     `Adding groupBy enum value for '${aggregateGroupBySpec.id}' derivative of ${table.name}.${columnName}.`
                   );
@@ -94,7 +107,7 @@ const Plugin: GraphileConfig.Plugin = {
 
               return memo;
             },
-            {}
+            Object.create(null) as GraphQLEnumValueConfigMap
           ),
           `Adding group by values for columns from table '${table.name}'`
         );

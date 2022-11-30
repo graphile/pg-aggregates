@@ -339,7 +339,6 @@ const Plugin: GraphileConfig.Plugin = {
               source,
               aggregateSpec,
             });
-            const name = typeName;
             build.registerInputObjectType(
               typeName,
               {},
@@ -464,9 +463,10 @@ const Plugin: GraphileConfig.Plugin = {
                         ) {
                           return memo;
                         }
-                        const fieldName = inflection.aggregatesField({
-                          aggregateSpec,
+                        const fieldName = inflection.computedColumnField({
+                          source: computedColumnSource,
                         });
+
                         const newField = fieldWithHooks(
                           { fieldName },
                           {
