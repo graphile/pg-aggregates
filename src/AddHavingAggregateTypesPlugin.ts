@@ -1,4 +1,11 @@
-import { PgTypeCodec, PgTypeColumn, TYPES } from "@dataplan/pg";
+import { PgConditionLikeStep, PgConditionStep } from "@dataplan/pg";
+import {
+  BooleanFilterStep,
+  OrFilterStep,
+  PgTypeCodec,
+  PgTypeColumn,
+  TYPES,
+} from "@dataplan/pg";
 import { GraphileFieldConfig, GraphileInputFieldConfigMap } from "grafast";
 import type {
   GraphQLFieldConfigMap,
@@ -104,33 +111,6 @@ const Plugin: GraphileConfig.Plugin = {
             () => ({
               name,
               fields: {},
-              // TODO: plan
-              /*
-              extensions: {
-                graphile: {
-                  toSql(argValue: any, details: any) {
-                    const fragments: SQL[] = [];
-                    if (argValue != null) {
-                      const fields = Self.getFields();
-                      Object.keys(fields).forEach((fieldName) => {
-                        const field = fields[fieldName];
-                        const value = argValue[fieldName];
-                        if (value == null) {
-                          return;
-                        }
-                        const toSql = field.extensions?.graphile?.toSql;
-                        if (typeof toSql === "function") {
-                          fragments.push(toSql(value, details));
-                        }
-                      });
-                    }
-                    return fragments.length > 0
-                      ? sql.fragment`(${sql.join(fragments, ") AND (")})`
-                      : sql.true;
-                  },
-                },
-              },
-              */
             }),
             ""
           );
@@ -173,29 +153,10 @@ const Plugin: GraphileConfig.Plugin = {
                         build.getInputTypeByName(tableHavingInputTypeName)
                       )
                     ),
-                    /*
-                    extensions: {
-                      graphile: {
-                        toSql(val: any, details: any) {
-                          if (val) {
-                            const children = val.map((item: any) =>
-                              TableHavingInputType.extensions.graphile.toSql(
-                                item,
-                                details
-                              )
-                            );
-                            if (children.length > 0) {
-                              return sql.fragment`(${sql.join(
-                                children,
-                                ") AND ("
-                              )})`;
-                            }
-                          }
-                          return sql.true;
-                        },
-                      },
+                    applyPlan($where, input) {
+                      input.apply($where);
+                      return null;
                     },
-                    */
                   },
                   OR: {
                     type: new GraphQLList(
@@ -203,58 +164,14 @@ const Plugin: GraphileConfig.Plugin = {
                         build.getInputTypeByName(tableHavingInputTypeName)
                       )
                     ),
-                    /*
-                    extensions: {
-                      graphile: {
-                        toSql(val: any, details: any) {
-                          if (val) {
-                            const children = val.map((item: any) =>
-                              TableHavingInputType.extensions.graphile.toSql(
-                                item,
-                                details
-                              )
-                            );
-                            if (children.length > 0) {
-                              return sql.fragment`(${sql.join(
-                                children,
-                                ") OR ("
-                              )})`;
-                            }
-                          }
-                          return sql.true;
-                        },
-                      },
+                    applyPlan($where, input) {
+                      const $or = new OrFilterStep($where);
+                      input.apply($or);
+                      return null;
                     },
-                    */
                   },
                 };
               },
-              /*
-              extensions: {
-                graphile: {
-                  toSql(argValue: any, details: any) {
-                    const fragments: SQL[] = [];
-                    if (argValue != null) {
-                      const fields = TableHavingInputType.getFields();
-                      Object.keys(fields).forEach((fieldName) => {
-                        const field = fields[fieldName];
-                        const value = argValue[fieldName];
-                        if (value == null) {
-                          return;
-                        }
-                        const toSql = field.extensions?.graphile?.toSql;
-                        if (typeof toSql === "function") {
-                          fragments.push(toSql(value, details));
-                        }
-                      });
-                    }
-                    return fragments.length > 0
-                      ? sql.fragment`(${sql.join(fragments, ") AND (")})`
-                      : sql.true;
-                  },
-                },
-              },
-              */
             }),
             `Adding connection "groupBy" having input type for ${source.name}.`
           );
@@ -282,6 +199,7 @@ const Plugin: GraphileConfig.Plugin = {
                       (memo, { inputType, graphqlArgName }) => {
                         memo[graphqlArgName] = {
                           type: inputType,
+                          // NO PLAN NEEDED!
                         };
                         return memo;
                       },
@@ -370,34 +288,17 @@ const Plugin: GraphileConfig.Plugin = {
                         }
                         const newField = fieldWithHooks({ fieldName }, () => ({
                           type: HavingFilterType,
-                          /*
-                            extensions: {
-                              graphile: {
-                                toSql(
-                                  val: any,
-                                  details: {
-                                    aggregateSpec: AggregateSpec;
-                                    tableAlias: SQL;
-                                  }
-                                ) {
-                                  const { tableAlias, aggregateSpec } = details;
-                                  const columnExpression = sql.fragment`${tableAlias}.${sql.identifier(
-                                    attr.name
-                                  )}`;
-                                  const aggregateExpression =
-                                    aggregateSpec.sqlAggregateWrap(
-                                      columnExpression
-                                    );
-                                  return (
-                                    HavingFilterType.extensions?.graphile?.toSql?.(
-                                      val,
-                                      { ...details, aggregateExpression }
-                                    ) ?? sql.true
-                                  );
-                                },
-                              },
-                            },
-                            */
+                          applyPlan($having: PgConditionLikeStep) {
+                            const columnExpression = sql.fragment`${
+                              $having.alias
+                            }.${sql.identifier(columnName)}`;
+                            const aggregateExpression =
+                              aggregateSpec.sqlAggregateWrap(columnExpression);
+                            return new BooleanFilterStep(
+                              $having,
+                              aggregateExpression
+                            );
+                          },
                         }));
                         return build.extend(
                           newFields,
@@ -513,32 +414,6 @@ const Plugin: GraphileConfig.Plugin = {
 
                   return fields;
                 },
-                /*
-                extensions: {
-                  graphile: {
-                    toSql(argValue: any, details: any) {
-                      const fragments: SQL[] = [];
-                      if (argValue != null) {
-                        const fields = SpecInput.getFields();
-                        Object.keys(fields).forEach((fieldName) => {
-                          const field = fields[fieldName];
-                          const value = argValue[fieldName];
-                          if (value == null) {
-                            return;
-                          }
-                          const toSql = field.extensions?.graphile?.toSql;
-                          if (typeof toSql === "function") {
-                            fragments.push(toSql(value, details));
-                          }
-                        });
-                      }
-                      return fragments.length > 0
-                        ? sql.fragment`(${sql.join(fragments, ") AND (")})`
-                        : sql.true;
-                    },
-                  },
-                },
-                */
               }),
               ""
             );
@@ -595,20 +470,9 @@ const Plugin: GraphileConfig.Plugin = {
                       { fieldName }, // e.g. 'average' or 'stddevPopulation'
                       {
                         type: SpecInput,
-                        /*
-                        extensions: {
-                          graphile: {
-                            toSql(val: any, details: any) {
-                              return (
-                                SpecInput.extensions?.graphile?.toSql?.(val, {
-                                  ...details,
-                                  aggregateSpec,
-                                }) ?? sql.true
-                              );
-                            },
-                          },
+                        applyPlan($having) {
+                          return $having;
                         },
-                        */
                       }
                     ),
                   },
@@ -661,25 +525,14 @@ const Plugin: GraphileConfig.Plugin = {
                   { fieldName },
                   {
                     type: FieldType,
-                    /*
-                    extensions: {
-                      graphile: {
-                        toSql(val: any, details: { aggregateExpression: SQL }) {
-                          if (val != null) {
-                            const { aggregateExpression } = details;
-
-                            return sql.fragment`(${aggregateExpression} ${infix} ${gql2pg(
-                              val,
-                              pgType,
-                              null
-                            )})`;
-                          } else {
-                            return sql.true;
-                          }
-                        },
-                      },
+                    applyPlan($booleanFilter: BooleanFilterStep, input) {
+                      const val = input.get();
+                      $booleanFilter.having(
+                        sql`(${sql.parens(
+                          $booleanFilter.expression
+                        )} ${infix} ${$booleanFilter.placeholder(val, codec!)})`
+                      );
                     },
-                    */
                   }
                 ),
               },

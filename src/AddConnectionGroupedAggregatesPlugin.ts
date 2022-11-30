@@ -139,6 +139,12 @@ const Plugin: GraphileConfig.Plugin = {
                           `Conditions on the grouped aggregates.`,
                           "arg"
                         ),
+                        applyPlan(
+                          $parent,
+                          $pgSelect: PgSelectStep<any, any, any, any>
+                        ) {
+                          return $pgSelect.havingPlan();
+                        },
                       },
                     }
                   : null),
