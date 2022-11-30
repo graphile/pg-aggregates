@@ -1,4 +1,9 @@
-import { PgConditionLikeStep, PgConditionStep } from "@dataplan/pg";
+import {
+  digestsFromArgumentSpecs,
+  PgConditionLikeStep,
+  PgConditionStep,
+} from "@dataplan/pg";
+import { PgSourceParameter } from "@dataplan/pg";
 import {
   BooleanFilterStep,
   OrFilterStep,
@@ -215,7 +220,8 @@ const Plugin: GraphileConfig.Plugin = {
                   aggregateSpec,
                   computedColumnSource,
                 });
-              const ComputedHavingInput = build.registerInputObjectType(
+              /*const ComputedHavingInput =*/
+              build.registerInputObjectType(
                 computedHavingInputName,
                 {},
                 () => {
@@ -234,17 +240,29 @@ const Plugin: GraphileConfig.Plugin = {
                   if (!HavingFilterType || !ArgsType) {
                     return { fields: {} };
                   }
+                  const requiresAtLeastOneArg = (
+                    computedColumnSource.parameters as PgSourceParameter[]
+                  )
+                    .slice(1)
+                    .some((p) => p.required);
                   return {
                     fields: {
                       ...(ArgsType
                         ? {
                             args: {
-                              type: ArgsType,
+                              type: build.nullableIf(
+                                !requiresAtLeastOneArg,
+                                ArgsType
+                              ),
+                              // NO PLAN NEEDED
                             },
                           }
                         : null),
                       filter: {
-                        type: HavingFilterType,
+                        type: new GraphQLNonNull(HavingFilterType),
+                        applyPlan($filter) {
+                          return $filter;
+                        },
                       },
                     },
                   };
@@ -367,35 +385,52 @@ const Plugin: GraphileConfig.Plugin = {
                         const fieldName = inflection.computedColumnField({
                           source: computedColumnSource,
                         });
+                        const { argDetails, makeFieldArgs, makeArgs } =
+                          build.pgGetArgDetailsFromParameters(
+                            computedColumnSource,
+                            computedColumnSource.parameters.slice(1)
+                          );
 
                         const newField = fieldWithHooks(
                           { fieldName },
                           {
                             type: ComputedHavingInput,
-                            /*
-                            extensions: {
-                              graphile: {
-                                toSql(
-                                  val: { args?: any; filter: any },
-                                  details: any
-                                ) {
-                                  const { tableAlias, aggregateSpec } = details;
-                                  const functionCallExpression =
-                                    makeSqlFunctionCall(val.args, {
-                                      implicitArgs: [tableAlias],
-                                    });
-                                  const aggregateExpression =
-                                    aggregateSpec.sqlAggregateWrap(
-                                      functionCallExpression
-                                    );
-                                  return HavingFilterType.extensions.graphile.toSql(
-                                    val.filter,
-                                    { ...details, aggregateExpression }
-                                  );
-                                },
-                              },
+                            applyPlan($having, fieldArgs) {
+                              // Because we require that the computed column is
+                              // evaluated inline, we have to convert it to an
+                              // expression here; this is only needed because of the
+                              // aggregation.
+
+                              const args = makeArgs(fieldArgs, ["args"]);
+                              const { digests } = digestsFromArgumentSpecs(
+                                $having,
+                                args,
+                                [
+                                  {
+                                    placeholder: $having.alias,
+                                    position: 0,
+                                  },
+                                ],
+                                1
+                              );
+                              if (
+                                typeof computedColumnSource.source !==
+                                "function"
+                              ) {
+                                throw new Error("!function");
+                              }
+                              const src = computedColumnSource.source(
+                                ...digests
+                              );
+
+                              const aggregateExpression =
+                                aggregateSpec.sqlAggregateWrap(src);
+                              const $filter = new BooleanFilterStep(
+                                $having,
+                                aggregateExpression
+                              );
+                              fieldArgs.apply($filter, "filter");
                             },
-                            */
                           }
                         );
                         return build.extend(
