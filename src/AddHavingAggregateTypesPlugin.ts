@@ -385,7 +385,7 @@ const Plugin: GraphileConfig.Plugin = {
                         const fieldName = inflection.computedColumnField({
                           source: computedColumnSource,
                         });
-                        const { argDetails, makeFieldArgs, makeArgs } =
+                        const { makeExpression } =
                           build.pgGetArgDetailsFromParameters(
                             computedColumnSource,
                             computedColumnSource.parameters.slice(1)
@@ -400,28 +400,13 @@ const Plugin: GraphileConfig.Plugin = {
                               // evaluated inline, we have to convert it to an
                               // expression here; this is only needed because of the
                               // aggregation.
-
-                              const args = makeArgs(fieldArgs, ["args"]);
-                              const { digests } = digestsFromArgumentSpecs(
-                                $having,
-                                args,
-                                [
-                                  {
-                                    placeholder: $having.alias,
-                                    position: 0,
-                                  },
-                                ],
-                                1
-                              );
-                              if (
-                                typeof computedColumnSource.source !==
-                                "function"
-                              ) {
-                                throw new Error("!function");
-                              }
-                              const src = computedColumnSource.source(
-                                ...digests
-                              );
+                              const src = makeExpression({
+                                $placeholderable: $having,
+                                source: computedColumnSource,
+                                fieldArgs,
+                                path: ["args"],
+                                initialArgs: [$having.alias],
+                              });
 
                               const aggregateExpression =
                                 aggregateSpec.sqlAggregateWrap(src);

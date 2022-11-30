@@ -302,11 +302,15 @@ const Plugin: GraphileConfig.Plugin = {
                       fieldName,
                     },
                     () => {
-                      const { argDetails, makeFieldArgs, makeArgs } =
-                        build.pgGetArgDetailsFromParameters(
-                          computedColumnSource,
-                          computedColumnSource.parameters.slice(1)
-                        );
+                      const {
+                        argDetails,
+                        makeFieldArgs,
+                        makeArgs,
+                        makeExpression,
+                      } = build.pgGetArgDetailsFromParameters(
+                        computedColumnSource,
+                        computedColumnSource.parameters.slice(1)
+                      );
                       return {
                         type: targetType,
                         description: `${
@@ -330,26 +334,12 @@ const Plugin: GraphileConfig.Plugin = {
                           // evaluated inline, we have to convert it to an
                           // expression here; this is only needed because of the
                           // aggregation.
-
-                          const args = makeArgs(fieldArgs);
-                          const { digests } = digestsFromArgumentSpecs(
-                            $pgSelectSingle,
-                            args,
-                            [
-                              {
-                                placeholder:
-                                  $pgSelectSingle.getClassStep().alias,
-                                position: 0,
-                              },
-                            ],
-                            1
-                          );
-                          if (
-                            typeof computedColumnSource.source !== "function"
-                          ) {
-                            throw new Error("!function");
-                          }
-                          const src = computedColumnSource.source(...digests);
+                          const src = makeExpression({
+                            $placeholderable: $pgSelectSingle,
+                            source: computedColumnSource,
+                            fieldArgs,
+                            initialArgs: [$pgSelectSingle.getClassStep().alias],
+                          });
 
                           const sqlAggregate = spec.sqlAggregateWrap(src);
                           return $pgSelectSingle.select(
