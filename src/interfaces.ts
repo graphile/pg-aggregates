@@ -4,7 +4,6 @@ import type { SQL } from "pg-sql2";
 declare module "@dataplan/pg" {
   interface PgTypeCodecExtensions {
     isNumberLike?: boolean;
-    oid?: string;
   }
 }
 

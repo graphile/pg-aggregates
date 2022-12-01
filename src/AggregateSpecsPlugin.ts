@@ -32,7 +32,6 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
             pgCodec.extensions = Object.create(null);
           }
           pgCodec.extensions!.isNumberLike = true;
-          pgCodec.extensions!.oid = pgType._id;
         }
       },
     },
