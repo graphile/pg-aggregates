@@ -151,36 +151,43 @@ const Plugin: GraphileConfig.Plugin = {
           fields = build.extend(
             fields,
             build.pgAggregateSpecs.reduce((memo, aggregateSpec) => {
-              const aggregateTypeName = inflection.aggregateType({
-                source,
-                aggregateSpec,
-              });
-              const AggregateType =
-                build.getOutputTypeByName(aggregateTypeName);
-              const fieldName = inflection.aggregatesField({ aggregateSpec });
-              return build.extend(
-                memo,
-                {
-                  [fieldName]: fieldWithHooks(
-                    {
-                      fieldName,
-                      isPgAggregateField: true,
-                      pgAggregateSpec: aggregateSpec,
-                      pgFieldSource: source,
-                    },
-                    () => ({
-                      description: `${aggregateSpec.HumanLabel} aggregates across the matching connection (ignoring before/after/first/last/offset)`,
-                      type: AggregateType,
-                      plan(
-                        $pgSelectSingle: PgSelectSingleStep<any, any, any, any>
-                      ) {
-                        return $pgSelectSingle;
+              return build.recoverable(memo, () => {
+                const aggregateTypeName = inflection.aggregateType({
+                  source,
+                  aggregateSpec,
+                });
+                const AggregateType =
+                  build.getOutputTypeByName(aggregateTypeName);
+                const fieldName = inflection.aggregatesField({ aggregateSpec });
+                return build.extend(
+                  memo,
+                  {
+                    [fieldName]: fieldWithHooks(
+                      {
+                        fieldName,
+                        isPgAggregateField: true,
+                        pgAggregateSpec: aggregateSpec,
+                        pgFieldSource: source,
                       },
-                    })
-                  ),
-                },
-                `Adding aggregates field to ${Self.name}`
-              );
+                      () => ({
+                        description: `${aggregateSpec.HumanLabel} aggregates across the matching connection (ignoring before/after/first/last/offset)`,
+                        type: AggregateType,
+                        plan(
+                          $pgSelectSingle: PgSelectSingleStep<
+                            any,
+                            any,
+                            any,
+                            any
+                          >
+                        ) {
+                          return $pgSelectSingle;
+                        },
+                      })
+                    ),
+                  },
+                  `Adding aggregates field to ${Self.name}`
+                );
+              });
             }, {} as GraphQLFieldConfigMap<unknown, unknown>),
             "Adding sum operation to aggregate type"
           );
