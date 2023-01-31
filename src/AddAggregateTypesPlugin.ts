@@ -8,7 +8,7 @@ import type {
 import type { GraphQLResolveInfo, GraphQLFieldConfigMap } from "graphql";
 import { AggregateSpec } from "./interfaces";
 
-const AddAggregateTypesPlugin: Plugin = (builder) => {
+const AddAggregateTypesPlugin: Plugin = (builder, options) => {
   // Create the aggregates type for each table
   builder.hook("init", (init, build, _context) => {
     const {
@@ -35,6 +35,12 @@ const AddAggregateTypesPlugin: Plugin = (builder) => {
         return;
       }
       if (!table.isSelectable) {
+        return;
+      }
+      if (table.tags.aggregates === "off") {
+        return;
+      }
+      if (options.disableAggregatesByDefault && table.tags.aggregates !== "on") {
         return;
       }
 
