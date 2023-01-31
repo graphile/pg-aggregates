@@ -429,7 +429,7 @@ more information.
 ## Disable aggregates
 
 The aggregates are created for all tables which really massively increases the type def in size.
-You can disable aggregates by default and enable them only for the tables yo need.
+You can disable aggregates by default and enable them only for the tables you need.
 
 ```ts
 // Disable aggregates by default
@@ -448,7 +448,7 @@ Enable aggregates for a specific table:
 }
 ```
 
-OR
+or:
 
 ```sql
 COMMENT ON TABLE my_schema.my_table IS E'@aggregates on';
@@ -464,7 +464,7 @@ You also can keep aggregates enabled by default, but disable aggregates for spec
 }
 ```
 
-OR
+or:
 
 ```sql
 COMMENT ON TABLE my_schema.my_table IS E'@aggregates off';
