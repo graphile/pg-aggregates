@@ -426,6 +426,50 @@ Finally pass this plugin into PostGraphile via `--append-plugins` or
 See [src/AggregateSpecsPlugin.ts](src/AggregateSpecsPlugin.ts) for examples and
 more information.
 
+## Disable aggregates
+
+The aggregates are created for all tables which really massively increases the type def in size.
+You can disable aggregates by default and enable them only for the tables yo need.
+
+```ts
+// Disable aggregates by default
+graphileBuildOptions: {
+  disableAggregatesByDefault: true,
+}
+```
+
+Enable aggregates for a specific table:
+
+```ts
+"my_schema.my_table": {
+  "tags": {
+    "aggregates": "on"
+  }
+}
+```
+
+OR
+
+```sql
+COMMENT ON TABLE my_schema.my_table IS E'@aggregates on';
+```
+
+You also can keep aggregates enabled by default, but disable aggregates for specific tables:
+
+```ts
+"my_schema.my_table": {
+  "tags": {
+    "aggregates": "off"
+  }
+}
+```
+
+OR
+
+```sql
+COMMENT ON TABLE my_schema.my_table IS E'@aggregates off';
+```
+
 ## Thanks
 
 This plugin was started as a proof of concept in 2019 thanks to sponsorship from
