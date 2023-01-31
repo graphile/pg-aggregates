@@ -428,22 +428,34 @@ more information.
 
 ## Disable aggregates
 
-The aggregates are created for all tables which really massively increases the type def in size.
-You can disable aggregates by default and enable them only for the tables you need.
+By default, aggregates are created for all tables. This significantly increases the size of your
+GraphQL schema, and could also be a security (DoS) concern as aggregates can be expensive. We
+recommend that you use the `disableAggregatesByDefault: true` option to disable aggregates by
+default, and then enable them only for the tables you need:
 
 ```ts
-// Disable aggregates by default
-graphileBuildOptions: {
-  disableAggregatesByDefault: true,
-}
+const middleware = postgraphile(DATABASE_URL, SCHEMAS, {
+  // ...
+  appendPlugins: [
+    // ...
+    PgAggregatesPlugin,
+  ],
+  
+  graphileBuildOptions: {
+    // Disable aggregates by default; opt each table in via the `@aggregates` smart tag
+    disableAggregatesByDefault: true,
+  },
+});
 ```
 
 Enable aggregates for a specific table:
 
-```ts
-"my_schema.my_table": {
-  "tags": {
-    "aggregates": "on"
+```json
+"class": {
+  "my_schema.my_table": {
+    "tags": {
+      "aggregates": "off"
+    }
   }
 }
 ```
@@ -456,10 +468,12 @@ COMMENT ON TABLE my_schema.my_table IS E'@aggregates on';
 
 You also can keep aggregates enabled by default, but disable aggregates for specific tables:
 
-```ts
-"my_schema.my_table": {
-  "tags": {
-    "aggregates": "off"
+```json
+"class": {
+  "my_schema.my_table": {
+    "tags": {
+      "aggregates": "on"
+    }
   }
 }
 ```
