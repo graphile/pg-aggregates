@@ -8,7 +8,7 @@ import type {
 } from "graphql";
 import { AggregateSpec } from "./interfaces";
 
-const FilterRelationalAggregatesPlugin: Plugin = (builder) => {
+const FilterRelationalAggregatesPlugin: Plugin = (builder, options) => {
   // This hook adds 'aggregates' under a "backwards" relation, siblings of
   // every, some, none.
   // See https://github.com/graphile-contrib/postgraphile-plugin-connection-filter/blob/6223cdb1d2ac5723aecdf55f735a18f8e2b98683/src/PgConnectionArgFilterBackwardRelationsPlugin.ts#L374
@@ -31,6 +31,14 @@ const FilterRelationalAggregatesPlugin: Plugin = (builder) => {
     } = context;
 
     if (!isPgConnectionFilterMany || !foreignTable) return fields;
+    if (
+      foreignTable.tags.aggregates === "off" || (
+        options.disableAggregatesByDefault &&
+        foreignTable.tags.aggregates !== "on"
+      )
+    ) {
+      return fields;
+    }
 
     connectionFilterTypesByTypeName[Self.name] = Self;
 

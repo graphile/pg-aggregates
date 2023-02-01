@@ -20,7 +20,7 @@ export interface OrderSpecs {
   };
 }
 
-const OrderByAggregatesPlugin: Plugin = (builder) => {
+const OrderByAggregatesPlugin: Plugin = (builder, options) => {
   builder.hook("GraphQLEnumType:values", (values, build, context) => {
     const {
       extend,
@@ -60,6 +60,14 @@ const OrderByAggregatesPlugin: Plugin = (builder) => {
         throw new Error(
           `Could not find the table that referenced us (constraint: ${constraint.name})`
         );
+      }
+      if (
+        table.tags.aggregates === "off" || (
+          options.disableAggregatesByDefault &&
+          table.tags.aggregates !== "on"
+        )
+      ) {
+        return memo;
       }
       const keys = constraint.keyAttributes;
       const foreignKeys = constraint.foreignKeyAttributes;

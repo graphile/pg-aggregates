@@ -426,6 +426,64 @@ Finally pass this plugin into PostGraphile via `--append-plugins` or
 See [src/AggregateSpecsPlugin.ts](src/AggregateSpecsPlugin.ts) for examples and
 more information.
 
+## Disable aggregates
+
+By default, aggregates are created for all tables. This significantly increases the size of your
+GraphQL schema, and could also be a security (DoS) concern as aggregates can be expensive. We
+recommend that you use the `disableAggregatesByDefault: true` option to disable aggregates by
+default, and then enable them only for the tables you need:
+
+```ts
+const middleware = postgraphile(DATABASE_URL, SCHEMAS, {
+  // ...
+  appendPlugins: [
+    // ...
+    PgAggregatesPlugin,
+  ],
+  
+  graphileBuildOptions: {
+    // Disable aggregates by default; opt each table in via the `@aggregates` smart tag
+    disableAggregatesByDefault: true,
+  },
+});
+```
+
+Enable aggregates for a specific table:
+
+```json
+"class": {
+  "my_schema.my_table": {
+    "tags": {
+      "aggregates": "on"
+    }
+  }
+}
+```
+
+or:
+
+```sql
+COMMENT ON TABLE my_schema.my_table IS E'@aggregates on';
+```
+
+You also can keep aggregates enabled by default, but disable aggregates for specific tables:
+
+```json
+"class": {
+  "my_schema.my_table": {
+    "tags": {
+      "aggregates": "off"
+    }
+  }
+}
+```
+
+or:
+
+```sql
+COMMENT ON TABLE my_schema.my_table IS E'@aggregates off';
+```
+
 ## Thanks
 
 This plugin was started as a proof of concept in 2019 thanks to sponsorship from
