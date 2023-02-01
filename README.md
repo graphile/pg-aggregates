@@ -454,7 +454,7 @@ Enable aggregates for a specific table:
 "class": {
   "my_schema.my_table": {
     "tags": {
-      "aggregates": "off"
+      "aggregates": "on"
     }
   }
 }
@@ -472,7 +472,7 @@ You also can keep aggregates enabled by default, but disable aggregates for spec
 "class": {
   "my_schema.my_table": {
     "tags": {
-      "aggregates": "on"
+      "aggregates": "off"
     }
   }
 }
