@@ -128,9 +128,8 @@ const Plugin: GraphileConfig.Plugin = {
         let fields = inFields;
         const {
           inflection,
-          graphql: { GraphQLObjectType },
           sql,
-          graphql: { GraphQLNonNull },
+          graphql: { GraphQLNonNull, isOutputType },
         } = build;
         const {
           fieldWithHooks,
@@ -156,8 +155,10 @@ const Plugin: GraphileConfig.Plugin = {
                   source,
                   aggregateSpec,
                 });
-                const AggregateType =
-                  build.getOutputTypeByName(aggregateTypeName);
+                const AggregateType = build.getTypeByName(aggregateTypeName);
+                if (!AggregateType || !isOutputType(AggregateType)) {
+                  return memo;
+                }
                 const fieldName = inflection.aggregatesField({ aggregateSpec });
                 return build.extend(
                   memo,
