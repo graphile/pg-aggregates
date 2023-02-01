@@ -208,7 +208,7 @@ where ${sql.join(
 
             return memo;
           },
-          {} as GraphQLEnumValueConfigMap
+          Object.create(null) as GraphQLEnumValueConfigMap
         );
 
         return extend(

@@ -352,7 +352,7 @@ export const Plugin: GraphileConfig.Plugin = {
                   type: OperatorsType,
                 },
               });
-            }, {} as GraphQLInputFieldConfigMap),
+            }, Object.create(null) as GraphQLInputFieldConfigMap),
 
             ...pgIntrospectionResultsByKind.procedure.reduce((memo, proc) => {
               if (proc.returnsSet) {
@@ -420,7 +420,7 @@ export const Plugin: GraphileConfig.Plugin = {
                   type: OperatorsType,
                 },
               });
-            }, {} as GraphQLInputFieldConfigMap),
+            }, Object.create(null) as GraphQLInputFieldConfigMap),
           });
         })();
         return fields;

@@ -115,7 +115,7 @@ const Plugin: GraphileConfig.Plugin = {
             },
             () => ({
               name,
-              fields: {},
+              fields: Object.create(null),
             }),
             ""
           );
@@ -208,7 +208,10 @@ const Plugin: GraphileConfig.Plugin = {
                         };
                         return memo;
                       },
-                      {} as GraphileInputFieldConfigMap<any, any>
+                      Object.create(null) as GraphileInputFieldConfigMap<
+                        any,
+                        any
+                      >
                     ),
                   };
                 },
@@ -238,7 +241,7 @@ const Plugin: GraphileConfig.Plugin = {
                     | GraphQLInputObjectType
                     | undefined;
                   if (!HavingFilterType || !ArgsType) {
-                    return { fields: {} };
+                    return { fields: Object.create(null) };
                   }
                   const requiresAtLeastOneArg = (
                     computedColumnSource.parameters as PgSourceParameter[]
@@ -324,7 +327,7 @@ const Plugin: GraphileConfig.Plugin = {
                           `Adding column '${columnName}' to having filter type for '${source.name}'`
                         );
                       },
-                      {}
+                      Object.create(null)
                     ),
                     ""
                   );
@@ -499,7 +502,7 @@ const Plugin: GraphileConfig.Plugin = {
                   ""
                 );
               },
-              {}
+              Object.create(null)
             ),
             `Adding columns to having filter for '${table.name}'`
           );

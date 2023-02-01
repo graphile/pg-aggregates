@@ -189,7 +189,7 @@ const Plugin: GraphileConfig.Plugin = {
                   `Adding aggregates field to ${Self.name}`
                 );
               });
-            }, {} as GraphQLFieldConfigMap<unknown, unknown>),
+            }, Object.create(null) as GraphQLFieldConfigMap<unknown, unknown>),
             "Adding sum operation to aggregate type"
           );
         }
@@ -361,7 +361,7 @@ const Plugin: GraphileConfig.Plugin = {
                 },
                 ""
               );
-            }, {} as GraphQLFieldConfigMap<any, any>),
+            }, Object.create(null) as GraphQLFieldConfigMap<any, any>),
             ""
           );
         }
