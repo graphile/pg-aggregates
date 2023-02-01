@@ -37,10 +37,12 @@ const AddAggregateTypesPlugin: Plugin = (builder, options) => {
       if (!table.isSelectable) {
         return;
       }
-      if (table.tags.aggregates === "off") {
-        return;
-      }
-      if (options.disableAggregatesByDefault && table.tags.aggregates !== "on") {
+      if (
+        table.tags.aggregates === "off" || (
+          options.disableAggregatesByDefault &&
+          table.tags.aggregates !== "on"
+        )
+      ) {
         return;
       }
 
