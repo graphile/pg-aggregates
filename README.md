@@ -21,10 +21,15 @@ and development via sponsorship.
 And please give some love to our featured sponsors 🤩:
 
 <table><tr>
+<td align="center"><a href="https://surge.io/"><img src="https://graphile.org/images/sponsors/surge.png" width="90" height="90" alt="Surge" /><br />Surge</a> *</td>
+<td align="center"><a href="https://www.netflix.com/"><img src="https://graphile.org/images/sponsors/Netflix.png" width="90" height="90" alt="Netflix" /><br />Netflix</a> *</td>
+<td align="center"><a href="https://www.the-guild.dev/"><img src="https://graphile.org/images/sponsors/theguild.png" width="90" height="90" alt="The Guild" /><br />The Guild</a> *</td>
+<td align="center"><a href="https://qwick.com/"><img src="https://graphile.org/images/sponsors/qwick.png" width="90" height="90" alt="Qwick" /><br />Qwick</a> *</td>
+</tr><tr>
 <td align="center"><a href="http://chads.website"><img src="https://graphile.org/images/sponsors/chadf.png" width="90" height="90" alt="Chad Furman" /><br />Chad Furman</a> *</td>
-<td align="center"><a href="https://storyscript.com/?utm_source=postgraphile"><img src="https://graphile.org/images/sponsors/storyscript.png" width="90" height="90" alt="Storyscript" /><br />Storyscript</a> *</td>
-<td align="center"><a href="https://surge.io/"><img src="https://graphile.org/images/sponsors/surge.png" width="90" height="90" alt="Surge.io" /><br />Surge.io</a> *</td>
-<td align="center"><a href="https://postlight.com/?utm_source=graphile"><img src="https://graphile.org/images/sponsors/postlight.jpg" width="90" height="90" alt="Postlight" /><br />Postlight</a> *</td>
+<td align="center"><a href="https://dovetailapp.com/"><img src="https://graphile.org/images/sponsors/dovetail.png" width="90" height="90" alt="Dovetail" /><br />Dovetail</a> *</td>
+<td align="center"><a href="https://www.enzuzo.com/"><img src="https://graphile.org/images/sponsors/enzuzo.png" width="90" height="90" alt="Enzuzo" /><br />Enzuzo</a> *</td>
+<td align="center"><a href="https://stellate.co/"><img src="https://graphile.org/images/sponsors/Stellate.png" width="90" height="90" alt="Stellate" /><br />Stellate</a> *</td>
 </tr></table>
 
 <em>\* Sponsors the entire Graphile suite</em>
@@ -428,10 +433,11 @@ more information.
 
 ## Disable aggregates
 
-By default, aggregates are created for all tables. This significantly increases the size of your
-GraphQL schema, and could also be a security (DoS) concern as aggregates can be expensive. We
-recommend that you use the `disableAggregatesByDefault: true` option to disable aggregates by
-default, and then enable them only for the tables you need:
+By default, aggregates are created for all tables. This significantly increases
+the size of your GraphQL schema, and could also be a security (DoS) concern as
+aggregates can be expensive. We recommend that you use the
+`disableAggregatesByDefault: true` option to disable aggregates by default, and
+then enable them only for the tables you need:
 
 ```ts
 const middleware = postgraphile(DATABASE_URL, SCHEMAS, {
@@ -440,7 +446,7 @@ const middleware = postgraphile(DATABASE_URL, SCHEMAS, {
     // ...
     PgAggregatesPlugin,
   ],
-  
+
   graphileBuildOptions: {
     // Disable aggregates by default; opt each table in via the `@aggregates` smart tag
     disableAggregatesByDefault: true,
@@ -466,7 +472,8 @@ or:
 COMMENT ON TABLE my_schema.my_table IS E'@aggregates on';
 ```
 
-You also can keep aggregates enabled by default, but disable aggregates for specific tables:
+You also can keep aggregates enabled by default, but disable aggregates for
+specific tables:
 
 ```json
 "class": {
