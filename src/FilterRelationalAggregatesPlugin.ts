@@ -163,10 +163,18 @@ export const Plugin: GraphileConfig.Plugin = {
       // See https://github.com/graphile-contrib/postgraphile-plugin-connection-filter/blob/6223cdb1d2ac5723aecdf55f735a18f8e2b98683/src/PgConnectionArgFilterBackwardRelationsPlugin.ts#L374
       GraphQLInputObjectType_fields(inFields, build, context) {
         let fields = inFields;
-        const { inflection, sql } = build;
+        const { extend, inflection, sql, pgAggregateSpecs } = build;
         const {
           fieldWithHooks,
-          scope: { foreignTable, isPgConnectionFilterMany },
+          scope: {
+            foreignTable,
+            isPgConnectionFilterMany,
+            isPgConnectionAggregateFilter,
+            pgSource,
+            isPgConnectionAggregateAggregateFilter,
+            pgConnectionAggregateFilterAggregateSpec: spec,
+            pgTypeSource,
+          },
         } = context;
 
         // Add 'aggregates' field to relation filters, next to `every`/`some`/`none`
@@ -236,87 +244,10 @@ export const Plugin: GraphileConfig.Plugin = {
             },
             "Adding 'aggregates' filter field on relation"
           );
-
-          /*
-          const resolve: ConnectionFilterResolver = ({
-            sourceAlias,
-            fieldValue,
-            queryBuilder,
-            parentFieldInfo,
-          }) => {
-            if (fieldValue == null) return null;
-
-            if (!parentFieldInfo || !parentFieldInfo.backwardRelationSpec) {
-              throw new Error("Did not receive backward relation spec");
-            }
-            const {
-              keyAttributes,
-              foreignKeyAttributes,
-            }: BackwardRelationSpec = parentFieldInfo.backwardRelationSpec;
-
-            const foreignTableAlias = sql.identifier(Symbol());
-            const sqlIdentifier = sql.identifier(
-              foreignTable.namespace.name,
-              foreignTable.name
-            );
-            const sqlKeysMatch = sql.query`(${sql.join(
-              foreignKeyAttributes.map((attr, i) => {
-                return sql.fragment`${foreignTableAlias}.${sql.identifier(
-                  attr.name
-                )} = ${sourceAlias}.${sql.identifier(keyAttributes[i].name)}`;
-              }),
-              ") and ("
-            )})`;
-
-            // Since we want `aggregates: {filter: {...}, sum: {...}}` at the same
-            // level, we extract the filter for the `where` clause whilst
-            // extracting all the other fields for the `select` clause.
-            const { [filterFieldName]: filter, ...rest } = fieldValue as any;
-            if (Object.keys(rest).length === 0) {
-              const fieldNames = Object.keys(AggregateType.getFields()).filter(
-                (n) => n !== filterFieldName
-              );
-              const lastFieldName = fieldNames.pop();
-              throw new Error(
-                `'aggregates' filter must specify at least one aggregate: ${
-                  fieldNames.length > 0
-                    ? `'${fieldNames.join("', '")}' or `
-                    : ""
-                }'${lastFieldName}').`
-              );
-            }
-            const sqlFragment = filter
-              ? connectionFilterResolve(
-                  filter,
-                  foreignTableAlias,
-                  foreignTableFilterTypeName,
-                  queryBuilder
-                )
-              : sql.fragment`true`;
-            const sqlAggregateConditions = connectionFilterResolve(
-              rest,
-              foreignTableAlias,
-              foreignTableAggregateFilterTypeName,
-              queryBuilder
-            );
-            //const sqlAggregateConditions = [sql.fragment`sum(saves) > 9`];
-            const sqlSelectWhereKeysMatch = sql.query`(select (${sqlAggregateConditions}) from (
-          select * from ${sqlIdentifier} as ${foreignTableAlias}
-          where ${sqlKeysMatch}
-          and (${sqlFragment})
-        ) as ${foreignTableAlias}
-          };
-          */
         })();
 
         // This hook adds our various aggregates to the 'aggregates' input defined in `AggregateType` above
         fields = (() => {
-          const { extend, inflection, pgAggregateSpecs } = build;
-          const {
-            fieldWithHooks,
-            scope: { isPgConnectionAggregateFilter, pgSource },
-          } = context;
-
           if (
             !isPgConnectionAggregateFilter ||
             !pgSource ||
@@ -335,24 +266,6 @@ export const Plugin: GraphileConfig.Plugin = {
               spec
             );
             const fieldName = inflection.camelCase(spec.id);
-
-            /*
-            const resolve: ConnectionFilterResolver = ({
-              sourceAlias,
-              fieldValue,
-              queryBuilder,
-              //parentFieldInfo,
-            }) => {
-              if (fieldValue == null) return null;
-              const sqlFrag = connectionFilterResolve(
-                fieldValue,
-                sourceAlias,
-                filterTypeName,
-                queryBuilder
-              );
-              return sqlFrag;
-            };
-            */
 
             const type = build.getTypeByName(filterTypeName);
             if (!type) {
@@ -379,15 +292,6 @@ export const Plugin: GraphileConfig.Plugin = {
 
         // This hook adds matching columns to the relevant aggregate types.
         fields = (() => {
-          const { extend, inflection } = build;
-          const {
-            scope: {
-              isPgConnectionAggregateAggregateFilter,
-              pgConnectionAggregateFilterAggregateSpec: spec,
-              pgTypeSource,
-            },
-          } = context;
-
           if (
             !isPgConnectionAggregateAggregateFilter ||
             !spec ||
@@ -433,42 +337,10 @@ export const Plugin: GraphileConfig.Plugin = {
                   const OperatorsType = build.getTypeByName(
                     digest.operatorsTypeName
                   ) as GraphQLInputObjectType;
-                  /*
-                const OperatorsType: GraphQLInputObjectType | undefined =
-                  connectionFilterOperatorsType(
-                    newWithHooks,
-                    pgType.id,
-                    pgTypeModifier
-                  );
-                */
 
                   if (!OperatorsType) {
                     return memo;
                   }
-                  /*
-                const resolve: ConnectionFilterResolver = ({
-                  sourceAlias,
-                  fieldName,
-                  fieldValue,
-                  queryBuilder,
-                }) => {
-                  if (fieldValue == null) return null;
-                  const sqlColumn = sql.query`${sourceAlias}.${sql.identifier(
-                    column.name
-                  )}`;
-                  const sqlAggregate = spec.sqlAggregateWrap(sqlColumn);
-                  const frag = connectionFilterResolve(
-                    fieldValue,
-                    sqlAggregate,
-                    OperatorsType.name,
-                    queryBuilder,
-                    pgType,
-                    pgTypeModifier,
-                    fieldName
-                  );
-                  return frag;
-                };
-                */
 
                   const codec = spec.pgTypeCodecModifier
                     ? spec.pgTypeCodecModifier(column.codec)
