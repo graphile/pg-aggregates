@@ -8,8 +8,7 @@
     "watch": "tsc --watch",
     "test": "jest -i",
     "tslint": "prettier --list-different 'src/**/*' && tslint --config tslint.json --project tsconfig.json",
-    "postgraphile": "nodemon --watch dist -x './postgraphile.sh'",
-    "dev": "psql -X1v ON_ERROR_STOP=1 -f __tests__/schema.sql graphile_aggregates && concurrently --kill-others 'npm run watch' 'npm run postgraphile'",
+    "dev": "psql -X1v ON_ERROR_STOP=1 -f __tests__/schema.sql graphile_aggregates && concurrently --kill-others 'yarn run watch' 'yarn nodemon --watch dist -x postgraphile'",
     "prepack": "rm -Rf dist && npm run build"
   },
   "repository": {
