@@ -3,6 +3,7 @@ const { version } = require("../package.json");
 const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddGroupByAggregateEnumsPlugin",
   version,
+  provides: ["aggregates"],
 
   schema: {
     hooks: {

@@ -41,6 +41,7 @@ const isSuitableSource = (
 const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddAggregateTypesPlugin",
   version,
+  provides: ["aggregates"],
 
   // Create the aggregates type for each table
   schema: {

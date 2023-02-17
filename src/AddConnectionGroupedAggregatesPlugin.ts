@@ -28,6 +28,7 @@ function isValidEnum(enumType: GraphQLEnumType | undefined): boolean {
 const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddConnectionGroupedAggregatesPlugin",
   version,
+  provides: ["aggregates"],
 
   schema: {
     hooks: {

@@ -22,6 +22,7 @@ const isNumberLike = (codec: PgTypeCodec<any, any, any, any>): boolean =>
 export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
   name: "PgAggregatesSpecsPlugin",
   version,
+  provides: ["aggregates"],
 
   gather: {
     hooks: {

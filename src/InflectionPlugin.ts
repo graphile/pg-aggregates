@@ -122,7 +122,7 @@ declare global {
 
       aggregateHavingFilterInputType(
         this: Inflection,
-        spec: typeof CORE_HAVING_FILTER_SPECS[number]
+        spec: (typeof CORE_HAVING_FILTER_SPECS)[number]
       ): string;
     }
   }
@@ -131,6 +131,7 @@ declare global {
 export const PgAggregatesInflectorsPlugin: GraphileConfig.Plugin = {
   name: "PgAggregatesInflectorsPlugin",
   version,
+  provides: ["aggregates"],
 
   inflection: {
     add: {

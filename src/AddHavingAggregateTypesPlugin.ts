@@ -42,6 +42,7 @@ const { version } = require("../package.json");
 const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddHavingAggregateTypesPlugin",
   version,
+  provides: ["aggregates"],
 
   schema: {
     hooks: {

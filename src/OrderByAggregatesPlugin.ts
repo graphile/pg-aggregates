@@ -15,6 +15,7 @@ const { version } = require("../package.json");
 export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
   name: "PgAggregatesOrderByAggregatesPlugin",
   version,
+  provides: ["aggregates"],
 
   schema: {
     hooks: {

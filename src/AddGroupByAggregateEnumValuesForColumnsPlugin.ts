@@ -8,6 +8,7 @@ const { version } = require("../package.json");
 const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddGroupByAggregateEnumValuesForColumnsPlugin",
   version,
+  provides: ["aggregates"],
 
   // Now add group by columns
   schema: {
