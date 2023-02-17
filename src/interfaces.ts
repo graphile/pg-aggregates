@@ -9,6 +9,12 @@ declare module "@dataplan/pg" {
 
 declare global {
   namespace GraphileBuild {
+    interface Inflection {
+      filterSomethingSomethingRenameMe(
+        foreignTable: PgSource<any, any, any, any>,
+        spec: AggregateSpec
+      ): string;
+    }
     interface Build {
       pgAggregateSpecs: AggregateSpec[];
       pgAggregateGroupBySpecs: AggregateGroupBySpec[];
@@ -26,12 +32,18 @@ declare global {
       isPgHavingFilterInputType?: boolean;
       isPgAggregateHavingInputType?: boolean;
       pgHavingFilterSpec?: string;
+      isPgConnectionAggregateFilter?: boolean;
+      isPgConnectionAggregateAggregateFilter?: boolean;
+      pgConnectionAggregateFilterAggregateSpec?: AggregateSpec;
     }
     interface ScopeObjectFieldsField {
       isPgAggregateField?: boolean;
       isPgConnectionAggregateField?: boolean;
       // TODO: remove this, it's redundant vs pgTypeSource?
       pgFieldSource?: PgSource<any, any, any, any>;
+    }
+    interface ScopeInputObjectFieldsField {
+      isPgConnectionFilterAggregatesField?: boolean;
     }
     interface ScopeEnum {
       pgTypeSource?: PgSource<any, any, any, any>;
