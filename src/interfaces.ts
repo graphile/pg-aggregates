@@ -10,7 +10,7 @@ declare module "@dataplan/pg" {
 declare global {
   namespace GraphileBuild {
     interface Inflection {
-      filterSomethingSomethingRenameMe(
+      filterTableAggregateType(
         foreignTable: PgSource<any, any, any, any>,
         spec: AggregateSpec
       ): string;

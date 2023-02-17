@@ -12,10 +12,7 @@ import {
   GraphileInputFieldConfigMap,
 } from "grafast";
 import "postgraphile-plugin-connection-filter";
-import type {
-  GraphQLInputFieldConfigMap,
-  GraphQLInputObjectType,
-} from "graphql";
+import type { GraphQLInputObjectType } from "graphql";
 import { PgSQL, SQL } from "pg-sql2";
 import { PgWhereConditionSpec } from "@dataplan/pg/dist/steps/pgCondition";
 import { AggregateSpec } from "./interfaces";
@@ -36,7 +33,7 @@ export const Plugin: GraphileConfig.Plugin = {
   inflection: {
     add: {
       // TODO: rename this!
-      filterSomethingSomethingRenameMe(_preset, foreignTable, spec) {
+      filterTableAggregateType(_preset, foreignTable, spec) {
         const foreignTableTypeName = this.tableType(foreignTable.codec);
         return this.filterType(
           foreignTableTypeName + this.upperCamelCase(spec.id) + "Aggregate"
@@ -138,7 +135,7 @@ export const Plugin: GraphileConfig.Plugin = {
 
           // Register the aggregate spec filter type for each aggreage spec for each source
           for (const spec of build.pgAggregateSpecs) {
-            const filterTypeName = inflection.filterSomethingSomethingRenameMe(
+            const filterTypeName = inflection.filterTableAggregateType(
               foreignTable,
               spec
             );
@@ -261,7 +258,7 @@ export const Plugin: GraphileConfig.Plugin = {
           const foreignTableTypeName = inflection.tableType(foreignTable.codec);
 
           return pgAggregateSpecs.reduce((memo, spec) => {
-            const filterTypeName = inflection.filterSomethingSomethingRenameMe(
+            const filterTypeName = inflection.filterTableAggregateType(
               foreignTable,
               spec
             );
