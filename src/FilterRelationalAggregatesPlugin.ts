@@ -14,7 +14,7 @@ import {
 import "postgraphile-plugin-connection-filter";
 import type { GraphQLInputObjectType } from "graphql";
 import { PgSQL, SQL } from "pg-sql2";
-import { PgWhereConditionSpec } from "@dataplan/pg/dist/steps/pgCondition";
+import { PgWhereConditionSpec } from "@dataplan/pg";
 import { AggregateSpec } from "./interfaces";
 
 const { version } = require("../package.json");
