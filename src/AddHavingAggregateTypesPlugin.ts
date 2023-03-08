@@ -1,40 +1,15 @@
-import {
-  digestsFromArgumentSpecs,
+import type {
   PgConditionLikeStep,
-  PgConditionStep,
-} from "@dataplan/pg";
-import { PgSourceParameter } from "@dataplan/pg";
-import {
-  BooleanFilterStep,
-  OrFilterStep,
+  PgSourceParameter,
   PgTypeCodec,
   PgTypeColumn,
-  TYPES,
 } from "@dataplan/pg";
-import { GraphileFieldConfig, GraphileInputFieldConfigMap } from "grafast";
-import type {
-  GraphQLFieldConfigMap,
-  GraphQLInputObjectType,
-  GraphQLInputType,
-} from "graphql";
-import { SQL } from "pg-sql2";
-import {
-  INT2_OID,
-  INT4_OID,
-  BIGINT_OID,
-  FLOAT4_OID,
-  FLOAT8_OID,
-  MONEY_OID,
-  NUMERIC_OID,
-  DATE_OID,
-  TIMESTAMP_OID,
-  TIMESTAMPTZ_OID,
-  CHAR_OID,
-  TEXT_OID,
-  VARCHAR_OID,
-  AggregateSpec,
-  CORE_HAVING_FILTER_SPECS,
-} from "./interfaces";
+import { TYPES, BooleanFilterStep, OrFilterStep } from "@dataplan/pg";
+import type { GraphileInputFieldConfigMap } from "grafast";
+import type { GraphQLInputObjectType, GraphQLInputType } from "graphql";
+import type { SQL } from "pg-sql2";
+import type { AggregateSpec } from "./interfaces";
+import { CORE_HAVING_FILTER_SPECS } from "./interfaces";
 import { getComputedColumnSources } from "./utils";
 
 const { version } = require("../package.json");
@@ -101,7 +76,7 @@ const Plugin: GraphileConfig.Plugin = {
 
       init(_, build, _context) {
         const {
-          graphql: { GraphQLInputObjectType, GraphQLList, GraphQLNonNull },
+          graphql: { GraphQLList, GraphQLNonNull },
           inflection,
           sql,
         } = build;
@@ -448,11 +423,7 @@ const Plugin: GraphileConfig.Plugin = {
       },
 
       GraphQLInputObjectType_fields(inFields, build, context) {
-        const {
-          sql,
-          inflection,
-          graphql: { GraphQLInputObjectType },
-        } = build;
+        const { sql, inflection } = build;
         const {
           scope: {
             isPgHavingFilterInputType,

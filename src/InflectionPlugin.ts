@@ -1,12 +1,7 @@
 import type {} from "graphile-config";
 import type {} from "graphile-build";
 import type {} from "graphile-build-pg";
-import {
-  PgSource,
-  PgSourceRelation,
-  PgTypeCodec,
-  PgTypeColumn,
-} from "@dataplan/pg";
+import { PgSource, PgSourceRelation } from "@dataplan/pg";
 import {
   AggregateGroupBySpec,
   AggregateSpec,
@@ -14,12 +9,6 @@ import {
 } from "./interfaces";
 
 const { version } = require("../package.json");
-
-type Keys = Array<{
-  column: string;
-  table: string;
-  schema?: string;
-}>;
 
 declare global {
   namespace GraphileBuild {
@@ -135,33 +124,33 @@ export const PgAggregatesInflectorsPlugin: GraphileConfig.Plugin = {
 
   inflection: {
     add: {
-      aggregateContainerType(preset, details) {
+      aggregateContainerType(_preset, details) {
         return this.upperCamelCase(
           `${this._singularizedCodecName(details.source.codec)}-aggregates`
         );
       },
-      aggregateType(preset, details) {
+      aggregateType(_preset, details) {
         return this.upperCamelCase(
           `${this._singularizedCodecName(details.source.codec)}-${
             details.aggregateSpec.id
           }-aggregates`
         );
       },
-      aggregatesContainerField(preset, details) {
+      aggregatesContainerField(_preset, _details) {
         return "aggregates";
       },
-      groupedAggregatesContainerField(preset, details) {
+      groupedAggregatesContainerField(_preset, _details) {
         return "groupedAggregates";
       },
-      aggregatesField(preset, details) {
+      aggregatesField(_preset, details) {
         return details.aggregateSpec.id;
       },
-      aggregateGroupByType(preset, details) {
+      aggregateGroupByType(_preset, details) {
         return this.upperCamelCase(
           `${this._singularizedCodecName(details.source.codec)}-group-by`
         );
       },
-      aggregateGroupByColumnEnum(preset, details) {
+      aggregateGroupByColumnEnum(_preset, details) {
         return this.constantCase(
           `${this._columnName({
             columnName: details.columnName,
@@ -169,33 +158,33 @@ export const PgAggregatesInflectorsPlugin: GraphileConfig.Plugin = {
           })}`
         );
       },
-      aggregateHavingInputType(preset, details) {
+      aggregateHavingInputType(_preset, details) {
         return this.upperCamelCase(
           `${this._singularizedCodecName(details.source.codec)}-having-input`
         );
       },
-      aggregateHavingAggregateInputType(preset, details) {
+      aggregateHavingAggregateInputType(_preset, details) {
         return this.upperCamelCase(
           `${this._singularizedCodecName(details.source.codec)}-having-${
             details.aggregateSpec.id
           }-input`
         );
       },
-      aggregateHavingAggregateComputedColumnInputType(preset, details) {
+      aggregateHavingAggregateComputedColumnInputType(_preset, details) {
         return this.upperCamelCase(
           `${this._singularizedCodecName(details.source.codec)}-having-${
             details.aggregateSpec.id
           }-${this._sourceName(details.computedColumnSource)}-input`
         );
       },
-      aggregateHavingAggregateComputedColumnArgsInputType(preset, details) {
+      aggregateHavingAggregateComputedColumnArgsInputType(_preset, details) {
         return this.upperCamelCase(
           `${this._singularizedCodecName(details.source.codec)}-having-${
             details.aggregateSpec.id
           }-${this._sourceName(details.computedColumnSource)}-args-input`
         );
       },
-      aggregateGroupByColumnDerivativeEnum(preset, details) {
+      aggregateGroupByColumnDerivativeEnum(_preset, details) {
         return this.constantCase(
           `${this._columnName({
             columnName: details.columnName,
@@ -203,11 +192,11 @@ export const PgAggregatesInflectorsPlugin: GraphileConfig.Plugin = {
           })}-${details.aggregateGroupBySpec.id}`
         );
       },
-      orderByCountOfManyRelationByKeys(preset, details) {
+      orderByCountOfManyRelationByKeys(_preset, details) {
         const relationName = this._manyRelation(details);
         return this.constantCase(`${relationName}-count`);
       },
-      orderByColumnAggregateOfManyRelationByKeys(preset, details) {
+      orderByColumnAggregateOfManyRelationByKeys(_preset, details) {
         const relationName = this._manyRelation(details);
         const relation: PgSourceRelation<any, any> = details.source.getRelation(
           details.relationName
@@ -219,7 +208,7 @@ export const PgAggregatesInflectorsPlugin: GraphileConfig.Plugin = {
           })}`
         );
       },
-      aggregateHavingFilterInputType(preset, spec) {
+      aggregateHavingFilterInputType(_preset, spec) {
         return this.upperCamelCase(`having-${spec}-filter`);
       },
     },

@@ -1,10 +1,6 @@
 import { PgSelectStep } from "@dataplan/pg";
-import { getEnumValueConfig, InputStep } from "grafast";
-import {
-  GraphQLResolveInfo,
-  GraphQLEnumType,
-  GraphQLObjectType,
-} from "graphql";
+import { getEnumValueConfig } from "grafast";
+import { GraphQLEnumType, GraphQLObjectType } from "graphql";
 
 const { version } = require("../package.json");
 
@@ -36,7 +32,6 @@ const Plugin: GraphileConfig.Plugin = {
         const {
           graphql: { GraphQLList, GraphQLNonNull },
           inflection,
-          sql,
         } = build;
         const {
           fieldWithHooks,
@@ -107,10 +102,9 @@ const Plugin: GraphileConfig.Plugin = {
                     "arg"
                   ),
                   applyPlan(
-                    $parent,
+                    _$parent,
                     $pgSelect: PgSelectStep<any, any, any, any>,
-                    input,
-                    info
+                    input
                   ) {
                     const $value = input.getRaw();
                     const val = $value.eval();
@@ -141,7 +135,7 @@ const Plugin: GraphileConfig.Plugin = {
                           "arg"
                         ),
                         applyPlan(
-                          $parent,
+                          _$parent,
                           $pgSelect: PgSelectStep<any, any, any, any>
                         ) {
                           return $pgSelect.havingPlan();

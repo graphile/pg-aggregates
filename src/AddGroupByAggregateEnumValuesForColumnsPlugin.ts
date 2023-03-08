@@ -1,7 +1,5 @@
 import { PgSelectStep, PgSourceUnique, PgTypeColumn } from "@dataplan/pg";
 import { GraphQLEnumValueConfig, GraphQLEnumValueConfigMap } from "graphql";
-import { SQL } from "pg-sql2";
-import { AggregateGroupBySpec } from "./interfaces";
 
 const { version } = require("../package.json");
 

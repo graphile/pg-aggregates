@@ -10,8 +10,6 @@ import {
   FLOAT8_OID,
   INTERVAL_OID,
   MONEY_OID,
-  TIMESTAMP_OID,
-  TIMESTAMPTZ_OID,
 } from "./interfaces";
 
 const { version } = require("../package.json");
@@ -81,6 +79,7 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
             // how the sum aggregate changes result type.
             pgTypeCodecModifier: convertWithMapAndFallback(
               {
+                // TODO: this should use codecs rather than OIDs
                 [INT2_OID]: TYPES.bigint, // smallint -> bigint
                 [INT4_OID]: TYPES.bigint, // integer -> bigint
                 [BIGINT_OID]: TYPES.numeric, // bigint -> numeric

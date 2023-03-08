@@ -1,5 +1,4 @@
 import {
-  PgOrderSpec,
   PgSelectStep,
   PgSourceBuilder,
   PgSourceRelation,
@@ -104,7 +103,7 @@ where ${sql.parens(
                 $select.orderBy({
                   fragment,
                   codec: TYPES.bigint,
-                  direction: "ASC",
+                  direction,
                 });
               };
             };
@@ -178,7 +177,7 @@ where ${sql.join(
                       codec:
                         aggregateSpec.pgTypeCodecModifier?.(column.codec) ??
                         column.codec,
-                      direction: "ASC",
+                      direction,
                     });
                   };
                 };

@@ -1,17 +1,10 @@
 import type {} from "graphile-config";
 import type {} from "graphile-build-pg";
-import type {
-  GraphQLResolveInfo,
-  GraphQLFieldConfigMap,
-  GraphQLOutputType,
-} from "graphql";
-import { AggregateSpec } from "./interfaces";
-import { constant, error, ExecutableStep, FieldArgs, lambda } from "grafast";
+import type { GraphQLFieldConfigMap, GraphQLOutputType } from "graphql";
+import { constant, ExecutableStep, FieldArgs } from "grafast";
 import {
-  digestsFromArgumentSpecs,
   PgSelectSingleStep,
   PgSource,
-  PgSourceParameter,
   PgTypeColumn,
   TYPES,
 } from "@dataplan/pg";
@@ -49,12 +42,7 @@ const Plugin: GraphileConfig.Plugin = {
       init(init, build, _context) {
         const {
           sql,
-          graphql: {
-            GraphQLObjectType,
-            GraphQLList,
-            GraphQLNonNull,
-            GraphQLString,
-          },
+          graphql: { GraphQLList, GraphQLNonNull, GraphQLString },
           inflection,
           input: { pgSources },
         } = build;
@@ -308,15 +296,11 @@ const Plugin: GraphileConfig.Plugin = {
                       fieldName,
                     },
                     () => {
-                      const {
-                        argDetails,
-                        makeFieldArgs,
-                        makeArgs,
-                        makeExpression,
-                      } = build.pgGetArgDetailsFromParameters(
-                        computedColumnSource,
-                        computedColumnSource.parameters.slice(1)
-                      );
+                      const { makeFieldArgs, makeExpression } =
+                        build.pgGetArgDetailsFromParameters(
+                          computedColumnSource,
+                          computedColumnSource.parameters.slice(1)
+                        );
                       return {
                         type: targetType,
                         description: `${

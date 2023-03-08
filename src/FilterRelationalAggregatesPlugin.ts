@@ -4,6 +4,7 @@ import {
   PgConditionStep,
   PgConditionCapableParentStep,
   pgWhereConditionSpecListToSQL,
+  PgWhereConditionSpec,
 } from "@dataplan/pg";
 import {
   ModifierStep,
@@ -14,7 +15,6 @@ import {
 import "postgraphile-plugin-connection-filter";
 import type { GraphQLInputObjectType } from "graphql";
 import { PgSQL, SQL } from "pg-sql2";
-import { PgWhereConditionSpec } from "@dataplan/pg";
 import { AggregateSpec } from "./interfaces";
 
 const { version } = require("../package.json");
@@ -74,7 +74,7 @@ export const Plugin: GraphileConfig.Plugin = {
         return build;
       },
 
-      init(_, build, context) {
+      init(_, build) {
         const { inflection } = build;
 
         // Register the aggregate filter type for each table

@@ -1,6 +1,4 @@
-import { PgSelectStep } from "@dataplan/pg";
-import { ConnectionStep } from "grafast";
-import type { GraphQLResolveInfo, GraphQLObjectType } from "graphql";
+import type { GraphQLObjectType } from "graphql";
 
 const { version } = require("../package.json");
 
@@ -13,7 +11,7 @@ const Plugin: GraphileConfig.Plugin = {
     hooks: {
       // Hook all connections to add the 'aggregates' field
       GraphQLObjectType_fields(fields, build, context) {
-        const { inflection, sql } = build;
+        const { inflection } = build;
         const {
           fieldWithHooks,
           scope: {

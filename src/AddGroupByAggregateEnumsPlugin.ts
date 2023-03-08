@@ -9,10 +9,7 @@ const Plugin: GraphileConfig.Plugin = {
     hooks: {
       // Create the group by enums for each table
       init(_, build) {
-        const {
-          graphql: { GraphQLEnumType },
-          inflection,
-        } = build;
+        const { inflection } = build;
 
         for (const source of build.input.pgSources) {
           if (source.parameters || !source.codec.columns || source.isUnique) {
