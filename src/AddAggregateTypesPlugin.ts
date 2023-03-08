@@ -83,15 +83,12 @@ const Plugin: GraphileConfig.Plugin = {
                     const $pgSelect = $pgSelectSingle.getClassStep();
                     const groups = $pgSelect.getGroups();
                     if (groups.length > 0) {
-                      return lambda(
-                        $pgSelectSingle.select(
-                          sql`json_build_array(${sql.join(
-                            groups.map((g) => g.fragment),
-                            ", "
-                          )})`,
-                          TYPES.json
-                        ),
-                        (str) => (str ? JSON.parse(str) : null)
+                      return $pgSelectSingle.select(
+                        sql`json_build_array(${sql.join(
+                          groups.map((g) => g.fragment),
+                          ", "
+                        )})`,
+                        TYPES.json
                       );
                     } else {
                       return constant(null);
