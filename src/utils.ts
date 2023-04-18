@@ -1,16 +1,18 @@
-import { PgSource, PgSourceParameter } from "@dataplan/pg";
+import { PgResource, PgResourceParameter } from "@dataplan/pg";
 import { GraphileBuild } from "graphile-build";
 import type {} from "graphile-build-pg";
 
-export function getComputedColumnSources(
+export function getComputedAttributeResources(
   build: GraphileBuild.Build,
-  source: PgSource<any, any, any, any>
+  resource: PgResource<any, any, any, any>
 ) {
-  const computedColumnSources = build.input.pgSources.filter((s) => {
+  const computedAttributeResources = Object.values(
+    build.input.pgRegistry.pgResources
+  ).filter((s) => {
     if (!s.parameters || s.parameters.length < 1) {
       return false;
     }
-    if (s.codec.columns) {
+    if (s.codec.attributes) {
       return false;
     }
     if (!s.isUnique) {
@@ -19,11 +21,11 @@ export function getComputedColumnSources(
     if (s.codec.arrayOfCodec) {
       return false;
     }
-    const firstParameter = s.parameters[0] as PgSourceParameter;
-    if (firstParameter.codec !== source.codec) {
+    const firstParameter = s.parameters[0] as PgResourceParameter;
+    if (firstParameter.codec !== resource.codec) {
       return false;
     }
     return true;
   });
-  return computedColumnSources;
+  return computedAttributeResources;
 }

@@ -1,81 +1,82 @@
-import { PgSelectStep, PgSourceUnique, PgTypeColumn } from "@dataplan/pg";
+import { PgSelectStep, PgResourceUnique, PgCodecAttribute } from "@dataplan/pg";
 import { GraphQLEnumValueConfig, GraphQLEnumValueConfigMap } from "graphql";
 
 const { version } = require("../package.json");
 
 const Plugin: GraphileConfig.Plugin = {
-  name: "PgAggregatesAddGroupByAggregateEnumValuesForColumnsPlugin",
+  name: "PgAggregatesAddGroupByAggregateEnumValuesForAttributesPlugin",
   version,
   provides: ["aggregates"],
 
-  // Now add group by columns
+  // Now add group by attributes
   schema: {
     hooks: {
       GraphQLEnumType_values(values, build, context) {
         const { extend, inflection, sql, pgAggregateGroupBySpecs } = build;
         const {
-          scope: { isPgAggregateGroupEnum, pgTypeSource: table },
+          scope: { isPgAggregateGroupEnum, pgTypeResource: table },
         } = context;
         if (
           !isPgAggregateGroupEnum ||
           !table ||
           table.parameters ||
-          !table.codec.columns
+          !table.codec.attributes
         ) {
           return values;
         }
         return extend(
           values,
-          Object.entries(table.codec.columns).reduce(
-            (memo, [columnName, column]: [string, PgTypeColumn]) => {
-              const behavior = build.pgGetBehavior([column.extensions]);
+          Object.entries(table.codec.attributes).reduce(
+            (memo, [attributeName, attribute]: [string, PgCodecAttribute]) => {
+              const behavior = build.pgGetBehavior([attribute.extensions]);
               // Grouping requires ordering.
               if (!build.behavior.matches(behavior, "order", "order")) {
                 return memo;
               }
-              const unique = !!(table.uniques as PgSourceUnique[]).find(
-                (u) => u.columns.length === 1 && u.columns[0] === columnName
+              const unique = !!(table.uniques as PgResourceUnique[]).find(
+                (u) =>
+                  u.attributes.length === 1 && u.attributes[0] === attributeName
               );
               if (unique) return memo; // No point grouping by something that's unique.
 
-              const fieldName = inflection.aggregateGroupByColumnEnum({
-                source: table,
-                columnName,
+              const fieldName = inflection.aggregateGroupByAttributeEnum({
+                resource: table,
+                attributeName,
               });
               memo = extend(
                 memo,
                 {
                   [fieldName]: {
                     extensions: {
-                      graphile: {
-                        applyPlan($pgSelect: PgSelectStep<any, any, any, any>) {
+                      grafast: {
+                        applyPlan($pgSelect: PgSelectStep<any>) {
                           $pgSelect.groupBy({
                             fragment: sql.fragment`${
                               $pgSelect.alias
-                            }.${sql.identifier(columnName)}`,
+                            }.${sql.identifier(attributeName)}`,
                           });
                         },
                       },
                     },
                   },
                 },
-                `Adding groupBy enum value for ${table.name}.${columnName}.`
+                `Adding groupBy enum value for ${table.name}.${attributeName}.`
               );
 
               pgAggregateGroupBySpecs.forEach((aggregateGroupBySpec) => {
                 if (
                   (!aggregateGroupBySpec.shouldApplyToEntity ||
                     aggregateGroupBySpec.shouldApplyToEntity({
-                      type: "column",
+                      type: "attribute",
                       codec: table.codec,
-                      columnName,
+                      attributeName,
                     })) &&
-                  aggregateGroupBySpec.isSuitableType(column.codec)
+                  aggregateGroupBySpec.isSuitableType(attribute.codec)
                 ) {
                   const fieldName =
-                    inflection.aggregateGroupByColumnDerivativeEnum({
-                      source: table,
-                      columnName,
+                    inflection.aggregateGroupByAttributeDerivativeEnum({
+                      resource: table,
+                      attributeName,
                       aggregateGroupBySpec,
                     });
                   memo = extend(
@@ -83,14 +84,12 @@ const Plugin: GraphileConfig.Plugin = {
                     {
                       [fieldName]: {
                         extensions: {
-                          graphile: {
-                            applyPlan(
-                              $pgSelect: PgSelectStep<any, any, any, any>
-                            ) {
+                          grafast: {
+                            applyPlan($pgSelect: PgSelectStep<any>) {
                               $pgSelect.groupBy({
                                 fragment: aggregateGroupBySpec.sqlWrap(
                                   sql`${$pgSelect.alias}.${sql.identifier(
-                                    columnName
+                                    attributeName
                                   )}`
                                 ),
                               });
@@ -99,7 +98,7 @@ const Plugin: GraphileConfig.Plugin = {
                         },
                       } as GraphQLEnumValueConfig,
                     },
-                    `Adding groupBy enum value for '${aggregateGroupBySpec.id}' derivative of ${table.name}.${columnName}.`
+                    `Adding groupBy enum value for '${aggregateGroupBySpec.id}' derivative of ${table.name}.${attributeName}.`
                   );
                 }
               });
@@ -108,11 +107,11 @@ const Plugin: GraphileConfig.Plugin = {
             },
             Object.create(null) as GraphQLEnumValueConfigMap
           ),
-          `Adding group by values for columns from table '${table.name}'`
+          `Adding group by values for attributes from table '${table.name}'`
         );
       },
     },
   },
 };
 
-export { Plugin as PgAggregatesAddGroupByAggregateEnumValuesForColumnsPlugin };
+export { Plugin as PgAggregatesAddGroupByAggregateEnumValuesForAttributesPlugin };

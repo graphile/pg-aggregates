@@ -16,15 +16,15 @@ const Plugin: GraphileConfig.Plugin = {
           fieldWithHooks,
           scope: {
             pgCodec,
-            pgTypeSource,
+            pgTypeResource,
             isConnectionType,
             isPgConnectionRelated,
           },
         } = context;
 
         const table =
-          pgTypeSource ??
-          build.input.pgSources.find(
+          pgTypeResource ??
+          Object.values(build.input.pgRegistry.pgResources).find(
             (s) => s.codec === pgCodec && !s.parameters
           );
 
@@ -34,13 +34,13 @@ const Plugin: GraphileConfig.Plugin = {
           !isPgConnectionRelated ||
           !table ||
           table.parameters ||
-          !table.codec.columns
+          !table.codec.attributes
         ) {
           return fields;
         }
 
         const AggregateContainerType = build.getTypeByName(
-          inflection.aggregateContainerType({ source: table })
+          inflection.aggregateContainerType({ resource: table })
         ) as GraphQLObjectType | undefined;
 
         if (
@@ -52,7 +52,7 @@ const Plugin: GraphileConfig.Plugin = {
         }
 
         const fieldName = inflection.aggregatesContainerField({
-          source: table,
+          resource: table,
         });
         return {
           ...fields,

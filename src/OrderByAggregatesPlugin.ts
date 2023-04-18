@@ -1,8 +1,7 @@
 import {
   PgSelectStep,
-  PgSourceBuilder,
-  PgSourceRelation,
-  PgTypeColumns,
+  PgCodecRelation,
+  PgCodecAttributes,
   TYPES,
 } from "@dataplan/pg";
 import { GraphQLEnumValueConfigMap } from "graphql";
@@ -22,12 +21,12 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
         const { extend, sql, inflection } = build;
         const pgAggregateSpecs: AggregateSpec[] = build.pgAggregateSpecs;
         const {
-          scope: { isPgRowSortEnum, pgTypeSource, pgCodec },
+          scope: { isPgRowSortEnum, pgTypeResource, pgCodec },
         } = context;
 
         const foreignTable =
-          pgTypeSource ??
-          build.input.pgSources.find(
+          pgTypeResource ??
+          Object.values(build.input.pgRegistry.pgResources).find(
             (s) => s.codec === pgCodec && !s.parameters
           );
 
@@ -35,13 +34,13 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
           !isPgRowSortEnum ||
           !foreignTable ||
           foreignTable.parameters ||
-          !foreignTable.codec.columns
+          !foreignTable.codec.attributes
         ) {
           return values;
         }
 
         const relations = foreignTable.getRelations() as {
-          [relName: string]: PgSourceRelation<any, any>;
+          [relName: string]: PgCodecRelation<any, any>;
         };
         const referenceeRelations = Object.entries(relations).filter(
           ([_, rel]) => rel.isReferencee
@@ -51,15 +50,12 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
           (memo, [relationName, relation]) => {
             const behavior = build.pgGetBehavior([
               relation.extensions,
-              relation.source.extensions,
+              relation.remoteResource.extensions,
             ]);
             if (!build.behavior.matches(behavior, "select", "select")) {
               return memo;
             }
-            const table =
-              relation.source instanceof PgSourceBuilder
-                ? relation.source.get()
-                : relation.source;
+            const table = relation.remoteResource;
             const isUnique = !!relation.isUnique;
             if (isUnique) {
               // No point aggregating over a relation that's unique
@@ -69,25 +65,30 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
             // Add count
             const totalCountBaseName =
               inflection.orderByCountOfManyRelationByKeys({
-                source: foreignTable,
+                registry: foreignTable.registry,
+                codec: foreignTable.codec,
                 relationName,
               });
 
             const makeTotalCountApplyPlan = (direction: "ASC" | "DESC") => {
-              return function applyPlan(
-                $select: PgSelectStep<any, any, any, any>
-              ) {
+              return function applyPlan($select: PgSelectStep<any>) {
                 const foreignTableAlias = $select.alias;
                 const conditions: SQL[] = [];
                 const tableAlias = sql.identifier(Symbol(table.name));
-                relation.localColumns.forEach((localColumn: string, i) => {
-                  const remoteColumn = relation.remoteColumns[i] as string;
-                  conditions.push(
-                    sql.fragment`${tableAlias}.${sql.identifier(
-                      remoteColumn
-                    )} = ${foreignTableAlias}.${sql.identifier(localColumn)}`
-                  );
-                });
+                relation.localAttributes.forEach(
+                  (localAttribute: string, i) => {
+                    const remoteAttribute = relation.remoteAttributes[
+                      i
+                    ] as string;
+                    conditions.push(
+                      sql.fragment`${tableAlias}.${sql.identifier(
+                        remoteAttribute
+                      )} = ${foreignTableAlias}.${sql.identifier(
+                        localAttribute
+                      )}`
+                    );
+                  }
+                );
                 if (typeof table.source === "function") {
                   throw new Error(`Function source unsupported`);
                 }
@@ -113,14 +114,14 @@ where ${sql.parens(
               {
                 [`${totalCountBaseName}_ASC`]: {
                   extensions: {
-                    graphile: {
+                    grafast: {
                       applyPlan: makeTotalCountApplyPlan("ASC"),
                     },
                   },
                 },
                 [`${totalCountBaseName}_DESC`]: {
                   extensions: {
-                    graphile: {
+                    grafast: {
                       applyPlan: makeTotalCountApplyPlan("DESC"),
                     },
                   },
@@ -131,41 +132,46 @@ where ${sql.parens(
 
             // Add other aggregates
             pgAggregateSpecs.forEach((aggregateSpec) => {
-              for (const [columnName, column] of Object.entries(
-                table.codec.columns as PgTypeColumns
+              for (const [attributeName, attribute] of Object.entries(
+                table.codec.attributes as PgCodecAttributes
               )) {
                 const baseName =
-                  inflection.orderByColumnAggregateOfManyRelationByKeys({
-                    source: foreignTable,
+                  inflection.orderByAttributeAggregateOfManyRelationByKeys({
+                    registry: foreignTable.registry,
+                    codec: foreignTable.codec,
                     relationName,
-                    columnName,
+                    attributeName: attributeName,
                     aggregateSpec,
                   });
 
                 const makeApplyPlan = (direction: "ASC" | "DESC") => {
-                  return function applyPlan(
-                    $select: PgSelectStep<any, any, any, any>
-                  ) {
+                  return function applyPlan($select: PgSelectStep<any>) {
                     const foreignTableAlias = $select.alias;
                     const conditions: SQL[] = [];
                     const tableAlias = sql.identifier(Symbol(table.name));
-                    relation.localColumns.forEach((localColumn: string, i) => {
-                      const remoteColumn = relation.remoteColumns[i] as string;
-                      conditions.push(
-                        sql.fragment`${tableAlias}.${sql.identifier(
-                          remoteColumn
-                        )} = ${foreignTableAlias}.${sql.identifier(
-                          localColumn
-                        )}`
-                      );
-                    });
+                    relation.localAttributes.forEach(
+                      (localAttribute: string, i) => {
+                        const remoteAttribute = relation.remoteAttributes[
+                          i
+                        ] as string;
+                        conditions.push(
+                          sql.fragment`${tableAlias}.${sql.identifier(
+                            remoteAttribute
+                          )} = ${foreignTableAlias}.${sql.identifier(
+                            localAttribute
+                          )}`
+                        );
+                      }
+                    );
                     if (typeof table.source === "function") {
                       throw new Error(`Function source unsupported`);
                     }
                     // TODO: refactor this to use joins instead of subqueries
                     const fragment = sql`(${sql.indent`
 select ${aggregateSpec.sqlAggregateWrap(
-                      sql.fragment`${tableAlias}.${sql.identifier(columnName)}`
+                      sql.fragment`${tableAlias}.${sql.identifier(
+                        attributeName
+                      )}`
                     )}
 from ${table.source} ${tableAlias}
 where ${sql.join(
@@ -175,8 +181,8 @@ where ${sql.join(
                     $select.orderBy({
                       fragment,
                       codec:
-                        aggregateSpec.pgTypeCodecModifier?.(column.codec) ??
-                        column.codec,
+                        aggregateSpec.pgTypeCodecModifier?.(attribute.codec) ??
+                        attribute.codec,
                       direction,
                     });
                   };
@@ -187,21 +193,21 @@ where ${sql.join(
                   {
                     [`${baseName}_ASC`]: {
                       extensions: {
-                        graphile: {
+                        grafast: {
                           applyPlan: makeApplyPlan("ASC"),
                         },
                       },
                     },
                     [`${baseName}_DESC`]: {
                       extensions: {
-                        graphile: {
+                        grafast: {
                           applyPlan: makeApplyPlan("DESC"),
                         },
                       },
                     },
                   },
 
-                  `Adding orderBy ${aggregateSpec.id} of '${columnName}' to '${foreignTable.name}' using constraint '${relationName}'`
+                  `Adding orderBy ${aggregateSpec.id} of '${attributeName}' to '${foreignTable.name}' using constraint '${relationName}'`
                 );
               }
             });

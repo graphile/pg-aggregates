@@ -1,6 +1,6 @@
 import {
-  PgTypeCodec,
-  PgTypeColumns,
+  PgCodec,
+  PgCodecAttributes,
   PgConditionStep,
   PgConditionCapableParentStep,
   pgWhereConditionSpecListToSQL,
@@ -10,7 +10,7 @@ import {
   ModifierStep,
   ExecutableStep,
   FieldArgs,
-  GraphileInputFieldConfigMap,
+  GrafastInputFieldConfigMap,
 } from "grafast";
 import "postgraphile-plugin-connection-filter";
 import type { GraphQLInputObjectType } from "graphql";
@@ -78,8 +78,10 @@ export const Plugin: GraphileConfig.Plugin = {
         const { inflection } = build;
 
         // Register the aggregate filter type for each table
-        for (const foreignTable of build.input.pgSources) {
-          if (foreignTable.parameters || !foreignTable.codec.columns) {
+        for (const foreignTable of Object.values(
+          build.input.pgRegistry.pgResources
+        )) {
+          if (foreignTable.parameters || !foreignTable.codec.attributes) {
             continue;
           }
           // TODO: if behavior includes filter:aggregates
@@ -97,7 +99,7 @@ export const Plugin: GraphileConfig.Plugin = {
             build.registerInputObjectType(
               foreignTableAggregateFilterTypeName,
               {
-                pgSource: foreignTable,
+                pgResource: foreignTable,
                 isPgConnectionAggregateFilter: true,
               },
               () => {
@@ -144,7 +146,7 @@ export const Plugin: GraphileConfig.Plugin = {
               {
                 isPgConnectionAggregateAggregateFilter: true,
                 pgConnectionAggregateFilterAggregateSpec: spec,
-                pgTypeSource: foreignTable,
+                pgTypeResource: foreignTable,
               },
               () => ({}),
               `Add '${spec.id}' aggregate filter type for '${foreignTableTypeName}'`
@@ -167,10 +169,10 @@ export const Plugin: GraphileConfig.Plugin = {
             foreignTable,
             isPgConnectionFilterMany,
             isPgConnectionAggregateFilter,
-            pgSource,
+            pgResource,
             isPgConnectionAggregateAggregateFilter,
             pgConnectionAggregateFilterAggregateSpec: spec,
-            pgTypeSource,
+            pgTypeResource,
           },
         } = context;
 
@@ -214,8 +216,8 @@ export const Plugin: GraphileConfig.Plugin = {
                       );
                     }
                     const {
-                      localColumns,
-                      remoteColumns,
+                      localAttributes,
+                      remoteAttributes,
                       tableExpression,
                       alias,
                     } = $where.extensions.pgFilterRelation;
@@ -224,13 +226,13 @@ export const Plugin: GraphileConfig.Plugin = {
                       tableExpression,
                       alias,
                     });
-                    localColumns.forEach((localColumn, i) => {
-                      const remoteColumn = remoteColumns[i];
+                    localAttributes.forEach((localAttribute, i) => {
+                      const remoteAttribute = remoteAttributes[i];
                       $subQuery.where(
                         sql`${$where.alias}.${sql.identifier(
-                          localColumn as string
+                          localAttribute as string
                         )} = ${$subQuery.alias}.${sql.identifier(
-                          remoteColumn as string
+                          remoteAttribute as string
                         )}`
                       );
                     });
@@ -247,13 +249,13 @@ export const Plugin: GraphileConfig.Plugin = {
         fields = (() => {
           if (
             !isPgConnectionAggregateFilter ||
-            !pgSource ||
-            pgSource.parameters ||
-            !pgSource.codec.columns
+            !pgResource ||
+            pgResource.parameters ||
+            !pgResource.codec.attributes
           ) {
             return fields;
           }
-          const foreignTable = pgSource;
+          const foreignTable = pgResource;
 
           const foreignTableTypeName = inflection.tableType(foreignTable.codec);
 
@@ -282,48 +284,48 @@ export const Plugin: GraphileConfig.Plugin = {
                   },
                 })),
               },
-              `Adding aggregate '${spec.id}' filter input for '${pgSource.name}'. `
+              `Adding aggregate '${spec.id}' filter input for '${pgResource.name}'. `
             );
           }, fields);
         })();
 
-        // This hook adds matching columns to the relevant aggregate types.
+        // This hook adds matching attributes to the relevant aggregate types.
         fields = (() => {
           if (
             !isPgConnectionAggregateAggregateFilter ||
             !spec ||
-            !pgTypeSource ||
-            pgTypeSource.parameters ||
-            !pgTypeSource.codec.columns
+            !pgTypeResource ||
+            pgTypeResource.parameters ||
+            !pgTypeResource.codec.attributes
           ) {
             return fields;
           }
-          const table = pgTypeSource;
+          const table = pgTypeResource;
 
-          const columns: PgTypeColumns = table.codec.columns;
+          const attributes: PgCodecAttributes = table.codec.attributes;
 
           return extend(
             fields,
             {
-              ...Object.entries(columns).reduce(
-                (memo, [columnName, column]) => {
+              ...Object.entries(attributes).reduce(
+                (memo, [attributeName, attribute]) => {
                   if (
                     (spec.shouldApplyToEntity &&
                       !spec.shouldApplyToEntity({
-                        type: "column",
+                        type: "attribute",
                         codec: table.codec,
-                        columnName,
+                        attributeName: attributeName,
                       })) ||
-                    !spec.isSuitableType(column.codec)
+                    !spec.isSuitableType(attribute.codec)
                   ) {
                     return memo;
                   }
                   const attrCodec = spec.pgTypeCodecModifier
-                    ? spec.pgTypeCodecModifier(column.codec)
-                    : column.codec;
-                  const fieldName = inflection.column({
+                    ? spec.pgTypeCodecModifier(attribute.codec)
+                    : attribute.codec;
+                  const fieldName = inflection.attribute({
                     codec: table.codec,
-                    columnName,
+                    attributeName,
                   });
 
                   const digest =
@@ -340,8 +342,8 @@ export const Plugin: GraphileConfig.Plugin = {
                   }
 
                   const codec = spec.pgTypeCodecModifier
-                    ? spec.pgTypeCodecModifier(column.codec)
-                    : column.codec;
+                    ? spec.pgTypeCodecModifier(attribute.codec)
+                    : attribute.codec;
                   return build.extend(
                     memo,
                     {
@@ -352,10 +354,12 @@ export const Plugin: GraphileConfig.Plugin = {
                           fieldArgs: FieldArgs
                         ) {
                           const $col = new PgConditionStep($parent);
-                          $col.extensions.pgFilterColumn = {
+                          $col.extensions.pgFilterAttribute = {
                             codec,
                             expression: spec.sqlAggregateWrap(
-                              sql`${$col.alias}.${sql.identifier(columnName)}`
+                              sql`${$col.alias}.${sql.identifier(
+                                attributeName
+                              )}`
                             ),
                           };
 
@@ -363,10 +367,10 @@ export const Plugin: GraphileConfig.Plugin = {
                         },
                       },
                     },
-                    `Add aggregate '${columnName}' filter for source '${table.name}' for spec '${spec.id}'`
+                    `Add aggregate '${attributeName}' filter for source '${table.name}' for spec '${spec.id}'`
                   );
                 },
-                Object.create(null) as GraphileInputFieldConfigMap<any, any>
+                Object.create(null) as GrafastInputFieldConfigMap<any, any>
               ),
 
               /*
@@ -383,17 +387,17 @@ export const Plugin: GraphileConfig.Plugin = {
                 ) {
                   return memo;
                 }
-                const computedColumnDetails = getComputedColumnDetails(
+                const computedAttributeDetails = getComputedAttributeDetails(
                   build,
                   table,
                   proc
                 );
-                if (!computedColumnDetails) {
+                if (!computedAttributeDetails) {
                   return memo;
                 }
-                const { pseudoColumnName } = computedColumnDetails;
-                const fieldName = inflection.computedColumn(
-                  pseudoColumnName,
+                const { pseudoAttributeName } = computedAttributeDetails;
+                const fieldName = inflection.computedAttribute(
+                  pseudoAttributeName,
                   proc,
                   table
                 );
@@ -412,12 +416,12 @@ export const Plugin: GraphileConfig.Plugin = {
                   queryBuilder,
                 }) => {
                   if (fieldValue == null) return null;
-                  const sqlComputedColumnCall = sql.query`${sql.identifier(
+                  const sqlComputedAttributeCall = sql.query`${sql.identifier(
                     proc.namespaceName,
                     proc.name
                   )}(${sourceAlias})`;
                   const sqlAggregate = spec.sqlAggregateWrap(
-                    sqlComputedColumnCall
+                    sqlComputedAttributeCall
                   );
                   const frag = connectionFilterResolve(
                     fieldValue,
@@ -440,7 +444,7 @@ export const Plugin: GraphileConfig.Plugin = {
               }, Object.create(null) as GraphQLInputFieldConfigMap),
               */
             },
-            `Adding per-column '${spec.id}' aggregate filters for '${pgTypeSource.name}'`
+            `Adding per-attribute '${spec.id}' aggregate filters for '${pgTypeResource.name}'`
           );
         })();
 
@@ -478,7 +482,7 @@ class PgAggregateConditionStep<TParentStep extends PgConditionCapableParentStep>
 
   placeholder(
     $step: ExecutableStep<any>,
-    codec: PgTypeCodec<any, any, any, any>
+    codec: PgCodec<any, any, any, any>
   ): SQL {
     return this.$parent.placeholder($step, codec);
   }
@@ -537,7 +541,7 @@ class PgAggregateConditionExpressionStep
 
   placeholder(
     $step: ExecutableStep<any>,
-    codec: PgTypeCodec<any, any, any, any>
+    codec: PgCodec<any, any, any, any>
   ): SQL {
     return this.$parent.placeholder($step, codec);
   }

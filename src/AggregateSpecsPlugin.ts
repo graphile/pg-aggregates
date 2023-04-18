@@ -1,4 +1,4 @@
-import { PgTypeCodec, TYPES } from "@dataplan/pg";
+import { PgCodec, TYPES } from "@dataplan/pg";
 import {
   AggregateSpec,
   AggregateGroupBySpec,
@@ -14,7 +14,7 @@ import {
 
 const { version } = require("../package.json");
 
-const isNumberLike = (codec: PgTypeCodec<any, any, any, any>): boolean =>
+const isNumberLike = (codec: PgCodec<any, any, any, any>): boolean =>
   !!codec.extensions?.isNumberLike;
 
 export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
@@ -24,7 +24,7 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
 
   gather: {
     hooks: {
-      pgCodecs_PgTypeCodec(_info, event) {
+      pgCodecs_PgCodec(_info, event) {
         const { pgType, pgCodec } = event;
         if (pgType.typcategory === "N") {
           if (!pgCodec.extensions) {
@@ -44,17 +44,17 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
           throw new Error(`build.sql is required!`);
         }
 
-        /** Maps from the data type of the column to the data type of the sum aggregate */
+        /** Maps from the data type of the attribute to the data type of the sum aggregate */
         /** BigFloat is our fallback type; it should be valid for almost all numeric types */
         const convertWithMapAndFallback = (
           dataTypeToAggregateTypeMap: {
-            [key: string]: PgTypeCodec<any, any, any, any>;
+            [key: string]: PgCodec<any, any, any, any>;
           },
-          fallback: PgTypeCodec<any, any, any, any>
+          fallback: PgCodec<any, any, any, any>
         ) => {
           return (
-            codec: PgTypeCodec<any, any, any, any>
-          ): PgTypeCodec<any, any, any, any> => {
+            codec: PgCodec<any, any, any, any>
+          ): PgCodec<any, any, any, any> => {
             const oid = codec.extensions?.oid;
             const targetType =
               (oid ? dataTypeToAggregateTypeMap[oid] : null) ?? fallback;

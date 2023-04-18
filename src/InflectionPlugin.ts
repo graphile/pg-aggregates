@@ -1,7 +1,12 @@
 import type {} from "graphile-config";
 import type {} from "graphile-build";
 import type {} from "graphile-build-pg";
-import { PgSource, PgSourceRelation } from "@dataplan/pg";
+import {
+  PgCodecWithAttributes,
+  PgRegistry,
+  PgResource,
+  PgCodecRelation,
+} from "@dataplan/pg";
 import {
   AggregateGroupBySpec,
   AggregateSpec,
@@ -16,26 +21,26 @@ declare global {
       aggregateContainerType(
         this: Inflection,
         details: {
-          source: PgSource<any, any, any, any>;
+          resource: PgResource<any, any, any, any, any>;
         }
       ): string;
       aggregateType(
         this: Inflection,
         details: {
-          source: PgSource<any, any, any, any>;
+          resource: PgResource<any, any, any, any, any>;
           aggregateSpec: AggregateSpec;
         }
       ): string;
       aggregatesContainerField(
         this: Inflection,
         details: {
-          source: PgSource<any, any, any, any>;
+          resource: PgResource<any, any, any, any, any>;
         }
       ): string;
       groupedAggregatesContainerField(
         this: Inflection,
         details: {
-          source: PgSource<any, any, any, any>;
+          resource: PgResource<any, any, any, any, any>;
         }
       ): string;
       aggregatesField(
@@ -47,65 +52,67 @@ declare global {
       aggregateGroupByType(
         this: Inflection,
         details: {
-          source: PgSource<any, any, any, any>;
+          resource: PgResource<any, any, any, any, any>;
         }
       ): string;
-      aggregateGroupByColumnEnum(
+      aggregateGroupByAttributeEnum(
         this: Inflection,
         details: {
-          source: PgSource<any, any, any, any>;
-          columnName: string;
+          resource: PgResource<any, any, any, any, any>;
+          attributeName: string;
         }
       ): string;
       aggregateHavingInputType(
         this: Inflection,
-        details: { source: PgSource<any, any, any, any> }
+        details: { resource: PgResource<any, any, any, any, any> }
       ): string;
       aggregateHavingAggregateInputType(
         this: Inflection,
         details: {
-          source: PgSource<any, any, any, any>;
+          resource: PgResource<any, any, any, any, any>;
           aggregateSpec: AggregateSpec;
         }
       ): string;
-      aggregateHavingAggregateComputedColumnInputType(
+      aggregateHavingAggregateComputedAttributeInputType(
         this: Inflection,
         details: {
-          source: PgSource<any, any, any, any>;
+          resource: PgResource<any, any, any, any, any>;
           aggregateSpec: AggregateSpec;
-          computedColumnSource: PgSource<any, any, any, any>;
+          computedAttributeResource: PgResource<any, any, any, any, any>;
         }
       ): string;
-      aggregateHavingAggregateComputedColumnArgsInputType(
+      aggregateHavingAggregateComputedAttributeArgsInputType(
         this: Inflection,
         details: {
-          source: PgSource<any, any, any, any>;
+          resource: PgResource<any, any, any, any, any>;
           aggregateSpec: AggregateSpec;
-          computedColumnSource: PgSource<any, any, any, any>;
+          computedAttributeResource: PgResource<any, any, any, any, any>;
         }
       ): string;
-      aggregateGroupByColumnDerivativeEnum(
+      aggregateGroupByAttributeDerivativeEnum(
         this: Inflection,
         details: {
-          source: PgSource<any, any, any, any>;
-          columnName: string;
+          resource: PgResource<any, any, any, any, any>;
+          attributeName: string;
           aggregateGroupBySpec: AggregateGroupBySpec;
         }
       ): string;
       orderByCountOfManyRelationByKeys(
         this: Inflection,
         details: {
-          source: PgSource<any, any, any, any>;
+          registry: PgRegistry;
+          codec: PgCodecWithAttributes;
           relationName: string;
         }
       ): string;
-      orderByColumnAggregateOfManyRelationByKeys(
+      orderByAttributeAggregateOfManyRelationByKeys(
         this: Inflection,
         details: {
-          source: PgSource<any, any, any, any>;
+          registry: PgRegistry;
+          codec: PgCodecWithAttributes;
           relationName: string;
           aggregateSpec: AggregateSpec;
-          columnName: string;
+          attributeName: string;
         }
       ): string;
 
@@ -126,12 +133,12 @@ export const PgAggregatesInflectorsPlugin: GraphileConfig.Plugin = {
     add: {
       aggregateContainerType(_preset, details) {
         return this.upperCamelCase(
-          `${this._singularizedCodecName(details.source.codec)}-aggregates`
+          `${this._singularizedCodecName(details.resource.codec)}-aggregates`
         );
       },
       aggregateType(_preset, details) {
         return this.upperCamelCase(
-          `${this._singularizedCodecName(details.source.codec)}-${
+          `${this._singularizedCodecName(details.resource.codec)}-${
             details.aggregateSpec.id
           }-aggregates`
         );
@@ -147,48 +154,48 @@ export const PgAggregatesInflectorsPlugin: GraphileConfig.Plugin = {
       },
       aggregateGroupByType(_preset, details) {
         return this.upperCamelCase(
-          `${this._singularizedCodecName(details.source.codec)}-group-by`
+          `${this._singularizedCodecName(details.resource.codec)}-group-by`
         );
       },
-      aggregateGroupByColumnEnum(_preset, details) {
+      aggregateGroupByAttributeEnum(_preset, details) {
         return this.constantCase(
-          `${this._columnName({
-            columnName: details.columnName,
-            codec: details.source.codec,
+          `${this._attributeName({
+            attributeName: details.attributeName,
+            codec: details.resource.codec,
           })}`
         );
       },
       aggregateHavingInputType(_preset, details) {
         return this.upperCamelCase(
-          `${this._singularizedCodecName(details.source.codec)}-having-input`
+          `${this._singularizedCodecName(details.resource.codec)}-having-input`
         );
       },
       aggregateHavingAggregateInputType(_preset, details) {
         return this.upperCamelCase(
-          `${this._singularizedCodecName(details.source.codec)}-having-${
+          `${this._singularizedCodecName(details.resource.codec)}-having-${
             details.aggregateSpec.id
           }-input`
         );
       },
-      aggregateHavingAggregateComputedColumnInputType(_preset, details) {
+      aggregateHavingAggregateComputedAttributeInputType(_preset, details) {
         return this.upperCamelCase(
-          `${this._singularizedCodecName(details.source.codec)}-having-${
+          `${this._singularizedCodecName(details.resource.codec)}-having-${
             details.aggregateSpec.id
-          }-${this._sourceName(details.computedColumnSource)}-input`
+          }-${this._resourceName(details.computedAttributeResource)}-input`
         );
       },
-      aggregateHavingAggregateComputedColumnArgsInputType(_preset, details) {
+      aggregateHavingAggregateComputedAttributeArgsInputType(_preset, details) {
         return this.upperCamelCase(
-          `${this._singularizedCodecName(details.source.codec)}-having-${
+          `${this._singularizedCodecName(details.resource.codec)}-having-${
             details.aggregateSpec.id
-          }-${this._sourceName(details.computedColumnSource)}-args-input`
+          }-${this._resourceName(details.computedAttributeResource)}-args-input`
         );
       },
-      aggregateGroupByColumnDerivativeEnum(_preset, details) {
+      aggregateGroupByAttributeDerivativeEnum(_preset, details) {
         return this.constantCase(
-          `${this._columnName({
-            columnName: details.columnName,
-            codec: details.source.codec,
+          `${this._attributeName({
+            attributeName: details.attributeName,
+            codec: details.resource.codec,
           })}-${details.aggregateGroupBySpec.id}`
         );
       },
@@ -196,15 +203,15 @@ export const PgAggregatesInflectorsPlugin: GraphileConfig.Plugin = {
         const relationName = this._manyRelation(details);
         return this.constantCase(`${relationName}-count`);
       },
-      orderByColumnAggregateOfManyRelationByKeys(_preset, details) {
+      orderByAttributeAggregateOfManyRelationByKeys(_preset, details) {
         const relationName = this._manyRelation(details);
-        const relation: PgSourceRelation<any, any> = details.source.getRelation(
+        const relation = details.registry.pgRelations[details.codec.name][
           details.relationName
-        );
+        ] as PgCodecRelation<any, any>;
         return this.constantCase(
-          `${relationName}-${details.aggregateSpec.id}-${this._columnName({
-            codec: relation.source.codec,
-            columnName: details.columnName,
+          `${relationName}-${details.aggregateSpec.id}-${this._attributeName({
+            codec: relation.remoteResource.codec,
+            attributeName: details.attributeName,
           })}`
         );
       },
