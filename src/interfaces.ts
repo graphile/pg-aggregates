@@ -1,9 +1,15 @@
-import type { PgSource, PgTypeCodec } from "@dataplan/pg";
+import type { PgResource, PgCodec } from "@dataplan/pg";
 import type { SQL } from "pg-sql2";
 
 declare module "@dataplan/pg" {
-  interface PgTypeCodecExtensions {
+  interface PgCodecExtensions {
     isNumberLike?: boolean;
+  }
+  interface PgConditionStepExtensions {
+    pgFilterAttribute?: {
+      codec: PgCodec<any, any, any, any, any, any, any>;
+      expression: SQL;
+    };
   }
 }
 
@@ -11,7 +17,7 @@ declare global {
   namespace GraphileBuild {
     interface Inflection {
       filterTableAggregateType(
-        foreignTable: PgSource<any, any, any, any>,
+        foreignTable: PgResource<any, any, any, any>,
         spec: AggregateSpec
       ): string;
     }
@@ -19,7 +25,7 @@ declare global {
       pgAggregateSpecs: AggregateSpec[];
       pgAggregateGroupBySpecs: AggregateGroupBySpec[];
       pgHavingFilterTypeNameForCodec(
-        codec: PgTypeCodec<any, any, any, any>
+        codec: PgCodec<any, any, any, any>
       ): string | null;
     }
     interface ScopeObject {
@@ -28,7 +34,7 @@ declare global {
       pgAggregateSpec?: AggregateSpec;
     }
     interface ScopeInputObject {
-      pgTypeSource?: PgSource<any, any, any, any>;
+      pgTypeResource?: PgResource<any, any, any, any>;
       isPgHavingFilterInputType?: boolean;
       isPgAggregateHavingInputType?: boolean;
       pgHavingFilterSpec?: string;
@@ -39,14 +45,14 @@ declare global {
     interface ScopeObjectFieldsField {
       isPgAggregateField?: boolean;
       isPgConnectionAggregateField?: boolean;
-      // TODO: remove this, it's redundant vs pgTypeSource?
-      pgFieldSource?: PgSource<any, any, any, any>;
+      // TODO: remove this, it's redundant vs pgTypeResource?
+      pgFieldResource?: PgResource<any, any, any, any, any>;
     }
     interface ScopeInputObjectFieldsField {
       isPgConnectionFilterAggregatesField?: boolean;
     }
     interface ScopeEnum {
-      pgTypeSource?: PgSource<any, any, any, any>;
+      pgTypeResource?: PgResource<any, any, any, any, any>;
       isPgAggregateGroupEnum?: boolean;
     }
   }
@@ -54,18 +60,18 @@ declare global {
 
 export type AggregateTargetEntity =
   | {
-      type: "column";
-      /** table codec - NOT column codec! */
-      codec: PgTypeCodec<any, any, any, any>;
-      /** column name available on this codec */
-      columnName: string;
-      source?: never;
+      type: "attribute";
+      /** table codec - NOT attribute codec! */
+      codec: PgCodec<any, any, any, any, any, any, any>;
+      /** attribute name available on this codec */
+      attributeName: string;
+      resource?: never;
     }
   | {
-      type: "computedColumn";
-      source: PgSource<any, any, any, any>;
+      type: "computedAttribute";
+      resource: PgResource<any, any, any, any, any>;
       codec?: never;
-      columnName?: never;
+      attributeName?: never;
     };
 
 export interface AggregateGroupBySpec {
@@ -73,7 +79,9 @@ export interface AggregateGroupBySpec {
   id: string; // e.g. 'truncated-to-hour'
 
   /** Return true if we can process this type */
-  isSuitableType: (codec: PgTypeCodec<any, any, any, any>) => boolean;
+  isSuitableType: (
+    codec: PgCodec<any, any, any, any, any, any, any>
+  ) => boolean;
 
   /** Return false if we cannot process this attribute (default: true) */
   shouldApplyToEntity?: (entity: AggregateTargetEntity) => boolean;
@@ -93,7 +101,7 @@ export interface AggregateSpec {
   HumanLabel: string;
 
   /** Return true if we can process this type */
-  isSuitableType: (codec: PgTypeCodec<any, any, any, any>) => boolean;
+  isSuitableType: (codec: PgCodec<any, any, any, any>) => boolean;
 
   /** Return false if we cannot process this attribute (default: true) */
   shouldApplyToEntity?: (entity: AggregateTargetEntity) => boolean;
@@ -109,8 +117,8 @@ export interface AggregateSpec {
    * - Median of int should be int
    */
   pgTypeCodecModifier?: (
-    codec: PgTypeCodec<any, any, any, any>
-  ) => PgTypeCodec<any, any, any, any>;
+    codec: PgCodec<any, any, any, any>
+  ) => PgCodec<any, any, any, any>;
 
   /** Set true if the result is guaranteed to be non-null */
   isNonNull?: boolean;

@@ -11,8 +11,14 @@ const Plugin: GraphileConfig.Plugin = {
       init(_, build) {
         const { inflection } = build;
 
-        for (const source of build.input.pgSources) {
-          if (source.parameters || !source.codec.columns || source.isUnique) {
+        for (const source of Object.values(
+          build.input.pgRegistry.pgResources
+        )) {
+          if (
+            source.parameters ||
+            !source.codec.attributes ||
+            source.isUnique
+          ) {
             continue;
           }
           const behavior = build.pgGetBehavior([
@@ -29,13 +35,13 @@ const Plugin: GraphileConfig.Plugin = {
           const tableTypeName = inflection.tableType(source.codec);
           /* const TableGroupByType = */
           build.registerEnumType(
-            inflection.aggregateGroupByType({ source }),
+            inflection.aggregateGroupByType({ resource: source }),
             {
-              pgTypeSource: source,
+              pgTypeResource: source,
               isPgAggregateGroupEnum: true,
             },
             () => ({
-              name: inflection.aggregateGroupByType({ source }),
+              name: inflection.aggregateGroupByType({ resource: source }),
               description: build.wrapDescription(
                 `Grouping methods for \`${tableTypeName}\` for usage during aggregation.`,
                 "type"

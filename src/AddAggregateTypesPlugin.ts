@@ -4,20 +4,21 @@ import type { GraphQLFieldConfigMap, GraphQLOutputType } from "graphql";
 import { constant, ExecutableStep, FieldArgs } from "grafast";
 import {
   PgSelectSingleStep,
-  PgSource,
-  PgTypeColumn,
+  PgResource,
+  PgCodecAttribute,
   TYPES,
+  PgResourceParameter,
 } from "@dataplan/pg";
-import { getComputedColumnSources } from "./utils";
+import { getComputedAttributeResources } from "./utils";
 
 // @ts-ignore
 const { version } = require("../package.json");
 
 const isSuitableSource = (
   build: GraphileBuild.Build,
-  source: PgSource<any, any, any, any>
+  source: PgResource<any, any, any, any>
 ): boolean => {
-  if (source.parameters || !source.codec.columns) {
+  if (source.parameters || !source.codec.attributes) {
     return false;
   }
   const behavior = build.pgGetBehavior([
@@ -44,30 +45,30 @@ const Plugin: GraphileConfig.Plugin = {
           sql,
           graphql: { GraphQLList, GraphQLNonNull, GraphQLString },
           inflection,
-          input: { pgSources },
+          input: {
+            pgRegistry: { pgResources },
+          },
         } = build;
 
         // TODO: should we be using the codec rather than the source here? What if two sources share the same codec?
-        for (const source of pgSources) {
-          if (!isSuitableSource(build, source)) {
+        for (const resource of Object.values(pgResources)) {
+          if (!isSuitableSource(build, resource)) {
             continue;
           }
 
           /* const AggregateContainerType = */
           build.registerObjectType(
-            inflection.aggregateContainerType({ source }),
+            inflection.aggregateContainerType({ resource: resource }),
             {
               isPgAggregateContainerType: true,
-              pgTypeSource: source,
+              pgTypeResource: resource,
             },
             ExecutableStep as any,
             () => ({
               fields: {
                 keys: {
                   type: new GraphQLList(new GraphQLNonNull(GraphQLString)),
-                  plan(
-                    $pgSelectSingle: PgSelectSingleStep<any, any, any, any>
-                  ) {
+                  plan($pgSelectSingle: PgSelectSingleStep<any>) {
                     const $pgSelect = $pgSelectSingle.getClassStep();
                     const groups = $pgSelect.getGroups();
                     if (groups.length > 0) {
@@ -85,12 +86,12 @@ const Plugin: GraphileConfig.Plugin = {
                 },
               },
             }),
-            `@graphile/pg-aggregates aggregate container type for ${source.name}`
+            `@graphile/pg-aggregates aggregate container type for ${resource.name}`
           );
 
           for (const aggregateSpec of build.pgAggregateSpecs) {
             const aggregateTypeName = inflection.aggregateType({
-              source,
+              resource: resource,
               aggregateSpec,
             });
             build.registerObjectType(
@@ -98,11 +99,11 @@ const Plugin: GraphileConfig.Plugin = {
               {
                 isPgAggregateType: true,
                 pgAggregateSpec: aggregateSpec,
-                pgTypeSource: source,
+                pgTypeResource: resource,
               },
               ExecutableStep as any,
               () => ({}),
-              `${aggregateTypeName} aggregate type for '${source.name}' source`
+              `${aggregateTypeName} aggregate type for '${resource.name}' source`
             );
           }
         }
@@ -123,11 +124,11 @@ const Plugin: GraphileConfig.Plugin = {
           scope: {
             isPgAggregateContainerType,
             isPgAggregateType,
-            pgTypeSource: source,
+            pgTypeResource: resource,
             pgAggregateSpec: spec,
           },
         } = context;
-        if (!source || !isSuitableSource(build, source)) {
+        if (!resource || !isSuitableSource(build, resource)) {
           return fields;
         }
 
@@ -138,7 +139,7 @@ const Plugin: GraphileConfig.Plugin = {
             build.pgAggregateSpecs.reduce((memo, aggregateSpec) => {
               return build.recoverable(memo, () => {
                 const aggregateTypeName = inflection.aggregateType({
-                  source,
+                  resource: resource,
                   aggregateSpec,
                 });
                 const AggregateType = build.getTypeByName(aggregateTypeName);
@@ -154,19 +155,12 @@ const Plugin: GraphileConfig.Plugin = {
                         fieldName,
                         isPgAggregateField: true,
                         pgAggregateSpec: aggregateSpec,
-                        pgFieldSource: source,
+                        pgFieldResource: resource,
                       },
                       () => ({
                         description: `${aggregateSpec.HumanLabel} aggregates across the matching connection (ignoring before/after/first/last/offset)`,
                         type: AggregateType,
-                        plan(
-                          $pgSelectSingle: PgSelectSingleStep<
-                            any,
-                            any,
-                            any,
-                            any
-                          >
-                        ) {
+                        plan($pgSelectSingle: PgSelectSingleStep<any>) {
                           return $pgSelectSingle;
                         },
                       })
@@ -180,30 +174,30 @@ const Plugin: GraphileConfig.Plugin = {
           );
         }
 
-        // Hook the sum aggregates type to add fields for each numeric source column
+        // Hook the sum aggregates type to add fields for each numeric source attribute
         if (isPgAggregateType && spec) {
           fields = build.extend(
             fields,
-            // Figure out the columns that we're allowed to do a `SUM(...)` of
-            Object.entries(source.codec.columns).reduce(
+            // Figure out the attributes that we're allowed to do a `SUM(...)` of
+            Object.entries(resource.codec.attributes).reduce(
               (
                 memo: GraphQLFieldConfigMap<any, any>,
-                [columnName, column]: [string, PgTypeColumn]
+                [attributeName, attribute]: [string, PgCodecAttribute]
               ) => {
                 if (
                   (spec.shouldApplyToEntity &&
                     !spec.shouldApplyToEntity({
-                      type: "column",
-                      codec: source.codec,
-                      columnName,
+                      type: "attribute",
+                      codec: resource.codec,
+                      attributeName,
                     })) ||
-                  !spec.isSuitableType(column.codec)
+                  !spec.isSuitableType(attribute.codec)
                 ) {
                   return memo;
                 }
                 const codec = spec.pgTypeCodecModifier
-                  ? spec.pgTypeCodecModifier(column.codec)
-                  : column.codec;
+                  ? spec.pgTypeCodecModifier(attribute.codec)
+                  : attribute.codec;
                 const Type = build.getGraphQLTypeByPgCodec(
                   codec,
                   "output"
@@ -211,9 +205,9 @@ const Plugin: GraphileConfig.Plugin = {
                 if (!Type) {
                   return memo;
                 }
-                const fieldName = inflection.column({
-                  columnName,
-                  codec: source.codec,
+                const fieldName = inflection.attribute({
+                  attributeName,
+                  codec: resource.codec,
                 });
                 return build.extend(
                   memo,
@@ -232,118 +226,120 @@ const Plugin: GraphileConfig.Plugin = {
                           type: spec.isNonNull
                             ? new GraphQLNonNull(Type)
                             : Type,
-                          plan(
-                            $pgSelectSingle: PgSelectSingleStep<
-                              any,
-                              any,
-                              any,
-                              any
-                            >
-                          ) {
+                          plan($pgSelectSingle: PgSelectSingleStep) {
                             // Note this expression is just an sql fragment, so you
                             // could add CASE statements, function calls, or whatever
                             // you need here
-                            const sqlColumn = sql.fragment`${
+                            const sqlAttribute = sql.fragment`${
                               $pgSelectSingle.getClassStep().alias
-                            }.${sql.identifier(columnName)}`;
+                            }.${sql.identifier(attributeName)}`;
                             const sqlAggregate =
-                              spec.sqlAggregateWrap(sqlColumn);
+                              spec.sqlAggregateWrap(sqlAttribute);
                             return $pgSelectSingle.select(sqlAggregate, codec);
                           },
                         };
                       }
                     ),
                   },
-                  `Add column '${columnName}' compatible with this aggregate`
+                  `Add attribute '${attributeName}' compatible with this aggregate`
                 );
               },
               Object.create(null)
             ),
-            "Add columns compatible with this aggregate"
+            "Add attributes compatible with this aggregate"
           );
 
-          const computedColumnSources = getComputedColumnSources(build, source);
+          const computedAttributeSources = getComputedAttributeResources(
+            build,
+            resource
+          );
           fields = build.extend(
             fields,
-            computedColumnSources.reduce((memo, computedColumnSource) => {
-              const codec = computedColumnSource.codec;
-              if (
-                (spec.shouldApplyToEntity &&
-                  !spec.shouldApplyToEntity({
-                    type: "computedColumn",
-                    source: computedColumnSource,
-                  })) ||
-                !spec.isSuitableType(codec)
-              ) {
-                return memo;
-              }
-              const fieldName = inflection.computedColumnField({
-                source: computedColumnSource,
-              });
-              const targetCodec = spec.pgTypeCodecModifier?.(codec) ?? codec;
-              const targetType = build.getGraphQLTypeByPgCodec(
-                targetCodec,
-                "output"
-              ) as GraphQLOutputType | undefined;
-              if (!targetType) {
-                return memo;
-              }
-              return build.extend(
-                memo,
-                {
-                  [fieldName]: fieldWithHooks(
-                    {
-                      fieldName,
-                    },
-                    () => {
-                      const { makeFieldArgs, makeExpression } =
-                        build.pgGetArgDetailsFromParameters(
-                          computedColumnSource,
-                          computedColumnSource.parameters.slice(1)
-                        );
-                      return {
-                        type: targetType,
-                        description: `${
-                          spec.HumanLabel
-                        } of this field across the matching connection.${
-                          computedColumnSource.description
-                            ? `\n\n---\n\n${computedColumnSource.description}`
-                            : ""
-                        }`,
-                        args: makeFieldArgs(),
-                        plan(
-                          $pgSelectSingle: PgSelectSingleStep<
-                            any,
-                            any,
-                            any,
-                            any
-                          >,
-                          fieldArgs: FieldArgs
-                        ) {
-                          // Because we require that the computed column is
-                          // evaluated inline, we have to convert it to an
-                          // expression here; this is only needed because of the
-                          // aggregation.
-                          const src = makeExpression({
-                            $placeholderable: $pgSelectSingle,
-                            source: computedColumnSource,
-                            fieldArgs,
-                            initialArgs: [$pgSelectSingle.getClassStep().alias],
-                          });
-
-                          const sqlAggregate = spec.sqlAggregateWrap(src);
-                          return $pgSelectSingle.select(
-                            sqlAggregate,
-                            targetCodec
+            computedAttributeSources.reduce(
+              (memo, computedAttributeResource) => {
+                const codec = computedAttributeResource.codec;
+                if (
+                  (spec.shouldApplyToEntity &&
+                    !spec.shouldApplyToEntity({
+                      type: "computedAttribute",
+                      resource: computedAttributeResource,
+                    })) ||
+                  !spec.isSuitableType(codec)
+                ) {
+                  return memo;
+                }
+                const fieldName = inflection.computedAttributeField({
+                  resource: computedAttributeResource as PgResource<
+                    any,
+                    any,
+                    any,
+                    readonly PgResourceParameter[],
+                    any
+                  >,
+                });
+                const targetCodec = spec.pgTypeCodecModifier?.(codec) ?? codec;
+                const targetType = build.getGraphQLTypeByPgCodec(
+                  targetCodec,
+                  "output"
+                ) as GraphQLOutputType | undefined;
+                if (!targetType) {
+                  return memo;
+                }
+                return build.extend(
+                  memo,
+                  {
+                    [fieldName]: fieldWithHooks(
+                      {
+                        fieldName,
+                      },
+                      () => {
+                        const { makeFieldArgs, makeExpression } =
+                          build.pgGetArgDetailsFromParameters(
+                            computedAttributeResource,
+                            computedAttributeResource.parameters!.slice(1)
                           );
-                        },
-                      };
-                    }
-                  ),
-                },
-                ""
-              );
-            }, Object.create(null) as GraphQLFieldConfigMap<any, any>),
+                        return {
+                          type: targetType,
+                          description: `${
+                            spec.HumanLabel
+                          } of this field across the matching connection.${
+                            computedAttributeResource.description
+                              ? `\n\n---\n\n${computedAttributeResource.description}`
+                              : ""
+                          }`,
+                          args: makeFieldArgs(),
+                          plan(
+                            $pgSelectSingle: PgSelectSingleStep<any>,
+                            fieldArgs: FieldArgs
+                          ) {
+                            // Because we require that the computed attribute is
+                            // evaluated inline, we have to convert it to an
+                            // expression here; this is only needed because of the
+                            // aggregation.
+                            const src = makeExpression({
+                              $placeholderable: $pgSelectSingle,
+                              resource: computedAttributeResource,
+                              fieldArgs,
+                              initialArgs: [
+                                $pgSelectSingle.getClassStep().alias,
+                              ],
+                            });
+
+                            const sqlAggregate = spec.sqlAggregateWrap(src);
+                            return $pgSelectSingle.select(
+                              sqlAggregate,
+                              targetCodec
+                            );
+                          },
+                        };
+                      }
+                    ),
+                  },
+                  ""
+                );
+              },
+              Object.create(null) as GraphQLFieldConfigMap<any, any>
+            ),
             ""
           );
         }

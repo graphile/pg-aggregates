@@ -1,16 +1,18 @@
 import type {
   PgConditionLikeStep,
-  PgSourceParameter,
-  PgTypeCodec,
-  PgTypeColumn,
+  PgResourceParameter,
+  PgCodec,
+  PgCodecAttribute,
+  PgCodecWithAttributes,
+  PgResource,
 } from "@dataplan/pg";
 import { TYPES, BooleanFilterStep, OrFilterStep } from "@dataplan/pg";
-import type { GraphileInputFieldConfigMap } from "grafast";
+import type { GrafastInputFieldConfigMap } from "grafast";
 import type { GraphQLInputObjectType, GraphQLInputType } from "graphql";
 import type { SQL } from "pg-sql2";
 import type { AggregateSpec } from "./interfaces";
 import { CORE_HAVING_FILTER_SPECS } from "./interfaces";
-import { getComputedColumnSources } from "./utils";
+import { getComputedAttributeResources } from "./utils";
 
 const { version } = require("../package.json");
 
@@ -25,9 +27,7 @@ const Plugin: GraphileConfig.Plugin = {
         return build.extend(
           build,
           {
-            pgHavingFilterTypeNameForCodec(
-              codec: PgTypeCodec<any, any, any, any>
-            ) {
+            pgHavingFilterTypeNameForCodec(codec: PgCodec<any, any, any, any>) {
               switch (codec) {
                 case TYPES.int2:
                 case TYPES.int: {
@@ -97,31 +97,37 @@ const Plugin: GraphileConfig.Plugin = {
           );
         }
 
-        for (const source of build.input.pgSources) {
-          if (source.parameters || !source.codec.columns || source.isUnique) {
+        for (const resource of Object.values(
+          build.input.pgRegistry.pgResources
+        )) {
+          if (
+            resource.parameters ||
+            !resource.codec.attributes ||
+            resource.isUnique
+          ) {
             continue;
           }
           const behavior = build.pgGetBehavior([
-            source.codec.extensions,
-            source.extensions,
+            resource.codec.extensions,
+            resource.extensions,
           ]);
           if (!build.behavior.matches(behavior, "order", "order")) {
             continue;
           }
 
-          const tableTypeName = inflection.tableType(source.codec);
+          const tableTypeName = inflection.tableType(resource.codec);
 
           const tableHavingInputTypeName = inflection.aggregateHavingInputType({
-            source,
+            resource: resource,
           });
           build.registerInputObjectType(
             tableHavingInputTypeName,
             {
-              pgTypeSource: source,
+              pgTypeResource: resource,
               isPgAggregateHavingInputType: true,
             },
             () => ({
-              name: inflection.aggregateHavingInputType({ source }),
+              name: inflection.aggregateHavingInputType({ resource: resource }),
               description: build.wrapDescription(
                 `Conditions for \`${tableTypeName}\` aggregates.`,
                 "type"
@@ -154,26 +160,31 @@ const Plugin: GraphileConfig.Plugin = {
                 };
               },
             }),
-            `Adding connection "groupBy" having input type for ${source.name}.`
+            `Adding connection "groupBy" having input type for ${resource.name}.`
           );
 
-          const computedColumnSources = getComputedColumnSources(build, source);
+          const computedAttributeResources = getComputedAttributeResources(
+            build,
+            resource
+          );
 
           for (const aggregateSpec of build.pgAggregateSpecs) {
-            for (const computedColumnSource of computedColumnSources) {
+            for (const computedAttributeResource of computedAttributeResources) {
               const argsTypeName =
-                inflection.aggregateHavingAggregateComputedColumnArgsInputType({
-                  source,
-                  aggregateSpec,
-                  computedColumnSource,
-                });
+                inflection.aggregateHavingAggregateComputedAttributeArgsInputType(
+                  {
+                    resource: resource,
+                    aggregateSpec,
+                    computedAttributeResource: computedAttributeResource,
+                  }
+                );
               build.registerInputObjectType(
                 argsTypeName,
                 {},
                 () => {
                   const { argDetails } = build.pgGetArgDetailsFromParameters(
-                    computedColumnSource,
-                    computedColumnSource.parameters.slice(1)
+                    computedAttributeResource,
+                    computedAttributeResource.parameters!.slice(1)
                   );
                   return {
                     fields: argDetails.reduce(
@@ -184,7 +195,7 @@ const Plugin: GraphileConfig.Plugin = {
                         };
                         return memo;
                       },
-                      Object.create(null) as GraphileInputFieldConfigMap<
+                      Object.create(null) as GrafastInputFieldConfigMap<
                         any,
                         any
                       >
@@ -194,10 +205,10 @@ const Plugin: GraphileConfig.Plugin = {
                 ""
               );
               const computedHavingInputName =
-                inflection.aggregateHavingAggregateComputedColumnInputType({
-                  source,
+                inflection.aggregateHavingAggregateComputedAttributeInputType({
+                  resource: resource,
                   aggregateSpec,
-                  computedColumnSource,
+                  computedAttributeResource: computedAttributeResource,
                 });
               /*const ComputedHavingInput =*/
               build.registerInputObjectType(
@@ -206,7 +217,7 @@ const Plugin: GraphileConfig.Plugin = {
                 () => {
                   const havingFilterTypeName =
                     build.pgHavingFilterTypeNameForCodec(
-                      computedColumnSource.codec
+                      computedAttributeResource.codec
                     );
                   const HavingFilterType = havingFilterTypeName
                     ? (build.getTypeByName(havingFilterTypeName) as
@@ -220,7 +231,7 @@ const Plugin: GraphileConfig.Plugin = {
                     return { fields: Object.create(null) };
                   }
                   const requiresAtLeastOneArg = (
-                    computedColumnSource.parameters as PgSourceParameter[]
+                    computedAttributeResource.parameters as PgResourceParameter[]
                   )
                     .slice(1)
                     .some((p) => p.required);
@@ -251,7 +262,7 @@ const Plugin: GraphileConfig.Plugin = {
             }
 
             const typeName = inflection.aggregateHavingAggregateInputType({
-              source,
+              resource: resource,
               aggregateSpec,
             });
             build.registerInputObjectType(
@@ -262,21 +273,21 @@ const Plugin: GraphileConfig.Plugin = {
                 fields: ({ fieldWithHooks }) => {
                   let fields = Object.create(
                     null
-                  ) as GraphileInputFieldConfigMap<any, any>;
+                  ) as GrafastInputFieldConfigMap<any, any>;
 
                   fields = build.extend(
                     fields,
-                    Object.entries(source.codec.columns).reduce(
+                    Object.entries(resource.codec.attributes!).reduce(
                       (
                         newFields,
-                        [columnName, column]: [string, PgTypeColumn]
+                        [attributeName, attribute]: [string, PgCodecAttribute]
                       ) => {
-                        const fieldName = inflection.column({
-                          codec: source.codec,
-                          columnName,
+                        const fieldName = inflection.attribute({
+                          codec: resource.codec as PgCodecWithAttributes,
+                          attributeName: attributeName,
                         });
                         const havingFilterTypeName =
-                          build.pgHavingFilterTypeNameForCodec(column.codec);
+                          build.pgHavingFilterTypeNameForCodec(attribute.codec);
                         const HavingFilterType = havingFilterTypeName
                           ? build.getTypeByName(havingFilterTypeName)
                           : undefined;
@@ -286,11 +297,13 @@ const Plugin: GraphileConfig.Plugin = {
                         const newField = fieldWithHooks({ fieldName }, () => ({
                           type: HavingFilterType,
                           applyPlan($having: PgConditionLikeStep) {
-                            const columnExpression = sql.fragment`${
+                            const attributeExpression = sql.fragment`${
                               $having.alias
-                            }.${sql.identifier(columnName)}`;
+                            }.${sql.identifier(attributeName)}`;
                             const aggregateExpression =
-                              aggregateSpec.sqlAggregateWrap(columnExpression);
+                              aggregateSpec.sqlAggregateWrap(
+                                attributeExpression
+                              );
                             return new BooleanFilterStep(
                               $having,
                               aggregateExpression
@@ -300,7 +313,7 @@ const Plugin: GraphileConfig.Plugin = {
                         return build.extend(
                           newFields,
                           { [fieldName]: newField },
-                          `Adding column '${columnName}' to having filter type for '${source.name}'`
+                          `Adding attribute '${attributeName}' to having filter type for '${resource.name}'`
                         );
                       },
                       Object.create(null)
@@ -310,30 +323,31 @@ const Plugin: GraphileConfig.Plugin = {
 
                   fields = build.extend(
                     fields,
-                    computedColumnSources.reduce(
-                      (memo, computedColumnSource) => {
-                        const codec = computedColumnSource.codec;
+                    computedAttributeResources.reduce(
+                      (memo, computedAttributeResource) => {
+                        const codec = computedAttributeResource.codec;
                         if (
                           (aggregateSpec.shouldApplyToEntity &&
                             !aggregateSpec.shouldApplyToEntity({
-                              type: "computedColumn",
-                              source: computedColumnSource,
+                              type: "computedAttribute",
+                              resource: computedAttributeResource,
                             })) ||
                           !aggregateSpec.isSuitableType(codec)
                         ) {
                           return memo;
                         }
                         const argsTypeName =
-                          inflection.aggregateHavingAggregateComputedColumnArgsInputType(
+                          inflection.aggregateHavingAggregateComputedAttributeArgsInputType(
                             {
-                              source,
+                              resource: resource,
                               aggregateSpec,
-                              computedColumnSource,
+                              computedAttributeResource:
+                                computedAttributeResource,
                             }
                           );
                         const havingFilterTypeName =
                           build.pgHavingFilterTypeNameForCodec(
-                            computedColumnSource.codec
+                            computedAttributeResource.codec
                           );
                         const HavingFilterType = havingFilterTypeName
                           ? (build.getTypeByName(havingFilterTypeName) as
@@ -344,11 +358,12 @@ const Plugin: GraphileConfig.Plugin = {
                           | GraphQLInputObjectType
                           | undefined;
                         const computedHavingInputName =
-                          inflection.aggregateHavingAggregateComputedColumnInputType(
+                          inflection.aggregateHavingAggregateComputedAttributeInputType(
                             {
-                              source,
+                              resource: resource,
                               aggregateSpec,
-                              computedColumnSource,
+                              computedAttributeResource:
+                                computedAttributeResource,
                             }
                           );
                         const ComputedHavingInput = build.getTypeByName(
@@ -361,13 +376,19 @@ const Plugin: GraphileConfig.Plugin = {
                         ) {
                           return memo;
                         }
-                        const fieldName = inflection.computedColumnField({
-                          source: computedColumnSource,
+                        const fieldName = inflection.computedAttributeField({
+                          resource: computedAttributeResource as PgResource<
+                            any,
+                            any,
+                            any,
+                            PgResourceParameter[],
+                            any
+                          >,
                         });
                         const { makeExpression } =
                           build.pgGetArgDetailsFromParameters(
-                            computedColumnSource,
-                            computedColumnSource.parameters.slice(1)
+                            computedAttributeResource,
+                            computedAttributeResource.parameters!.slice(1)
                           );
 
                         const newField = fieldWithHooks(
@@ -375,13 +396,13 @@ const Plugin: GraphileConfig.Plugin = {
                           {
                             type: ComputedHavingInput,
                             applyPlan($having, fieldArgs) {
-                              // Because we require that the computed column is
+                              // Because we require that the computed attribute is
                               // evaluated inline, we have to convert it to an
                               // expression here; this is only needed because of the
                               // aggregation.
                               const src = makeExpression({
                                 $placeholderable: $having,
-                                source: computedColumnSource,
+                                resource: computedAttributeResource,
                                 fieldArgs,
                                 path: ["args"],
                                 initialArgs: [$having.alias],
@@ -400,10 +421,10 @@ const Plugin: GraphileConfig.Plugin = {
                         return build.extend(
                           memo,
                           { [fieldName]: newField },
-                          `Adding computed column function '${computedColumnSource.name}' to having filter type for '${source.name}'`
+                          `Adding computed attribute function '${computedAttributeResource.name}' to having filter type for '${resource.name}'`
                         );
                       },
-                      Object.create(null) as GraphileInputFieldConfigMap<
+                      Object.create(null) as GrafastInputFieldConfigMap<
                         any,
                         any
                       >
@@ -429,7 +450,7 @@ const Plugin: GraphileConfig.Plugin = {
             isPgHavingFilterInputType,
             pgHavingFilterSpec,
             isPgAggregateHavingInputType,
-            pgTypeSource: table,
+            pgTypeResource: table,
           },
           fieldWithHooks,
         } = context;
@@ -439,7 +460,7 @@ const Plugin: GraphileConfig.Plugin = {
             !isPgAggregateHavingInputType ||
             !table ||
             table.parameters ||
-            !table.codec.columns
+            !table.codec.attributes
           ) {
             return fields;
           }
@@ -448,7 +469,7 @@ const Plugin: GraphileConfig.Plugin = {
             build.pgAggregateSpecs.reduce(
               (aggregateFields: any, aggregateSpec: AggregateSpec) => {
                 const typeName = inflection.aggregateHavingAggregateInputType({
-                  source: table,
+                  resource: table,
                   aggregateSpec,
                 });
                 const SpecInput = build.getTypeByName(typeName) as
@@ -476,7 +497,7 @@ const Plugin: GraphileConfig.Plugin = {
               },
               Object.create(null)
             ),
-            `Adding columns to having filter for '${table.name}'`
+            `Adding attributes to having filter for '${table.name}'`
           );
         })();
 

@@ -37,15 +37,15 @@ const Plugin: GraphileConfig.Plugin = {
           fieldWithHooks,
           scope: {
             pgCodec,
-            pgTypeSource,
+            pgTypeResource,
             isConnectionType,
             isPgConnectionRelated,
           },
         } = context;
 
         const table =
-          pgTypeSource ??
-          build.input.pgSources.find(
+          pgTypeResource ??
+          Object.values(build.input.pgRegistry.pgResources).find(
             (s) => s.codec === pgCodec && !s.parameters
           );
 
@@ -55,13 +55,13 @@ const Plugin: GraphileConfig.Plugin = {
           !isPgConnectionRelated ||
           !table ||
           table.parameters ||
-          !table.codec.columns
+          !table.codec.attributes
         ) {
           return fields;
         }
 
         const AggregateContainerType = build.getTypeByName(
-          inflection.aggregateContainerType({ source: table })
+          inflection.aggregateContainerType({ resource: table })
         ) as GraphQLObjectType | undefined;
 
         if (
@@ -73,13 +73,13 @@ const Plugin: GraphileConfig.Plugin = {
         }
 
         const fieldName = inflection.groupedAggregatesContainerField({
-          source: table,
+          resource: table,
         });
         const TableGroupByType = build.getTypeByName(
-          inflection.aggregateGroupByType({ source: table })
+          inflection.aggregateGroupByType({ resource: table })
         ) as GraphQLEnumType | undefined;
         const TableHavingInputType = build.getTypeByName(
-          inflection.aggregateHavingInputType({ source: table })
+          inflection.aggregateHavingInputType({ resource: table })
         );
         const tableTypeName = inflection.tableType(table.codec);
         if (!TableGroupByType || !isValidEnum(TableGroupByType)) {
@@ -101,11 +101,7 @@ const Plugin: GraphileConfig.Plugin = {
                     `The method to use when grouping \`${tableTypeName}\` for these aggregates.`,
                     "arg"
                   ),
-                  applyPlan(
-                    _$parent,
-                    $pgSelect: PgSelectStep<any, any, any, any>,
-                    input
-                  ) {
+                  applyPlan(_$parent, $pgSelect: PgSelectStep<any>, input) {
                     const $value = input.getRaw();
                     const val = $value.eval();
                     if (!Array.isArray(val)) {
@@ -116,7 +112,7 @@ const Plugin: GraphileConfig.Plugin = {
                         TableGroupByType,
                         group
                       );
-                      const plan = config?.extensions?.graphile?.applyPlan;
+                      const plan = config?.extensions?.grafast?.applyPlan;
                       if (typeof plan === "function") {
                         plan($pgSelect);
                       } else {
@@ -134,10 +130,7 @@ const Plugin: GraphileConfig.Plugin = {
                           `Conditions on the grouped aggregates.`,
                           "arg"
                         ),
-                        applyPlan(
-                          _$parent,
-                          $pgSelect: PgSelectStep<any, any, any, any>
-                        ) {
+                        applyPlan(_$parent, $pgSelect: PgSelectStep<any>) {
                           return $pgSelect.havingPlan();
                         },
                       },
