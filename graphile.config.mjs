@@ -1,7 +1,7 @@
 import { postgraphilePresetAmber } from "postgraphile/presets/amber";
 import { PostGraphileConnectionFilterPreset } from "postgraphile-plugin-connection-filter";
 import { PgAggregatesPreset } from "./dist/index.js";
-import { makePgConfig } from "@dataplan/pg/adaptors/pg";
+import { makePgService } from "@dataplan/pg/adaptors/pg";
 
 /** @type {GraphileConfig.Preset} */
 const preset = {
@@ -10,8 +10,8 @@ const preset = {
     PostGraphileConnectionFilterPreset,
     PgAggregatesPreset,
   ],
-  pgConfigs: [
-    makePgConfig({
+  pgServices: [
+    makePgService({
       connectionString: "graphile_aggregates",
       schemas: ["test"],
     }),
