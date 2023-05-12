@@ -11,19 +11,19 @@ const Plugin: GraphileConfig.Plugin = {
       init(_, build) {
         const { inflection } = build;
 
-        for (const source of Object.values(
+        for (const resource of Object.values(
           build.input.pgRegistry.pgResources
         )) {
           if (
-            source.parameters ||
-            !source.codec.attributes ||
-            source.isUnique
+            resource.parameters ||
+            !resource.codec.attributes ||
+            resource.isUnique
           ) {
             continue;
           }
           const behavior = build.pgGetBehavior([
-            source.codec.extensions,
-            source.extensions,
+            resource.codec.extensions,
+            resource.extensions,
           ]);
           if (!build.behavior.matches(behavior, "select", "select")) {
             continue;
@@ -32,16 +32,16 @@ const Plugin: GraphileConfig.Plugin = {
             continue;
           }
 
-          const tableTypeName = inflection.tableType(source.codec);
+          const tableTypeName = inflection.tableType(resource.codec);
           /* const TableGroupByType = */
           build.registerEnumType(
-            inflection.aggregateGroupByType({ resource: source }),
+            inflection.aggregateGroupByType({ resource }),
             {
-              pgTypeResource: source,
+              pgTypeResource: resource,
               isPgAggregateGroupEnum: true,
             },
             () => ({
-              name: inflection.aggregateGroupByType({ resource: source }),
+              name: inflection.aggregateGroupByType({ resource }),
               description: build.wrapDescription(
                 `Grouping methods for \`${tableTypeName}\` for usage during aggregation.`,
                 "type"
@@ -50,7 +50,7 @@ const Plugin: GraphileConfig.Plugin = {
                 /* no default values, these will be added via hooks */
               },
             }),
-            `Adding connection "groupBy" enum type for ${source.name}.`
+            `Adding connection "groupBy" enum type for ${resource.name}.`
           );
         }
         return _;

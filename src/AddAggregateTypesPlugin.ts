@@ -16,14 +16,14 @@ const { version } = require("../package.json");
 
 const isSuitableSource = (
   build: GraphileBuild.Build,
-  source: PgResource<any, any, any, any>
+  resource: PgResource<any, any, any, any>
 ): boolean => {
-  if (source.parameters || !source.codec.attributes) {
+  if (resource.parameters || !resource.codec.attributes) {
     return false;
   }
   const behavior = build.pgGetBehavior([
-    source.codec.extensions,
-    source.extensions,
+    resource.codec.extensions,
+    resource.extensions,
   ]);
 
   if (!build.behavior.matches(behavior, "select", "select")) {
