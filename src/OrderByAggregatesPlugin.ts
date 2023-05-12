@@ -3,6 +3,7 @@ import {
   PgCodecRelation,
   PgCodecAttributes,
   TYPES,
+  PgResource,
 } from "@dataplan/pg";
 import { GraphQLEnumValueConfigMap } from "graphql";
 import { SQL } from "pg-sql2";
@@ -55,7 +56,7 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
             if (!build.behavior.matches(behavior, "select", "select")) {
               return memo;
             }
-            const table = relation.remoteResource;
+            const table = relation.remoteResource as PgResource;
             const isUnique = !!relation.isUnique;
             if (isUnique) {
               // No point aggregating over a relation that's unique
@@ -89,12 +90,12 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
                     );
                   }
                 );
-                if (typeof table.source === "function") {
+                if (typeof table.from === "function") {
                   throw new Error(`Function source unsupported`);
                 }
                 // TODO: refactor this to use joins instead of subqueries
                 const fragment = sql`(${sql.indent`select count(*)
-from ${table.source} ${tableAlias}
+from ${table.from} ${tableAlias}
 where ${sql.parens(
                   sql.join(
                     conditions.map((c) => sql.parens(c)),
@@ -163,7 +164,7 @@ where ${sql.parens(
                         );
                       }
                     );
-                    if (typeof table.source === "function") {
+                    if (typeof table.from === "function") {
                       throw new Error(`Function source unsupported`);
                     }
                     // TODO: refactor this to use joins instead of subqueries
@@ -173,7 +174,7 @@ select ${aggregateSpec.sqlAggregateWrap(
                         attributeName
                       )}`
                     )}
-from ${table.source} ${tableAlias}
+from ${table.from} ${tableAlias}
 where ${sql.join(
                       conditions.map((c) => sql.parens(c)),
                       " AND "
