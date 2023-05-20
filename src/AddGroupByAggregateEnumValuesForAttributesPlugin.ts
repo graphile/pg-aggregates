@@ -1,5 +1,8 @@
 import { PgSelectStep, PgResourceUnique, PgCodecAttribute } from "@dataplan/pg";
-import { GraphQLEnumValueConfig, GraphQLEnumValueConfigMap } from "graphql";
+import type {
+  GraphQLEnumValueConfig,
+  GraphQLEnumValueConfigMap,
+} from "graphql";
 
 const { version } = require("../package.json");
 

@@ -5,7 +5,7 @@ import {
   TYPES,
   PgResource,
 } from "@dataplan/pg";
-import { GraphQLEnumValueConfigMap } from "graphql";
+import type { GraphQLEnumValueConfigMap } from "graphql";
 import { SQL } from "pg-sql2";
 import { AggregateSpec } from "./interfaces";
 

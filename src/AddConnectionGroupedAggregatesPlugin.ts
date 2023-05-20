@@ -1,15 +1,18 @@
 import { PgSelectStep } from "@dataplan/pg";
 import { getEnumValueConfig } from "grafast";
-import { GraphQLEnumType, GraphQLObjectType } from "graphql";
+import type { GraphQLEnumType, GraphQLObjectType } from "graphql";
 
 const { version } = require("../package.json");
 
-function isValidEnum(enumType: GraphQLEnumType | undefined): boolean {
+function isValidEnum(
+  build: GraphileBuild.Build,
+  enumType: GraphQLEnumType | undefined
+): boolean {
   try {
     if (!enumType) {
       return false;
     }
-    if (!(enumType instanceof GraphQLEnumType)) {
+    if (!(enumType instanceof build.graphql.GraphQLEnumType)) {
       return false;
     }
     if (Object.keys(enumType.getValues()).length === 0) {
@@ -82,7 +85,7 @@ const Plugin: GraphileConfig.Plugin = {
           inflection.aggregateHavingInputType({ resource: table })
         );
         const tableTypeName = inflection.tableType(table.codec);
-        if (!TableGroupByType || !isValidEnum(TableGroupByType)) {
+        if (!TableGroupByType || !isValidEnum(build, TableGroupByType)) {
           return fields;
         }
 
