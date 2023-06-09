@@ -13,6 +13,9 @@ const Plugin: GraphileConfig.Plugin = {
 
   // Now add group by attributes
   schema: {
+    entityBehavior: {
+      pgCodecAttribute: "order",
+    },
     hooks: {
       GraphQLEnumType_values(values, build, context) {
         const { extend, inflection, sql, pgAggregateGroupBySpecs } = build;
@@ -31,9 +34,13 @@ const Plugin: GraphileConfig.Plugin = {
           values,
           Object.entries(table.codec.attributes).reduce(
             (memo, [attributeName, attribute]: [string, PgCodecAttribute]) => {
-              const behavior = build.pgGetBehavior([attribute.extensions]);
               // Grouping requires ordering.
-              if (!build.behavior.matches(behavior, "order", "order")) {
+              if (
+                !build.behavior.pgCodecAttributeMatches(
+                  [table.codec, attribute],
+                  "order"
+                )
+              ) {
                 return memo;
               }
               const unique = !!(table.uniques as PgResourceUnique[]).find(

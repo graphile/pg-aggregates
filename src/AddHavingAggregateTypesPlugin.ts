@@ -22,6 +22,10 @@ const Plugin: GraphileConfig.Plugin = {
   provides: ["aggregates"],
 
   schema: {
+    entityBehavior: {
+      pgResource: "order",
+    },
+
     hooks: {
       build(build) {
         return build.extend(
@@ -107,11 +111,7 @@ const Plugin: GraphileConfig.Plugin = {
           ) {
             continue;
           }
-          const behavior = build.pgGetBehavior([
-            resource.codec.extensions,
-            resource.extensions,
-          ]);
-          if (!build.behavior.matches(behavior, "order", "order")) {
+          if (!build.behavior.pgResourceMatches(resource, "order")) {
             continue;
           }
 

@@ -21,12 +21,7 @@ const isSuitableSource = (
   if (resource.parameters || !resource.codec.attributes) {
     return false;
   }
-  const behavior = build.pgGetBehavior([
-    resource.codec.extensions,
-    resource.extensions,
-  ]);
-
-  if (!build.behavior.matches(behavior, "select", "select")) {
+  if (!build.behavior.pgResourceMatches(resource, "select")) {
     return false;
   }
 
@@ -39,6 +34,10 @@ const Plugin: GraphileConfig.Plugin = {
 
   // Create the aggregates type for each table
   schema: {
+    entityBehavior: {
+      pgResource: "select",
+    },
+
     hooks: {
       init(init, build, _context) {
         const {

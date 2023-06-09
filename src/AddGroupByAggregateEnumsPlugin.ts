@@ -6,6 +6,10 @@ const Plugin: GraphileConfig.Plugin = {
   provides: ["aggregates"],
 
   schema: {
+    entityBehavior: {
+      pgResource: "select order",
+    },
+
     hooks: {
       // Create the group by enums for each table
       init(_, build) {
@@ -21,14 +25,10 @@ const Plugin: GraphileConfig.Plugin = {
           ) {
             continue;
           }
-          const behavior = build.pgGetBehavior([
-            resource.codec.extensions,
-            resource.extensions,
-          ]);
-          if (!build.behavior.matches(behavior, "select", "select")) {
+          if (!build.behavior.pgResourceMatches(resource, "select")) {
             continue;
           }
-          if (!build.behavior.matches(behavior, "order", "order")) {
+          if (!build.behavior.pgResourceMatches(resource, "order")) {
             continue;
           }
 
