@@ -1,5 +1,4 @@
-import { PgSelectStep } from "@dataplan/pg";
-import { getEnumValueConfig } from "grafast";
+import type { PgSelectStep } from "@dataplan/pg";
 import type { GraphQLEnumType, GraphQLObjectType } from "graphql";
 
 const { version } = require("../package.json");
@@ -34,6 +33,7 @@ const Plugin: GraphileConfig.Plugin = {
       GraphQLObjectType_fields(fields, build, context) {
         const {
           graphql: { GraphQLList, GraphQLNonNull },
+          grafast: { getEnumValueConfig },
           inflection,
         } = build;
         const {

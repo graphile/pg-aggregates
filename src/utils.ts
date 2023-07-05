@@ -1,4 +1,4 @@
-import { PgResource, PgResourceParameter } from "@dataplan/pg";
+import type { PgResource, PgResourceParameter } from "@dataplan/pg";
 import type { GraphileBuild } from "graphile-build";
 import type {} from "graphile-build-pg";
 

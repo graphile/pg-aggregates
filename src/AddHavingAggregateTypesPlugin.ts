@@ -1,4 +1,5 @@
 import type {
+  BooleanFilterStep,
   PgConditionLikeStep,
   PgResourceParameter,
   PgCodec,
@@ -6,7 +7,6 @@ import type {
   PgCodecWithAttributes,
   PgResource,
 } from "@dataplan/pg";
-import { TYPES, BooleanFilterStep, OrFilterStep } from "@dataplan/pg";
 import type { GrafastInputFieldConfigMap } from "grafast";
 import type { GraphQLInputObjectType, GraphQLInputType } from "graphql";
 import type { SQL } from "pg-sql2";
@@ -20,6 +20,7 @@ const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddHavingAggregateTypesPlugin",
   version,
   provides: ["aggregates"],
+  after: ["PgBasicsPlugin"],
 
   schema: {
     entityBehavior: {
@@ -28,6 +29,12 @@ const Plugin: GraphileConfig.Plugin = {
 
     hooks: {
       build(build) {
+        if (!build.dataplanPg) {
+          throw new Error(`PgBasicsPlugin must be loaded first`);
+        }
+        const {
+          dataplanPg: { TYPES },
+        } = build;
         return build.extend(
           build,
           {
@@ -83,6 +90,7 @@ const Plugin: GraphileConfig.Plugin = {
           graphql: { GraphQLList, GraphQLNonNull },
           inflection,
           sql,
+          dataplanPg: { OrFilterStep, BooleanFilterStep },
         } = build;
 
         for (const spec of CORE_HAVING_FILTER_SPECS) {
@@ -444,7 +452,11 @@ const Plugin: GraphileConfig.Plugin = {
       },
 
       GraphQLInputObjectType_fields(inFields, build, context) {
-        const { sql, inflection } = build;
+        const {
+          sql,
+          inflection,
+          dataplanPg: { TYPES },
+        } = build;
         const {
           scope: {
             isPgHavingFilterInputType,

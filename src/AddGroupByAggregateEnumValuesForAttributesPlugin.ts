@@ -1,4 +1,8 @@
-import { PgSelectStep, PgResourceUnique, PgCodecAttribute } from "@dataplan/pg";
+import type {
+  PgSelectStep,
+  PgResourceUnique,
+  PgCodecAttribute,
+} from "@dataplan/pg";
 import type {
   GraphQLEnumValueConfig,
   GraphQLEnumValueConfigMap,

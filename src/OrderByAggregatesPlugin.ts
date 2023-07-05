@@ -1,12 +1,11 @@
-import {
+import type {
   PgSelectStep,
   PgCodecRelation,
   PgCodecAttributes,
-  TYPES,
   PgResource,
 } from "@dataplan/pg";
 import type { GraphQLEnumValueConfigMap } from "graphql";
-import { SQL } from "pg-sql2";
+import type { SQL } from "pg-sql2";
 import { AggregateSpec } from "./interfaces";
 
 const { version } = require("../package.json");
@@ -23,7 +22,12 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
 
     hooks: {
       GraphQLEnumType_values(values, build, context) {
-        const { extend, sql, inflection } = build;
+        const {
+          extend,
+          sql,
+          inflection,
+          dataplanPg: { TYPES },
+        } = build;
         const pgAggregateSpecs: AggregateSpec[] = build.pgAggregateSpecs;
         const {
           scope: { isPgRowSortEnum, pgTypeResource, pgCodec },

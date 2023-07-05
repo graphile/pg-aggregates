@@ -1,9 +1,8 @@
-import {
+import type {
   PgCodec,
   PgCodecAttributes,
   PgConditionStep,
   PgConditionCapableParentStep,
-  pgWhereConditionSpecListToSQL,
   PgWhereConditionSpec,
 } from "@dataplan/pg";
 import {
@@ -12,9 +11,9 @@ import {
   FieldArgs,
   GrafastInputFieldConfigMap,
 } from "grafast";
-import "postgraphile-plugin-connection-filter";
+import type {} from "postgraphile-plugin-connection-filter";
 import type { GraphQLInputObjectType } from "graphql";
-import { PgSQL, SQL } from "pg-sql2";
+import type { PgSQL, SQL } from "pg-sql2";
 import { AggregateSpec } from "./interfaces";
 
 const { version } = require("../package.json");
@@ -26,7 +25,7 @@ export const Plugin: GraphileConfig.Plugin = {
   // This has to run AFTER any plugins that provide `build.pgAggregateSpecs`
   // otherwise we might add codecs to build.allPgCodecs before all the relevant
   // codecs/specs are available.
-  after: ["PgCodecsPlugin", "aggregates"],
+  after: ["PgBasicsPlugin", "PgCodecsPlugin", "aggregates"],
   provides: ["codecs"],
   before: ["PgConnectionArgFilterPlugin"],
 
@@ -75,7 +74,10 @@ export const Plugin: GraphileConfig.Plugin = {
       },
 
       init(_, build) {
-        const { inflection } = build;
+        const {
+          inflection,
+          dataplanPg: { PgConditionStep },
+        } = build;
 
         // Register the aggregate filter type for each table
         for (const foreignTable of Object.values(
@@ -162,7 +164,13 @@ export const Plugin: GraphileConfig.Plugin = {
       // See https://github.com/graphile-contrib/postgraphile-plugin-connection-filter/blob/6223cdb1d2ac5723aecdf55f735a18f8e2b98683/src/PgConnectionArgFilterBackwardRelationsPlugin.ts#L374
       GraphQLInputObjectType_fields(inFields, build, context) {
         let fields = inFields;
-        const { extend, inflection, sql, pgAggregateSpecs } = build;
+        const {
+          extend,
+          inflection,
+          sql,
+          pgAggregateSpecs,
+          dataplanPg: { PgConditionStep, pgWhereConditionSpecListToSQL },
+        } = build;
         const {
           fieldWithHooks,
           scope: {
@@ -221,11 +229,15 @@ export const Plugin: GraphileConfig.Plugin = {
                       tableExpression,
                       alias,
                     } = $where.extensions.pgFilterRelation;
-                    const $subQuery = new PgAggregateConditionStep($where, {
-                      sql,
-                      tableExpression,
-                      alias,
-                    });
+                    const $subQuery = new PgAggregateConditionStep(
+                      $where,
+                      {
+                        sql,
+                        tableExpression,
+                        alias,
+                      },
+                      pgWhereConditionSpecListToSQL
+                    );
                     localAttributes.forEach((localAttribute, i) => {
                       const remoteAttribute = remoteAttributes[i];
                       $subQuery.where(
@@ -471,7 +483,8 @@ class PgAggregateConditionStep<TParentStep extends PgConditionCapableParentStep>
       sql: PgSQL;
       tableExpression: SQL;
       alias?: string;
-    }
+    },
+    private pgWhereConditionSpecListToSQL: GraphileBuild.Build["dataplanPg"]["pgWhereConditionSpecListToSQL"]
   ) {
     super($parent);
     const { sql, tableExpression, alias } = options;
@@ -496,13 +509,17 @@ class PgAggregateConditionStep<TParentStep extends PgConditionCapableParentStep>
   }
 
   forAggregate(spec: AggregateSpec): PgAggregateConditionExpressionStep {
-    return new PgAggregateConditionExpressionStep(this, spec);
+    return new PgAggregateConditionExpressionStep(
+      this,
+      spec,
+      this.pgWhereConditionSpecListToSQL
+    );
   }
 
   apply(): void {
     const { sql } = this;
 
-    const sqlCondition = pgWhereConditionSpecListToSQL(
+    const sqlCondition = this.pgWhereConditionSpecListToSQL(
       this.alias,
       this.conditions
     );
@@ -533,7 +550,8 @@ class PgAggregateConditionExpressionStep
   conditions: PgWhereConditionSpec<any>[] = [];
   constructor(
     $parent: PgAggregateConditionStep<any>,
-    private spec: AggregateSpec
+    private spec: AggregateSpec,
+    private pgWhereConditionSpecListToSQL: GraphileBuild.Build["dataplanPg"]["pgWhereConditionSpecListToSQL"]
   ) {
     super($parent);
     this.alias = $parent.alias;
@@ -551,7 +569,7 @@ class PgAggregateConditionExpressionStep
   }
 
   apply(): void {
-    const sqlCondition = pgWhereConditionSpecListToSQL(
+    const sqlCondition = this.pgWhereConditionSpecListToSQL(
       this.alias,
       this.conditions
     );

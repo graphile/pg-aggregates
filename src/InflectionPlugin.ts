@@ -1,7 +1,7 @@
 import type {} from "graphile-config";
 import type {} from "graphile-build";
 import type {} from "graphile-build-pg";
-import {
+import type {
   PgCodecWithAttributes,
   PgRegistry,
   PgResource,

@@ -1,4 +1,4 @@
-import { PgCodec, TYPES } from "@dataplan/pg";
+import type { PgCodec } from "@dataplan/pg";
 import {
   AggregateSpec,
   AggregateGroupBySpec,
@@ -21,6 +21,7 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
   name: "PgAggregatesSpecsPlugin",
   version,
   provides: ["aggregates"],
+  after: ["PgBasicsPlugin"],
 
   gather: {
     hooks: {
@@ -39,10 +40,13 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
   schema: {
     hooks: {
       build(build) {
-        const { sql } = build;
-        if (!sql) {
-          throw new Error(`build.sql is required!`);
+        if (!build.dataplanPg || !build.sql) {
+          throw new Error(`PgBasicsPlugin must be loaded first`);
         }
+        const {
+          sql,
+          dataplanPg: { TYPES },
+        } = build;
 
         /** Maps from the data type of the attribute to the data type of the sum aggregate */
         /** BigFloat is our fallback type; it should be valid for almost all numeric types */

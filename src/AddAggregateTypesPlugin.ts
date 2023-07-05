@@ -1,12 +1,11 @@
 import type {} from "graphile-config";
 import type {} from "graphile-build-pg";
 import type { GraphQLFieldConfigMap, GraphQLOutputType } from "graphql";
-import { constant, ExecutableStep, FieldArgs } from "grafast";
-import {
+import type { FieldArgs } from "grafast";
+import type {
   PgSelectSingleStep,
   PgResource,
   PgCodecAttribute,
-  TYPES,
   PgResourceParameter,
 } from "@dataplan/pg";
 import { getComputedAttributeResources } from "./utils";
@@ -43,6 +42,8 @@ const Plugin: GraphileConfig.Plugin = {
         const {
           sql,
           graphql: { GraphQLList, GraphQLNonNull, GraphQLString },
+          dataplanPg: { assertPgClassSingleStep, TYPES },
+          grafast: { constant },
           inflection,
           input: {
             pgRegistry: { pgResources },
@@ -62,8 +63,8 @@ const Plugin: GraphileConfig.Plugin = {
               isPgAggregateContainerType: true,
               pgTypeResource: resource,
             },
-            ExecutableStep as any,
             () => ({
+              assertStep: assertPgClassSingleStep,
               fields: {
                 keys: {
                   type: new GraphQLList(new GraphQLNonNull(GraphQLString)),
@@ -100,7 +101,6 @@ const Plugin: GraphileConfig.Plugin = {
                 pgAggregateSpec: aggregateSpec,
                 pgTypeResource: resource,
               },
-              ExecutableStep as any,
               () => ({}),
               `${aggregateTypeName} aggregate type for '${resource.name}' source`
             );
