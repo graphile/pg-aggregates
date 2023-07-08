@@ -1,12 +1,13 @@
 import type {
-  PgSelectStep,
-  PgCodecRelation,
   PgCodecAttributes,
+  PgCodecRelation,
   PgResource,
+  PgSelectStep,
 } from "@dataplan/pg";
 import type { GraphQLEnumValueConfigMap } from "graphql";
 import type { SQL } from "pg-sql2";
-import { AggregateSpec } from "./interfaces.js";
+
+import type { AggregateSpec } from "./interfaces.js";
 
 const { version } = require("../package.json");
 

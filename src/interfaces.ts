@@ -1,4 +1,4 @@
-import type { PgResource, PgCodec } from "@dataplan/pg";
+import type { PgCodec, PgResource } from "@dataplan/pg";
 import type { SQL } from "pg-sql2";
 
 declare module "@dataplan/pg" {
@@ -86,7 +86,11 @@ export interface AggregateGroupBySpec {
   /** Return false if we cannot process this attribute (default: true) */
   shouldApplyToEntity?: (entity: AggregateTargetEntity) => boolean;
 
-  /** Wraps the SQL to return a derivative (e.g. sqlFrag => sql.fragment`date_trunc('hour', ${sqlFrag})`) */
+  /** Wraps the SQL to return a derivative (e.g.:
+   * ```
+   * sqlFrag => sql.fragment`date_trunc('hour', ${sqlFrag})`)
+   * ```
+   */
   sqlWrap: (sqlFrag: SQL) => SQL;
 }
 

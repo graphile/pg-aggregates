@@ -1,7 +1,7 @@
 import type {
-  PgSelectStep,
-  PgResourceUnique,
   PgCodecAttribute,
+  PgResourceUnique,
+  PgSelectStep,
 } from "@dataplan/pg";
 import type {
   GraphQLEnumValueConfig,

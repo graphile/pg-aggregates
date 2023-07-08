@@ -1,13 +1,14 @@
-import type {} from "graphile-config";
-import type {} from "graphile-build";
-import type {} from "graphile-build-pg";
 import type {
+  PgCodecRelation,
   PgCodecWithAttributes,
   PgRegistry,
   PgResource,
-  PgCodecRelation,
 } from "@dataplan/pg";
-import {
+import type {} from "graphile-build";
+import type {} from "graphile-build-pg";
+import type {} from "graphile-config";
+
+import type {
   AggregateGroupBySpec,
   AggregateSpec,
   CORE_HAVING_FILTER_SPECS,

@@ -1,15 +1,15 @@
 import type { PgCodec } from "@dataplan/pg";
+
+import type { AggregateGroupBySpec, AggregateSpec } from "./interfaces.js";
 import {
-  AggregateSpec,
-  AggregateGroupBySpec,
   BIGINT_OID,
-  INT2_OID,
-  INT4_OID,
-  NUMERIC_OID,
   FLOAT4_OID,
   FLOAT8_OID,
+  INT2_OID,
+  INT4_OID,
   INTERVAL_OID,
   MONEY_OID,
+  NUMERIC_OID,
 } from "./interfaces.js";
 
 const { version } = require("../package.json");

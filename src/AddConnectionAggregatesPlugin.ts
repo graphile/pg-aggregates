@@ -1,4 +1,5 @@
 import type { GraphQLObjectType } from "graphql";
+import { EXPORTABLE } from "./EXPORTABLE.js";
 
 const { version } = require("../package.json");
 
@@ -60,11 +61,15 @@ const Plugin: GraphileConfig.Plugin = {
             return {
               description: `Aggregates across the matching connection (ignoring before/after/first/last/offset)`,
               type: AggregateContainerType,
-              plan($connection) {
-                return $connection
-                  .cloneSubplanWithoutPagination("aggregate")
-                  .single();
-              },
+              plan: EXPORTABLE(
+                () =>
+                  function plan($connection) {
+                    return $connection
+                      .cloneSubplanWithoutPagination("aggregate")
+                      .single();
+                  },
+                []
+              ),
             };
           }),
         };

@@ -1,5 +1,6 @@
 import type { PgSelectStep } from "@dataplan/pg";
 import type { GraphQLEnumType, GraphQLObjectType } from "graphql";
+import { EXPORTABLE } from "./EXPORTABLE.js";
 
 const { version } = require("../package.json");
 
@@ -140,9 +141,15 @@ const Plugin: GraphileConfig.Plugin = {
                     }
                   : null),
               },
-              plan($connection) {
-                return $connection.cloneSubplanWithoutPagination("aggregate");
-              },
+              plan: EXPORTABLE(
+                () =>
+                  function plan($connection) {
+                    return $connection.cloneSubplanWithoutPagination(
+                      "aggregate"
+                    );
+                  },
+                []
+              ),
             };
           }),
         };

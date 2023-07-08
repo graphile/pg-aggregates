@@ -1,20 +1,22 @@
 import type {
   PgCodec,
   PgCodecAttributes,
-  PgConditionStep,
   PgConditionCapableParentStep,
+  PgConditionStep,
   PgWhereConditionSpec,
 } from "@dataplan/pg";
 import type {
-  ModifierStep,
   ExecutableStep,
   FieldArgs,
   GrafastInputFieldConfigMap,
+  ModifierStep,
 } from "grafast";
-import type {} from "postgraphile-plugin-connection-filter";
 import type { GraphQLInputObjectType } from "graphql";
 import type { PgSQL, SQL } from "pg-sql2";
-import { AggregateSpec } from "./interfaces.js";
+import type {} from "postgraphile-plugin-connection-filter";
+
+import type { AggregateSpec } from "./interfaces.js";
+import { EXPORTABLE } from "./EXPORTABLE.js";
 
 const { version } = require("../package.json");
 
@@ -83,8 +85,48 @@ export const Plugin: GraphileConfig.Plugin = {
             }
           }
         }
+        const PgAggregateConditionExpressionStep = EXPORTABLE(
+          (ModifierStep) =>
+            class PgAggregateConditionExpressionStep
+              extends ModifierStep<PgAggregateConditionStep<any>>
+              implements PgConditionCapableParentStep
+            {
+              alias: SQL;
+              conditions: PgWhereConditionSpec<any>[] = [];
+              constructor(
+                $parent: PgAggregateConditionStep<any>,
+                private spec: AggregateSpec,
+                private pgWhereConditionSpecListToSQL: GraphileBuild.Build["dataplanPg"]["pgWhereConditionSpecListToSQL"]
+              ) {
+                super($parent);
+                this.alias = $parent.alias;
+              }
+
+              placeholder(
+                $step: ExecutableStep<any>,
+                codec: PgCodec<any, any, any, any>
+              ): SQL {
+                return this.$parent.placeholder($step, codec);
+              }
+
+              where(condition: PgWhereConditionSpec<any>): void {
+                this.conditions.push(condition);
+              }
+
+              apply(): void {
+                const sqlCondition = this.pgWhereConditionSpecListToSQL(
+                  this.alias,
+                  this.conditions
+                );
+                if (sqlCondition) {
+                  this.$parent.expression(sqlCondition);
+                }
+              }
+            } as PgAggregateConditionExpressionStepClass,
+          [ModifierStep]
+        );
         const PgAggregateConditionStep = EXPORTABLE(
-          () =>
+          (ModifierStep, PgAggregateConditionExpressionStep) =>
             class PgAggregateConditionStep<
               TParentStep extends PgConditionCapableParentStep
             > extends ModifierStep<TParentStep> {
@@ -161,47 +203,7 @@ group by true)`;
                 return this.$parent.where(subquery);
               }
             } as PgAggregateConditionStepClass,
-          []
-        );
-        const PgAggregateConditionExpressionStep = EXPORTABLE(
-          (ModifierStep) =>
-            class PgAggregateConditionExpressionStep
-              extends ModifierStep<PgAggregateConditionStep<any>>
-              implements PgConditionCapableParentStep
-            {
-              alias: SQL;
-              conditions: PgWhereConditionSpec<any>[] = [];
-              constructor(
-                $parent: PgAggregateConditionStep<any>,
-                private spec: AggregateSpec,
-                private pgWhereConditionSpecListToSQL: GraphileBuild.Build["dataplanPg"]["pgWhereConditionSpecListToSQL"]
-              ) {
-                super($parent);
-                this.alias = $parent.alias;
-              }
-
-              placeholder(
-                $step: ExecutableStep<any>,
-                codec: PgCodec<any, any, any, any>
-              ): SQL {
-                return this.$parent.placeholder($step, codec);
-              }
-
-              where(condition: PgWhereConditionSpec<any>): void {
-                this.conditions.push(condition);
-              }
-
-              apply(): void {
-                const sqlCondition = this.pgWhereConditionSpecListToSQL(
-                  this.alias,
-                  this.conditions
-                );
-                if (sqlCondition) {
-                  this.$parent.expression(sqlCondition);
-                }
-              }
-            } as PgAggregateConditionExpressionStepClass,
-          [ModifierStep]
+          [ModifierStep, PgAggregateConditionExpressionStep]
         );
 
         return build.extend(

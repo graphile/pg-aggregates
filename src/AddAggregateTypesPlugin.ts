@@ -1,14 +1,16 @@
-import type {} from "graphile-config";
-import type {} from "graphile-build-pg";
-import type { GraphQLFieldConfigMap, GraphQLOutputType } from "graphql";
-import type { FieldArgs } from "grafast";
 import type {
-  PgSelectSingleStep,
-  PgResource,
   PgCodecAttribute,
+  PgResource,
   PgResourceParameter,
+  PgSelectSingleStep,
 } from "@dataplan/pg";
+import type { FieldArgs } from "grafast";
+import type {} from "graphile-build-pg";
+import type {} from "graphile-config";
+import type { GraphQLFieldConfigMap, GraphQLOutputType } from "graphql";
+
 import { getComputedAttributeResources } from "./utils.js";
+import { EXPORTABLE } from "./EXPORTABLE.js";
 
 // @ts-ignore
 const { version } = require("../package.json");
@@ -68,21 +70,25 @@ const Plugin: GraphileConfig.Plugin = {
               fields: {
                 keys: {
                   type: new GraphQLList(new GraphQLNonNull(GraphQLString)),
-                  plan($pgSelectSingle: PgSelectSingleStep<any>) {
-                    const $pgSelect = $pgSelectSingle.getClassStep();
-                    const groups = $pgSelect.getGroups();
-                    if (groups.length > 0) {
-                      return $pgSelectSingle.select(
-                        sql`json_build_array(${sql.join(
-                          groups.map((g) => g.fragment),
-                          ", "
-                        )})`,
-                        TYPES.json
-                      );
-                    } else {
-                      return constant(null);
-                    }
-                  },
+                  plan: EXPORTABLE(
+                    (TYPES, constant, sql) =>
+                      function plan($pgSelectSingle: PgSelectSingleStep<any>) {
+                        const $pgSelect = $pgSelectSingle.getClassStep();
+                        const groups = $pgSelect.getGroups();
+                        if (groups.length > 0) {
+                          return $pgSelectSingle.select(
+                            sql`json_build_array(${sql.join(
+                              groups.map((g) => g.fragment),
+                              ", "
+                            )})`,
+                            TYPES.json
+                          );
+                        } else {
+                          return constant(null);
+                        }
+                      },
+                    [TYPES, constant, sql]
+                  ),
                 },
               },
             }),
@@ -159,9 +165,15 @@ const Plugin: GraphileConfig.Plugin = {
                       () => ({
                         description: `${aggregateSpec.HumanLabel} aggregates across the matching connection (ignoring before/after/first/last/offset)`,
                         type: AggregateType,
-                        plan($pgSelectSingle: PgSelectSingleStep<any>) {
-                          return $pgSelectSingle;
-                        },
+                        plan: EXPORTABLE(
+                          () =>
+                            function plan(
+                              $pgSelectSingle: PgSelectSingleStep<any>
+                            ) {
+                              return $pgSelectSingle;
+                            },
+                          []
+                        ),
                       })
                     ),
                   },
@@ -225,17 +237,26 @@ const Plugin: GraphileConfig.Plugin = {
                           type: spec.isNonNull
                             ? new GraphQLNonNull(Type)
                             : Type,
-                          plan($pgSelectSingle: PgSelectSingleStep) {
-                            // Note this expression is just an sql fragment, so you
-                            // could add CASE statements, function calls, or whatever
-                            // you need here
-                            const sqlAttribute = sql.fragment`${
-                              $pgSelectSingle.getClassStep().alias
-                            }.${sql.identifier(attributeName)}`;
-                            const sqlAggregate =
-                              spec.sqlAggregateWrap(sqlAttribute);
-                            return $pgSelectSingle.select(sqlAggregate, codec);
-                          },
+                          plan: EXPORTABLE(
+                            (attributeName, codec, spec, sql) =>
+                              function plan(
+                                $pgSelectSingle: PgSelectSingleStep
+                              ) {
+                                // Note this expression is just an sql fragment, so you
+                                // could add CASE statements, function calls, or whatever
+                                // you need here
+                                const sqlAttribute = sql.fragment`${
+                                  $pgSelectSingle.getClassStep().alias
+                                }.${sql.identifier(attributeName)}`;
+                                const sqlAggregate =
+                                  spec.sqlAggregateWrap(sqlAttribute);
+                                return $pgSelectSingle.select(
+                                  sqlAggregate,
+                                  codec
+                                );
+                              },
+                            [attributeName, codec, spec, sql]
+                          ),
                         };
                       }
                     ),
@@ -307,29 +328,43 @@ const Plugin: GraphileConfig.Plugin = {
                               : ""
                           }`,
                           args: makeFieldArgs(),
-                          plan(
-                            $pgSelectSingle: PgSelectSingleStep<any>,
-                            fieldArgs: FieldArgs
-                          ) {
-                            // Because we require that the computed attribute is
-                            // evaluated inline, we have to convert it to an
-                            // expression here; this is only needed because of the
-                            // aggregation.
-                            const src = makeExpression({
-                              $placeholderable: $pgSelectSingle,
-                              resource: computedAttributeResource,
-                              fieldArgs,
-                              initialArgs: [
-                                $pgSelectSingle.getClassStep().alias,
-                              ],
-                            });
-
-                            const sqlAggregate = spec.sqlAggregateWrap(src);
-                            return $pgSelectSingle.select(
-                              sqlAggregate,
+                          plan: EXPORTABLE(
+                            (
+                              computedAttributeResource,
+                              makeExpression,
+                              spec,
                               targetCodec
-                            );
-                          },
+                            ) =>
+                              function plan(
+                                $pgSelectSingle: PgSelectSingleStep<any>,
+                                fieldArgs: FieldArgs
+                              ) {
+                                // Because we require that the computed attribute is
+                                // evaluated inline, we have to convert it to an
+                                // expression here; this is only needed because of the
+                                // aggregation.
+                                const src = makeExpression({
+                                  $placeholderable: $pgSelectSingle,
+                                  resource: computedAttributeResource,
+                                  fieldArgs,
+                                  initialArgs: [
+                                    $pgSelectSingle.getClassStep().alias,
+                                  ],
+                                });
+
+                                const sqlAggregate = spec.sqlAggregateWrap(src);
+                                return $pgSelectSingle.select(
+                                  sqlAggregate,
+                                  targetCodec
+                                );
+                              },
+                            [
+                              computedAttributeResource,
+                              makeExpression,
+                              spec,
+                              targetCodec,
+                            ]
+                          ),
                         };
                       }
                     ),
