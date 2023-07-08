@@ -41,7 +41,7 @@ const Plugin: GraphileConfig.Plugin = {
               // Grouping requires ordering.
               if (
                 !build.behavior.pgCodecAttributeMatches(
-                  [table.codec, attribute],
+                  [table.codec, attributeName],
                   "order"
                 )
               ) {
