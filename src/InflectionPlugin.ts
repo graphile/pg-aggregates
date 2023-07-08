@@ -11,7 +11,7 @@ import {
   AggregateGroupBySpec,
   AggregateSpec,
   CORE_HAVING_FILTER_SPECS,
-} from "./interfaces";
+} from "./interfaces.js";
 
 const { version } = require("../package.json");
 

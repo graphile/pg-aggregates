@@ -81,4 +81,17 @@ module.exports = {
     "import/no-duplicates": "off",
     "@typescript-eslint/no-duplicate-imports": ["error"],
   },
+  overrides: [
+    // Rules for TypeScript only
+    {
+      files: ["*.ts", "*.tsx"],
+      parser: "@typescript-eslint/parser",
+      rules: {
+        "no-dupe-class-members": "off",
+        "no-undef": "off",
+        // This rule doesn't understand import of './js'
+        "import/no-unresolved": "off",
+      },
+    },
+  ],
 };

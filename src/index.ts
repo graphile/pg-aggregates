@@ -1,13 +1,13 @@
-import { PgAggregatesInflectorsPlugin } from "./InflectionPlugin";
-import { PgAggregatesSpecsPlugin } from "./AggregateSpecsPlugin";
-import { PgAggregatesAddGroupByAggregateEnumsPlugin } from "./AddGroupByAggregateEnumsPlugin";
-import { PgAggregatesAddGroupByAggregateEnumValuesForAttributesPlugin } from "./AddGroupByAggregateEnumValuesForAttributesPlugin";
-import { PgAggregatesAddHavingAggregateTypesPlugin } from "./AddHavingAggregateTypesPlugin";
-import { PgAggregatesAddAggregateTypesPlugin } from "./AddAggregateTypesPlugin";
-import { PgAggregatesAddConnectionAggregatesPlugin } from "./AddConnectionAggregatesPlugin";
-import { PgAggregatesAddConnectionGroupedAggregatesPlugin } from "./AddConnectionGroupedAggregatesPlugin";
-import { PgAggregatesOrderByAggregatesPlugin } from "./OrderByAggregatesPlugin";
-import { PgAggregatesFilterRelationalAggregatesPlugin } from "./FilterRelationalAggregatesPlugin";
+import { PgAggregatesInflectorsPlugin } from "./InflectionPlugin.js";
+import { PgAggregatesSpecsPlugin } from "./AggregateSpecsPlugin.js";
+import { PgAggregatesAddGroupByAggregateEnumsPlugin } from "./AddGroupByAggregateEnumsPlugin.js";
+import { PgAggregatesAddGroupByAggregateEnumValuesForAttributesPlugin } from "./AddGroupByAggregateEnumValuesForAttributesPlugin.js";
+import { PgAggregatesAddHavingAggregateTypesPlugin } from "./AddHavingAggregateTypesPlugin.js";
+import { PgAggregatesAddAggregateTypesPlugin } from "./AddAggregateTypesPlugin.js";
+import { PgAggregatesAddConnectionAggregatesPlugin } from "./AddConnectionAggregatesPlugin.js";
+import { PgAggregatesAddConnectionGroupedAggregatesPlugin } from "./AddConnectionGroupedAggregatesPlugin.js";
+import { PgAggregatesOrderByAggregatesPlugin } from "./OrderByAggregatesPlugin.js";
+import { PgAggregatesFilterRelationalAggregatesPlugin } from "./FilterRelationalAggregatesPlugin.js";
 
 export const PgAggregatesPreset: GraphileConfig.Preset = {
   plugins: [

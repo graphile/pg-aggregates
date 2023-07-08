@@ -8,7 +8,7 @@ import type {
   PgCodecAttribute,
   PgResourceParameter,
 } from "@dataplan/pg";
-import { getComputedAttributeResources } from "./utils";
+import { getComputedAttributeResources } from "./utils.js";
 
 // @ts-ignore
 const { version } = require("../package.json");

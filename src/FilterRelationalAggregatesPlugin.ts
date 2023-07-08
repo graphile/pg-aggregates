@@ -14,7 +14,7 @@ import type {
 import type {} from "postgraphile-plugin-connection-filter";
 import type { GraphQLInputObjectType } from "graphql";
 import type { PgSQL, SQL } from "pg-sql2";
-import { AggregateSpec } from "./interfaces";
+import { AggregateSpec } from "./interfaces.js";
 
 const { version } = require("../package.json");
 

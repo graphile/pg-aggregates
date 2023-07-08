@@ -10,7 +10,7 @@ import {
   FLOAT8_OID,
   INTERVAL_OID,
   MONEY_OID,
-} from "./interfaces";
+} from "./interfaces.js";
 
 const { version } = require("../package.json");
 

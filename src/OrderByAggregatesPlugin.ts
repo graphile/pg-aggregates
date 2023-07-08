@@ -6,7 +6,7 @@ import type {
 } from "@dataplan/pg";
 import type { GraphQLEnumValueConfigMap } from "graphql";
 import type { SQL } from "pg-sql2";
-import { AggregateSpec } from "./interfaces";
+import { AggregateSpec } from "./interfaces.js";
 
 const { version } = require("../package.json");
 
