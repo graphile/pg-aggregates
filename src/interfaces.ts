@@ -1,19 +1,19 @@
 import type { PgCodec, PgResource } from "@dataplan/pg";
 import type { SQL } from "pg-sql2";
 
-declare module "@dataplan/pg" {
-  interface PgCodecExtensions {
-    isNumberLike?: boolean;
-  }
-  interface PgConditionStepExtensions {
-    pgFilterAttribute?: {
-      codec: PgCodec<any, any, any, any, any, any, any>;
-      expression: SQL;
-    };
-  }
-}
-
 declare global {
+  namespace DataplanPg {
+    interface PgCodecExtensions {
+      isNumberLike?: boolean;
+    }
+    interface PgConditionStepExtensions {
+      pgFilterAttribute?: {
+        codec: PgCodec<any, any, any, any, any, any, any>;
+        expression: SQL;
+      };
+    }
+  }
+
   namespace GraphileBuild {
     interface Inflection {
       filterTableAggregateType(
