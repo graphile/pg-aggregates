@@ -135,13 +135,13 @@ const Plugin: GraphileConfig.Plugin = {
               pgTypeResource: resource,
               isPgAggregateHavingInputType: true,
             },
-            () => ({
+            (): Omit<GraphileBuild.GrafastInputObjectTypeConfig, "name"> => ({
               name: inflection.aggregateHavingInputType({ resource: resource }),
               description: build.wrapDescription(
                 `Conditions for \`${tableTypeName}\` aggregates.`,
                 "type"
               ),
-              fields: () => {
+              fields: (): GrafastInputFieldConfigMap<any, any> => {
                 return {
                   AND: {
                     type: new GraphQLList(
@@ -263,7 +263,7 @@ const Plugin: GraphileConfig.Plugin = {
                           return $filter;
                         },
                       },
-                    },
+                    } as GrafastInputFieldConfigMap<any, any>,
                   };
                 },
                 ""
@@ -279,7 +279,9 @@ const Plugin: GraphileConfig.Plugin = {
               {},
               () => ({
                 name: typeName,
-                fields: ({ fieldWithHooks }) => {
+                fields: ({
+                  fieldWithHooks,
+                }: GraphileBuild.ContextInputObjectFields) => {
                   let fields = Object.create(
                     null
                   ) as GrafastInputFieldConfigMap<any, any>;
@@ -325,7 +327,10 @@ const Plugin: GraphileConfig.Plugin = {
                           `Adding attribute '${attributeName}' to having filter type for '${resource.name}'`
                         );
                       },
-                      Object.create(null)
+                      Object.create(null) as GrafastInputFieldConfigMap<
+                        any,
+                        any
+                      >
                     ),
                     ""
                   );
