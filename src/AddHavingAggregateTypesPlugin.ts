@@ -191,24 +191,27 @@ const Plugin: GraphileConfig.Plugin = {
                 argsTypeName,
                 {},
                 () => {
-                  const { argDetails } = build.pgGetArgDetailsFromParameters(
-                    computedAttributeResource,
-                    computedAttributeResource.parameters!.slice(1)
-                  );
                   return {
-                    fields: argDetails.reduce(
-                      (memo, { inputType, graphqlArgName }) => {
-                        memo[graphqlArgName] = {
-                          type: inputType,
-                          // NO PLAN NEEDED!
-                        };
-                        return memo;
-                      },
-                      Object.create(null) as GrafastInputFieldConfigMap<
-                        any,
-                        any
-                      >
-                    ),
+                    fields: () => {
+                      const { argDetails } =
+                        build.pgGetArgDetailsFromParameters(
+                          computedAttributeResource,
+                          computedAttributeResource.parameters!.slice(1)
+                        );
+                      return argDetails.reduce(
+                        (memo, { inputType, graphqlArgName }) => {
+                          memo[graphqlArgName] = {
+                            type: inputType,
+                            // NO PLAN NEEDED!
+                          };
+                          return memo;
+                        },
+                        Object.create(null) as GrafastInputFieldConfigMap<
+                          any,
+                          any
+                        >
+                      );
+                    },
                   };
                 },
                 ""
@@ -224,46 +227,48 @@ const Plugin: GraphileConfig.Plugin = {
                 computedHavingInputName,
                 {},
                 () => {
-                  const havingFilterTypeName =
-                    build.pgHavingFilterTypeNameForCodec(
-                      computedAttributeResource.codec
-                    );
-                  const HavingFilterType = havingFilterTypeName
-                    ? (build.getTypeByName(havingFilterTypeName) as
-                        | GraphQLInputObjectType
-                        | undefined)
-                    : undefined;
-                  const ArgsType = build.getTypeByName(argsTypeName) as
-                    | GraphQLInputObjectType
-                    | undefined;
-                  if (!HavingFilterType || !ArgsType) {
-                    return { fields: Object.create(null) };
-                  }
-                  const requiresAtLeastOneArg = (
-                    computedAttributeResource.parameters as PgResourceParameter[]
-                  )
-                    .slice(1)
-                    .some((p) => p.required);
                   return {
-                    fields: {
-                      ...(ArgsType
-                        ? {
-                            args: {
-                              type: build.nullableIf(
-                                !requiresAtLeastOneArg,
-                                ArgsType
-                              ),
-                              // NO PLAN NEEDED
-                            },
-                          }
-                        : null),
-                      filter: {
-                        type: new GraphQLNonNull(HavingFilterType),
-                        applyPlan($filter) {
-                          return $filter;
+                    fields: () => {
+                      const havingFilterTypeName =
+                        build.pgHavingFilterTypeNameForCodec(
+                          computedAttributeResource.codec
+                        );
+                      const HavingFilterType = havingFilterTypeName
+                        ? (build.getTypeByName(havingFilterTypeName) as
+                            | GraphQLInputObjectType
+                            | undefined)
+                        : undefined;
+                      const ArgsType = build.getTypeByName(argsTypeName) as
+                        | GraphQLInputObjectType
+                        | undefined;
+                      if (!HavingFilterType || !ArgsType) {
+                        return { fields: Object.create(null) };
+                      }
+                      const requiresAtLeastOneArg = (
+                        computedAttributeResource.parameters as PgResourceParameter[]
+                      )
+                        .slice(1)
+                        .some((p) => p.required);
+                      return {
+                        ...(ArgsType
+                          ? {
+                              args: {
+                                type: build.nullableIf(
+                                  !requiresAtLeastOneArg,
+                                  ArgsType
+                                ),
+                                // NO PLAN NEEDED
+                              },
+                            }
+                          : null),
+                        filter: {
+                          type: new GraphQLNonNull(HavingFilterType),
+                          applyPlan($filter) {
+                            return $filter;
+                          },
                         },
-                      },
-                    } as GrafastInputFieldConfigMap<any, any>,
+                      } as GrafastInputFieldConfigMap<any, any>;
+                    },
                   };
                 },
                 ""

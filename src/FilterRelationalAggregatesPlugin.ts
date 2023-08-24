@@ -248,31 +248,33 @@ group by true)`;
                 isPgConnectionAggregateFilter: true,
               },
               () => {
-                const type = build.getTypeByName(
-                  foreignTableFilterTypeName
-                ) as GraphQLInputObjectType;
-                if (!type) {
-                  return {};
-                }
                 return {
                   description: `A filter to be used against aggregates of \`${foreignTableTypeName}\` object types.`,
-                  fields: {
-                    [filterFieldName]: {
-                      description: `A filter that must pass for the relevant \`${foreignTableTypeName}\` object to be included within the aggregate.`,
-                      type,
-                      applyPlan(
-                        $subquery: PgAggregateConditionStep<any>,
-                        fieldArgs: FieldArgs
-                      ) {
-                        // Enable all the helpers
-                        const $condition = new PgConditionStep(
-                          $subquery,
-                          false,
-                          "AND"
-                        );
-                        fieldArgs.apply($condition);
+                  fields: () => {
+                    const type = build.getTypeByName(
+                      foreignTableFilterTypeName
+                    ) as GraphQLInputObjectType;
+                    if (!type) {
+                      return {};
+                    }
+                    return {
+                      [filterFieldName]: {
+                        description: `A filter that must pass for the relevant \`${foreignTableTypeName}\` object to be included within the aggregate.`,
+                        type,
+                        applyPlan(
+                          $subquery: PgAggregateConditionStep<any>,
+                          fieldArgs: FieldArgs
+                        ) {
+                          // Enable all the helpers
+                          const $condition = new PgConditionStep(
+                            $subquery,
+                            false,
+                            "AND"
+                          );
+                          fieldArgs.apply($condition);
+                        },
                       },
-                    },
+                    };
                   },
                 };
               },
