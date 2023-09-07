@@ -26,7 +26,7 @@ const isSuitableSource = (
     return false;
   }
 
-  return true;
+  return !!build.behavior.pgResourceMatches(resource, "aggregates");
 };
 const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddAggregateTypesPlugin",

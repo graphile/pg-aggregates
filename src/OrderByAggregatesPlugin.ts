@@ -61,6 +61,11 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
             if (!build.behavior.pgCodecRelationMatches(relation, "select")) {
               return memo;
             }
+            if (
+              !build.behavior.pgCodecRelationMatches(relation, "aggregates")
+            ) {
+              return memo;
+            }
             const table = relation.remoteResource as PgResource;
             const isUnique = !!relation.isUnique;
             if (isUnique) {

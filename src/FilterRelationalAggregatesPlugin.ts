@@ -13,6 +13,7 @@ import type {
 } from "grafast";
 import type { GraphQLInputObjectType } from "graphql";
 import type { PgSQL, SQL } from "pg-sql2";
+import type {} from "graphile-build";
 import type {} from "postgraphile-plugin-connection-filter";
 
 import type { AggregateSpec } from "./interfaces.js";
@@ -229,7 +230,9 @@ group by true)`;
           if (foreignTable.parameters || !foreignTable.codec.attributes) {
             continue;
           }
-          // TODO: if behavior includes filter:aggregates
+          if (!build.behavior.pgResourceMatches(foreignTable, "aggregates")) {
+            continue;
+          }
 
           const foreignTableTypeName = inflection.tableType(foreignTable.codec);
           const foreignTableFilterTypeName =
