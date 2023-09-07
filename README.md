@@ -456,7 +456,7 @@ You also can keep aggregates enabled by default, but disable aggregates for spec
 COMMENT ON TABLE my_schema.my_table IS E'@behavior -aggregates';
 ```
 
-You can continue to use your `postgraphile.tags.json5` file, if you used it for postgraphile V4
+You can continue to use your `postgraphile.tags.json5` file if you used it for postgraphile V4
 
  - to enable aggregates for a specific table
 ```json
@@ -479,6 +479,8 @@ You can continue to use your `postgraphile.tags.json5` file, if you used it for 
   }
 }
 ```
+
+You can continue to use yor `@aggregates` smart tags if you already have them - it isn't necessary to replace them to behaviors.
 
 ## Thanks
 
