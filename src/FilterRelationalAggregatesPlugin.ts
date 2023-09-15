@@ -247,7 +247,7 @@ group by true)`;
                 pgResource: foreignTable,
                 isPgConnectionAggregateFilter: true,
               },
-              () => {
+              (): GraphileBuild.GrafastInputObjectTypeConfig => {
                 return {
                   description: `A filter to be used against aggregates of \`${foreignTableTypeName}\` object types.`,
                   fields: () => {
@@ -255,7 +255,7 @@ group by true)`;
                       foreignTableFilterTypeName
                     ) as GraphQLInputObjectType;
                     if (!type) {
-                      return {};
+                      return {} as GrafastInputFieldConfigMap<any, any>;
                     }
                     return {
                       [filterFieldName]: {
