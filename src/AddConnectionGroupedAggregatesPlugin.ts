@@ -125,6 +125,7 @@ const Plugin: GraphileConfig.Plugin = {
                     }
                     return null;
                   },
+                  autoApplyAfterParentPlan: true,
                 },
                 ...(TableHavingInputType
                   ? {
@@ -137,6 +138,7 @@ const Plugin: GraphileConfig.Plugin = {
                         applyPlan(_$parent, $pgSelect: PgSelectStep<any>) {
                           return $pgSelect.havingPlan();
                         },
+                        autoApplyAfterParentPlan: true,
                       },
                     }
                   : null),

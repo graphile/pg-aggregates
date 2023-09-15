@@ -273,6 +273,7 @@ group by true)`;
                           );
                           fieldArgs.apply($condition);
                         },
+                        // No need to auto-apply since we're applied manually via `fieldArgs.apply($subQuery)` below.
                       },
                     };
                   },
@@ -396,6 +397,7 @@ group by true)`;
                     });
                     fieldArgs.apply($subQuery);
                   },
+                  // No need to auto-apply, postgraphile-plugin-connection-filter explicitly calls fieldArgs.apply()
                 }
               ),
             },
@@ -440,6 +442,7 @@ group by true)`;
                   ) {
                     fieldArgs.apply($subquery.forAggregate(spec));
                   },
+                  // No need to auto-apply since we're applied manually via `fieldArgs.apply($subQuery)` above.
                 })),
               },
               `Adding aggregate '${spec.id}' filter input for '${pgResource.name}'. `
@@ -523,6 +526,7 @@ group by true)`;
 
                           fieldArgs.apply($col);
                         },
+                        // No need to auto-apply since we're called via `fieldArgs.apply($subquery.forAggregate(spec))` above
                       },
                     },
                     `Add aggregate '${attributeName}' filter for source '${table.name}' for spec '${spec.id}'`

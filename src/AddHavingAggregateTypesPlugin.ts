@@ -153,6 +153,7 @@ const Plugin: GraphileConfig.Plugin = {
                       input.apply($where);
                       return null;
                     },
+                    // No need to auto-apply, the having field calls `fieldArgs.apply(...)`
                   },
                   OR: {
                     type: new GraphQLList(
@@ -165,6 +166,7 @@ const Plugin: GraphileConfig.Plugin = {
                       input.apply($or);
                       return null;
                     },
+                    // No need to auto-apply, the having field calls `fieldArgs.apply(...)`
                   },
                 };
               },
@@ -266,6 +268,7 @@ const Plugin: GraphileConfig.Plugin = {
                           applyPlan($filter) {
                             return $filter;
                           },
+                          // No need to auto-apply, parent calls `fieldArgs.apply($filter, "filter")` below
                         },
                       } as GrafastInputFieldConfigMap<any, any>;
                     },
@@ -325,6 +328,7 @@ const Plugin: GraphileConfig.Plugin = {
                               aggregateExpression
                             );
                           },
+                          // No need to auto-apply, parent does `return $having;`
                         }));
                         return build.extend(
                           newFields,
@@ -435,6 +439,7 @@ const Plugin: GraphileConfig.Plugin = {
                               );
                               fieldArgs.apply($filter, "filter");
                             },
+                            // No need to auto-apply, parent does `return $having;`
                           }
                         );
                         return build.extend(
@@ -512,6 +517,7 @@ const Plugin: GraphileConfig.Plugin = {
                         applyPlan($having) {
                           return $having;
                         },
+                        // No need to auto-apply, `filter` field does `return new BooleanFilterStep($having, aggregateExpression)`
                       }
                     ),
                   },
@@ -572,6 +578,7 @@ const Plugin: GraphileConfig.Plugin = {
                         )} ${infix} ${$booleanFilter.placeholder(val, codec!)})`
                       );
                     },
+                    // No need to auto-apply
                   }
                 ),
               },
