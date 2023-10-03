@@ -53,10 +53,10 @@ function processTags(
 ): void {
   switch (tags?.aggregates) {
     case "on":
-      addBehaviorToTags(tags, "+aggregates");
+      addBehaviorToTags(tags, "+aggregates +aggregates:filterBy +aggregates:orderBy");
       break;
     case "off":
-      addBehaviorToTags(tags, "-aggregates");
+      addBehaviorToTags(tags, "-aggregates -aggregates:filterBy -aggregates:orderBy");
       break;
   }
 }

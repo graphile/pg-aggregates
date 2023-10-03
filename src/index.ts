@@ -26,7 +26,7 @@ export const PgAggregatesPreset: GraphileConfig.Preset = {
   ],
 
   schema: {
-    defaultBehavior: "+aggregates",
+    defaultBehavior: "+aggregates +aggregates:filterBy +aggregates:orderBy",
   },
 };
 

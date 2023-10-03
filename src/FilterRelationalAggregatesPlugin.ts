@@ -230,7 +230,7 @@ group by true)`;
           if (foreignTable.parameters || !foreignTable.codec.attributes) {
             continue;
           }
-          if (!build.behavior.pgResourceMatches(foreignTable, "aggregates")) {
+          if (!build.behavior.pgResourceMatches(foreignTable, "aggregates:filterBy")) {
             continue;
           }
 
