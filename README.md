@@ -439,21 +439,27 @@ default, and then enable them only for the tables you need:
 export default {
   // ...
   schema: {
-    defaultBehavior: "-aggregates",
+    defaultBehavior: "-aggregates -aggregates:filterBy -aggregates:orderBy",
   },
 };
 ```
 
+The `aggregates:filterBy` behavior is used to enable/disable the [filtering by aggregates](#filtering-by-aggregates)
+
+The `aggregates:orderBy` behavior is used to enable/disable the [ordering by aggregates](#ordering-by-aggregates)
+
+You can use any combination of `aggregates`, `aggregates:filterBy` and `aggregates:orderBy` behaviors. 
+
 Enable aggregates for a specific table:
 
 ```sql
-COMMENT ON TABLE my_schema.my_table IS E'@behavior +aggregates';
+COMMENT ON TABLE my_schema.my_table IS E'@behavior +aggregates +aggregates:filterBy +aggregates:orderBy';
 ```
 
 You also can keep aggregates enabled by default, but disable aggregates for specific tables:
 
 ```sql
-COMMENT ON TABLE my_schema.my_table IS E'@behavior -aggregates';
+COMMENT ON TABLE my_schema.my_table IS E'@behavior -aggregates -aggregates:filterBy -aggregates:orderBy';
 ```
 
 You can also use a smart tags file such as `postgraphile.tags.json5` to add these behaviors:
@@ -463,7 +469,7 @@ You can also use a smart tags file such as `postgraphile.tags.json5` to add thes
 "class": {
   "my_schema.my_table": {
     "tags": {
-      "behavior": "+aggregates"
+      "behavior": "+aggregates +aggregates:filterBy +aggregates:orderBy"
     }
   }
 }
@@ -474,7 +480,7 @@ You can also use a smart tags file such as `postgraphile.tags.json5` to add thes
 "class": {
   "my_schema.my_table": {
     "tags": {
-      "behavior": "-aggregates"
+      "behavior": "-aggregates -aggregates:filterBy -aggregates:orderBy"
     }
   }
 }
