@@ -227,6 +227,11 @@ group by true)`;
           dataplanPg: { PgConditionStep },
         } = build;
 
+        if (!inflection.filterType) {
+          // Filter plugin is not enabled
+          return _;
+        }
+
         // Register the aggregate filter type for each table
         for (const foreignTable of Object.values(
           build.input.pgRegistry.pgResources
@@ -330,6 +335,12 @@ group by true)`;
           dataplanPg: { PgConditionStep, pgWhereConditionSpecListToSQL },
           PgAggregateConditionStep,
         } = build;
+
+        if (!inflection.filterType) {
+          // Filter plugin is not enabled
+          return inFields;
+        }
+
         const {
           fieldWithHooks,
           scope: {
