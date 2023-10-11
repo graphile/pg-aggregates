@@ -26,4 +26,10 @@ export const PgAggregatesPreset: GraphileConfig.Preset = {
   ],
 };
 
+export {
+  AggregateSpec,
+  AggregateGroupBySpec,
+  AggregateTargetEntity,
+} from "./interfaces.js";
+
 // :args src/InflectionPlugin.ts src/AggregateSpecsPlugin.ts src/AddGroupByAggregateEnumsPlugin.ts src/AddGroupByAggregateEnumValuesForAttributesPlugin.ts src/AddHavingAggregateTypesPlugin.ts src/AddAggregateTypesPlugin.ts src/AddConnectionAggregatesPlugin.ts src/AddConnectionGroupedAggregatesPlugin.ts src/OrderByAggregatesPlugin.ts src/FilterRelationalAggregatesPlugin.ts src/AggregatesSmartTagsPlugin.ts
