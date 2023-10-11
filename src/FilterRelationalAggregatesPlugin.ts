@@ -54,6 +54,10 @@ export const Plugin: GraphileConfig.Plugin = {
   },
 
   schema: {
+    entityBehavior: {
+      pgResource: "aggregates:filterBy",
+    },
+
     hooks: {
       build(build) {
         const {

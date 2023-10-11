@@ -24,10 +24,6 @@ export const PgAggregatesPreset: GraphileConfig.Preset = {
     PgAggregatesOrderByAggregatesPlugin,
     PgAggregatesFilterRelationalAggregatesPlugin,
   ],
-
-  schema: {
-    defaultBehavior: "+aggregates +aggregates:filterBy +aggregates:orderBy",
-  },
 };
 
 // :args src/InflectionPlugin.ts src/AggregateSpecsPlugin.ts src/AddGroupByAggregateEnumsPlugin.ts src/AddGroupByAggregateEnumValuesForAttributesPlugin.ts src/AddHavingAggregateTypesPlugin.ts src/AddAggregateTypesPlugin.ts src/AddConnectionAggregatesPlugin.ts src/AddConnectionGroupedAggregatesPlugin.ts src/OrderByAggregatesPlugin.ts src/FilterRelationalAggregatesPlugin.ts src/AggregatesSmartTagsPlugin.ts

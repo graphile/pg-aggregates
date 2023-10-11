@@ -36,7 +36,7 @@ const Plugin: GraphileConfig.Plugin = {
   // Create the aggregates type for each table
   schema: {
     entityBehavior: {
-      pgResource: "select",
+      pgResource: "select aggregates",
     },
 
     hooks: {

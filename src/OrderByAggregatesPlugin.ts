@@ -18,7 +18,7 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
 
   schema: {
     entityBehavior: {
-      pgCodecRelation: "select",
+      pgCodecRelation: "select aggregates:orderBy",
     },
 
     hooks: {
