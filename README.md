@@ -433,6 +433,8 @@ GraphQL schema, and could also be a security (DoS) concern as aggregates can be 
 recommend that you use the `-aggregates` default behavior to disable aggregates by
 default, and then enable them only for the tables you need:
 
+(This currently doesn't work due to a [bug in PostGraphile that's being worked on](https://github.com/graphile/crystal/pull/1803))
+
 ```ts
 // graphile.config.mjs
 
