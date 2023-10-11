@@ -433,7 +433,7 @@ GraphQL schema, and could also be a security (DoS) concern as aggregates can be 
 recommend that you use the `-aggregates` default behavior to disable aggregates by
 default, and then enable them only for the tables you need:
 
-(This currently doesn't work due to a [bug in PostGraphile that's being worked on](https://github.com/graphile/crystal/pull/1803))
+(This currently doesn't work due to a [bug in PostGraphile that's being worked on](https://github.com/graphile/crystal/pull/1803).)
 
 ```ts
 // graphile.config.mjs
@@ -488,7 +488,7 @@ You can also use a smart tags file such as `postgraphile.tags.json5` to add thes
 }
 ```
 
-You can continue to use yor `@aggregates` smart tags and smart comments if you already have them - it isn't necessary to replace them to behaviors.
+You can continue to use your `@aggregates` smart tags and smart comments if you already have them - it isn't necessary to replace them with behaviors.
 
 ## Thanks
 
