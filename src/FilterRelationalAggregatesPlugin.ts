@@ -13,6 +13,7 @@ import type {
 } from "grafast";
 import type { GraphQLInputObjectType } from "graphql";
 import type { PgSQL, SQL } from "pg-sql2";
+import type {} from "graphile-build";
 import type {} from "postgraphile-plugin-connection-filter";
 
 import type { AggregateSpec } from "./interfaces.js";
@@ -53,6 +54,10 @@ export const Plugin: GraphileConfig.Plugin = {
   },
 
   schema: {
+    entityBehavior: {
+      pgResource: "aggregates:filterBy",
+    },
+
     hooks: {
       build(build) {
         const {
@@ -222,6 +227,11 @@ group by true)`;
           dataplanPg: { PgConditionStep },
         } = build;
 
+        if (!inflection.filterType) {
+          // Filter plugin is not enabled
+          return _;
+        }
+
         // Register the aggregate filter type for each table
         for (const foreignTable of Object.values(
           build.input.pgRegistry.pgResources
@@ -229,7 +239,14 @@ group by true)`;
           if (foreignTable.parameters || !foreignTable.codec.attributes) {
             continue;
           }
-          // TODO: if behavior includes filter:aggregates
+          if (
+            !build.behavior.pgResourceMatches(
+              foreignTable,
+              "aggregates:filterBy"
+            )
+          ) {
+            continue;
+          }
 
           const foreignTableTypeName = inflection.tableType(foreignTable.codec);
           const foreignTableFilterTypeName =
@@ -318,6 +335,12 @@ group by true)`;
           dataplanPg: { PgConditionStep, pgWhereConditionSpecListToSQL },
           PgAggregateConditionStep,
         } = build;
+
+        if (!inflection.filterType) {
+          // Filter plugin is not enabled
+          return inFields;
+        }
+
         const {
           fieldWithHooks,
           scope: {

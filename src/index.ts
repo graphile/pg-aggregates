@@ -5,6 +5,7 @@ import { PgAggregatesAddGroupByAggregateEnumsPlugin } from "./AddGroupByAggregat
 import { PgAggregatesAddGroupByAggregateEnumValuesForAttributesPlugin } from "./AddGroupByAggregateEnumValuesForAttributesPlugin.js";
 import { PgAggregatesAddHavingAggregateTypesPlugin } from "./AddHavingAggregateTypesPlugin.js";
 import { PgAggregatesSpecsPlugin } from "./AggregateSpecsPlugin.js";
+import { PgAggregatesSmartTagsPlugin } from "./AggregatesSmartTagsPlugin.js";
 import { PgAggregatesFilterRelationalAggregatesPlugin } from "./FilterRelationalAggregatesPlugin.js";
 import { PgAggregatesInflectorsPlugin } from "./InflectionPlugin.js";
 import { PgAggregatesOrderByAggregatesPlugin } from "./OrderByAggregatesPlugin.js";
@@ -12,6 +13,7 @@ import { PgAggregatesOrderByAggregatesPlugin } from "./OrderByAggregatesPlugin.j
 export const PgAggregatesPreset: GraphileConfig.Preset = {
   plugins: [
     PgAggregatesInflectorsPlugin,
+    PgAggregatesSmartTagsPlugin,
     PgAggregatesSpecsPlugin,
     PgAggregatesAddGroupByAggregateEnumsPlugin,
     PgAggregatesAddGroupByAggregateEnumValuesForAttributesPlugin,
@@ -24,4 +26,4 @@ export const PgAggregatesPreset: GraphileConfig.Preset = {
   ],
 };
 
-// :args src/InflectionPlugin.ts src/AggregateSpecsPlugin.ts src/AddGroupByAggregateEnumsPlugin.ts src/AddGroupByAggregateEnumValuesForAttributesPlugin.ts src/AddHavingAggregateTypesPlugin.ts src/AddAggregateTypesPlugin.ts src/AddConnectionAggregatesPlugin.ts src/AddConnectionGroupedAggregatesPlugin.ts src/OrderByAggregatesPlugin.ts src/FilterRelationalAggregatesPlugin.ts
+// :args src/InflectionPlugin.ts src/AggregateSpecsPlugin.ts src/AddGroupByAggregateEnumsPlugin.ts src/AddGroupByAggregateEnumValuesForAttributesPlugin.ts src/AddHavingAggregateTypesPlugin.ts src/AddAggregateTypesPlugin.ts src/AddConnectionAggregatesPlugin.ts src/AddConnectionGroupedAggregatesPlugin.ts src/OrderByAggregatesPlugin.ts src/FilterRelationalAggregatesPlugin.ts src/AggregatesSmartTagsPlugin.ts

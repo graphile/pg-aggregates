@@ -18,7 +18,7 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
 
   schema: {
     entityBehavior: {
-      pgCodecRelation: "select",
+      pgCodecRelation: "select aggregates:orderBy",
     },
 
     hooks: {
@@ -59,6 +59,14 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
         const newValues = referenceeRelations.reduce(
           (memo, [relationName, relation]) => {
             if (!build.behavior.pgCodecRelationMatches(relation, "select")) {
+              return memo;
+            }
+            if (
+              !build.behavior.pgCodecRelationMatches(
+                relation,
+                "aggregates:orderBy"
+              )
+            ) {
               return memo;
             }
             const table = relation.remoteResource as PgResource;
