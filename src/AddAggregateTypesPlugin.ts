@@ -43,7 +43,7 @@ const Plugin: GraphileConfig.Plugin = {
       init(init, build, _context) {
         const {
           sql,
-          graphql: { GraphQLList, GraphQLNonNull, GraphQLString },
+          graphql: { GraphQLList, GraphQLString },
           dataplanPg: { assertPgClassSingleStep, TYPES },
           grafast: { constant },
           inflection,
@@ -69,7 +69,7 @@ const Plugin: GraphileConfig.Plugin = {
               assertStep: assertPgClassSingleStep,
               fields: {
                 keys: {
-                  type: new GraphQLList(new GraphQLNonNull(GraphQLString)),
+                  type: new GraphQLList(GraphQLString),
                   plan: EXPORTABLE(
                     (TYPES, constant, sql) =>
                       function plan($pgSelectSingle: PgSelectSingleStep<any>) {
