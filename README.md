@@ -428,12 +428,14 @@ more information.
 
 ## Disable aggregates
 
-By default, aggregates are created for all tables. This significantly increases the size of your
-GraphQL schema, and could also be a security (DoS) concern as aggregates can be expensive. We
-recommend that you use the `-aggregates` default behavior to disable aggregates by
-default, and then enable them only for the tables you need:
+By default, aggregates are created for all tables. This significantly increases
+the size of your GraphQL schema, and could also be a security (DoS) concern as
+aggregates can be expensive. We recommend that you use the `-aggregates` default
+behavior to disable aggregates by default, and then enable them only for the
+tables you need:
 
-(This currently doesn't work due to a [bug in PostGraphile that's being worked on](https://github.com/graphile/crystal/pull/1803).)
+(This currently doesn't work due to a
+[bug in PostGraphile that's being worked on](https://github.com/graphile/crystal/pull/1803).)
 
 ```ts
 // graphile.config.mjs
@@ -446,11 +448,14 @@ export default {
 };
 ```
 
-The `aggregates:filterBy` behavior is used to enable/disable the [filtering by aggregates](#filtering-by-aggregates)
+The `aggregates:filterBy` behavior is used to enable/disable the
+[filtering by aggregates](#filtering-by-aggregates)
 
-The `aggregates:orderBy` behavior is used to enable/disable the [ordering by aggregates](#ordering-by-aggregates)
+The `aggregates:orderBy` behavior is used to enable/disable the
+[ordering by aggregates](#ordering-by-aggregates)
 
-You can use any combination of `aggregates`, `aggregates:filterBy` and `aggregates:orderBy` behaviors. 
+You can use any combination of `aggregates`, `aggregates:filterBy` and
+`aggregates:orderBy` behaviors.
 
 Enable aggregates for a specific table:
 
@@ -458,15 +463,18 @@ Enable aggregates for a specific table:
 COMMENT ON TABLE my_schema.my_table IS E'@behavior +aggregates +aggregates:filterBy +aggregates:orderBy';
 ```
 
-You also can keep aggregates enabled by default, but disable aggregates for specific tables:
+You also can keep aggregates enabled by default, but disable aggregates for
+specific tables:
 
 ```sql
 COMMENT ON TABLE my_schema.my_table IS E'@behavior -aggregates -aggregates:filterBy -aggregates:orderBy';
 ```
 
-You can also use a smart tags file such as `postgraphile.tags.json5` to add these behaviors:
+You can also use a smart tags file such as `postgraphile.tags.json5` to add
+these behaviors:
 
 - to enable aggregates for a specific table:
+
 ```json
 "class": {
   "my_schema.my_table": {
@@ -478,6 +486,7 @@ You can also use a smart tags file such as `postgraphile.tags.json5` to add thes
 ```
 
 - to disable aggregates for a specific table:
+
 ```json
 "class": {
   "my_schema.my_table": {
@@ -488,7 +497,8 @@ You can also use a smart tags file such as `postgraphile.tags.json5` to add thes
 }
 ```
 
-You can continue to use your `@aggregates` smart tags and smart comments if you already have them - it isn't necessary to replace them with behaviors.
+You can continue to use your `@aggregates` smart tags and smart comments if you
+already have them - it isn't necessary to replace them with behaviors.
 
 ## Thanks
 

@@ -62,7 +62,10 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
               return memo;
             }
             if (
-              !build.behavior.pgCodecRelationMatches(relation, "aggregates:orderBy")
+              !build.behavior.pgCodecRelationMatches(
+                relation,
+                "aggregates:orderBy"
+              )
             ) {
               return memo;
             }

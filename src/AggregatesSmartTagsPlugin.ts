@@ -49,14 +49,20 @@ export const PgAggregatesSmartTagsPlugin: GraphileConfig.Plugin = {
 };
 
 function processTags(
-  tags: Partial<GraphileBuild.PgSmartTagsDict> | undefined,
+  tags: Partial<GraphileBuild.PgSmartTagsDict> | undefined
 ): void {
   switch (tags?.aggregates) {
     case "on":
-      addBehaviorToTags(tags, "+aggregates +aggregates:filterBy +aggregates:orderBy");
+      addBehaviorToTags(
+        tags,
+        "+aggregates +aggregates:filterBy +aggregates:orderBy"
+      );
       break;
     case "off":
-      addBehaviorToTags(tags, "-aggregates -aggregates:filterBy -aggregates:orderBy");
+      addBehaviorToTags(
+        tags,
+        "-aggregates -aggregates:filterBy -aggregates:orderBy"
+      );
       break;
   }
 }
