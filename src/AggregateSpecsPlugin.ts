@@ -17,7 +17,7 @@ const { version } = require("../package.json");
 const isNumberLike = (codec: PgCodec<any, any, any, any>): boolean =>
   !!codec.extensions?.isNumberLike;
 
-  const isIntervalLike = (codec: PgCodec<any, any, any, any>): boolean =>
+const isIntervalLike = (codec: PgCodec<any, any, any, any>): boolean =>
   !!codec.extensions?.isIntervalLike;
 
 export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
