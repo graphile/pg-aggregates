@@ -18,7 +18,8 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
   builder.hook("build", (build) => {
     const { pgSql: sql } = build;
     const isNumberLike = (pgType: PgType): boolean => pgType.category === "N";
-    const isIntervalLike = (pgType: PgType): boolean => pgType.id === INTERVAL_OID;
+    const isIntervalLike = (pgType: PgType): boolean =>
+      pgType.id === INTERVAL_OID;
     /** Maps from the data type of the column to the data type of the sum aggregate */
     /** BigFloat is our fallback type; it should be valid for almost all numeric types */
     const convertWithMapAndFallback = (
@@ -124,7 +125,7 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
         id: "stddevSample",
         humanLabel: "sample standard deviation",
         HumanLabel: "Sample standard deviation",
-        isSuitableType: isNumberLike || isIntervalLike,
+        isSuitableType: isNumberLike,
         sqlAggregateWrap: (sqlFrag) => sql.fragment`stddev_samp(${sqlFrag})`,
 
         // See https://www.postgresql.org/docs/current/functions-aggregate.html
@@ -141,7 +142,7 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
         id: "stddevPopulation",
         humanLabel: "population standard deviation",
         HumanLabel: "Population standard deviation",
-        isSuitableType: isNumberLike || isIntervalLike,
+        isSuitableType: isNumberLike,
         sqlAggregateWrap: (sqlFrag) => sql.fragment`stddev_pop(${sqlFrag})`,
 
         // See https://www.postgresql.org/docs/current/functions-aggregate.html
@@ -158,7 +159,7 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
         id: "varianceSample",
         humanLabel: "sample variance",
         HumanLabel: "Sample variance",
-        isSuitableType: isNumberLike || isIntervalLike,
+        isSuitableType: isNumberLike,
         sqlAggregateWrap: (sqlFrag) => sql.fragment`var_samp(${sqlFrag})`,
 
         // See https://www.postgresql.org/docs/current/functions-aggregate.html
@@ -175,7 +176,7 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
         id: "variancePopulation",
         humanLabel: "population variance",
         HumanLabel: "Population variance",
-        isSuitableType: isNumberLike || isIntervalLike,
+        isSuitableType: isNumberLike,
         sqlAggregateWrap: (sqlFrag) => sql.fragment`var_pop(${sqlFrag})`,
 
         // See https://www.postgresql.org/docs/current/functions-aggregate.html
