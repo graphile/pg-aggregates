@@ -18,6 +18,7 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
   builder.hook("build", (build) => {
     const { pgSql: sql } = build;
     const isNumberLike = (pgType: PgType): boolean => pgType.category === "N";
+    const isIntervalLike = (pgType: PgType): boolean => pgType.id === INTERVAL_OID;
     /** Maps from the data type of the column to the data type of the sum aggregate */
     /** BigFloat is our fallback type; it should be valid for almost all numeric types */
     const convertWithMapAndFallback = (
@@ -48,7 +49,7 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
         id: "sum",
         humanLabel: "sum",
         HumanLabel: "Sum",
-        isSuitableType: isNumberLike,
+        isSuitableType: isNumberLike || isIntervalLike,
         // I've wrapped it in `coalesce` so that it cannot be null
         sqlAggregateWrap: (sqlFrag) =>
           sql.fragment`coalesce(sum(${sqlFrag}), 0)`,
@@ -86,21 +87,21 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
         id: "min",
         humanLabel: "minimum",
         HumanLabel: "Minimum",
-        isSuitableType: isNumberLike,
+        isSuitableType: isNumberLike || isIntervalLike,
         sqlAggregateWrap: (sqlFrag) => sql.fragment`min(${sqlFrag})`,
       },
       {
         id: "max",
         humanLabel: "maximum",
         HumanLabel: "Maximum",
-        isSuitableType: isNumberLike,
+        isSuitableType: isNumberLike || isIntervalLike,
         sqlAggregateWrap: (sqlFrag) => sql.fragment`max(${sqlFrag})`,
       },
       {
         id: "average",
         humanLabel: "mean average",
         HumanLabel: "Mean average",
-        isSuitableType: isNumberLike,
+        isSuitableType: isNumberLike || isIntervalLike,
         sqlAggregateWrap: (sqlFrag) => sql.fragment`avg(${sqlFrag})`,
 
         // An AVG(...) ends up more precise than any individual value; see
@@ -123,7 +124,7 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
         id: "stddevSample",
         humanLabel: "sample standard deviation",
         HumanLabel: "Sample standard deviation",
-        isSuitableType: isNumberLike,
+        isSuitableType: isNumberLike || isIntervalLike,
         sqlAggregateWrap: (sqlFrag) => sql.fragment`stddev_samp(${sqlFrag})`,
 
         // See https://www.postgresql.org/docs/current/functions-aggregate.html
@@ -140,7 +141,7 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
         id: "stddevPopulation",
         humanLabel: "population standard deviation",
         HumanLabel: "Population standard deviation",
-        isSuitableType: isNumberLike,
+        isSuitableType: isNumberLike || isIntervalLike,
         sqlAggregateWrap: (sqlFrag) => sql.fragment`stddev_pop(${sqlFrag})`,
 
         // See https://www.postgresql.org/docs/current/functions-aggregate.html
@@ -157,7 +158,7 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
         id: "varianceSample",
         humanLabel: "sample variance",
         HumanLabel: "Sample variance",
-        isSuitableType: isNumberLike,
+        isSuitableType: isNumberLike || isIntervalLike,
         sqlAggregateWrap: (sqlFrag) => sql.fragment`var_samp(${sqlFrag})`,
 
         // See https://www.postgresql.org/docs/current/functions-aggregate.html
@@ -174,7 +175,7 @@ const AggregateSpecsPlugin: Plugin = (builder) => {
         id: "variancePopulation",
         humanLabel: "population variance",
         HumanLabel: "Population variance",
-        isSuitableType: isNumberLike,
+        isSuitableType: isNumberLike || isIntervalLike,
         sqlAggregateWrap: (sqlFrag) => sql.fragment`var_pop(${sqlFrag})`,
 
         // See https://www.postgresql.org/docs/current/functions-aggregate.html
