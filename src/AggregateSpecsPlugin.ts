@@ -17,6 +17,9 @@ const { version } = require("../package.json");
 const isNumberLike = (codec: PgCodec<any, any, any, any>): boolean =>
   !!codec.extensions?.isNumberLike;
 
+  const isIntervalLike = (codec: PgCodec<any, any, any, any>): boolean =>
+  !!codec.extensions?.isIntervalLike;
+
 export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
   name: "PgAggregatesSpecsPlugin",
   version,
@@ -32,6 +35,12 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
             pgCodec.extensions = Object.create(null);
           }
           pgCodec.extensions!.isNumberLike = true;
+        }
+        if (pgType.typcategory === "I") {
+          if (!pgCodec.extensions) {
+            pgCodec.extensions = Object.create(null);
+          }
+          pgCodec.extensions!.isIntervalLike = true;
         }
       },
     },
