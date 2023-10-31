@@ -5,7 +5,6 @@ declare global {
   namespace DataplanPg {
     interface PgCodecExtensions {
       isNumberLike?: boolean;
-      isIntervalLike?: boolean;
     }
     interface PgConditionStepExtensions {
       pgFilterAttribute?: {
