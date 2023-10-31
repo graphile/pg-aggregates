@@ -17,6 +17,9 @@ const { version } = require("../package.json");
 const isNumberLike = (codec: PgCodec<any, any, any, any>): boolean =>
   !!codec.extensions?.isNumberLike;
 
+const isIntervalLike = (codec: PgCodec<any, any, any, any>): boolean =>
+!!codec.extensions?.isIntervalLike;
+
 export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
   name: "PgAggregatesSpecsPlugin",
   version,
@@ -31,7 +34,12 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
           if (!pgCodec.extensions) {
             pgCodec.extensions = Object.create(null);
           }
+        }
+        if (pgType.typcategory === "N") {
           pgCodec.extensions!.isNumberLike = true;
+        }
+        if (pgType._id === INTERVAL_OID) {
+          pgCodec.extensions!.isIntervalLike = true;
         }
       },
     },
@@ -72,7 +80,7 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
             id: "sum",
             humanLabel: "sum",
             HumanLabel: "Sum",
-            isSuitableType: isNumberLike,
+            isSuitableType: isNumberLike || isIntervalLike,
             // I've wrapped it in `coalesce` so that it cannot be null
             sqlAggregateWrap: (sqlFrag) => sql`coalesce(sum(${sqlFrag}), 0)`,
             isNonNull: true,
@@ -110,21 +118,21 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
             id: "min",
             humanLabel: "minimum",
             HumanLabel: "Minimum",
-            isSuitableType: isNumberLike,
+            isSuitableType: isNumberLike || isIntervalLike,
             sqlAggregateWrap: (sqlFrag) => sql`min(${sqlFrag})`,
           },
           {
             id: "max",
             humanLabel: "maximum",
             HumanLabel: "Maximum",
-            isSuitableType: isNumberLike,
+            isSuitableType: isNumberLike || isIntervalLike,
             sqlAggregateWrap: (sqlFrag) => sql`max(${sqlFrag})`,
           },
           {
             id: "average",
             humanLabel: "mean average",
             HumanLabel: "Mean average",
-            isSuitableType: isNumberLike,
+            isSuitableType: isNumberLike || isIntervalLike,
             sqlAggregateWrap: (sqlFrag) => sql`avg(${sqlFrag})`,
 
             // An AVG(...) ends up more precise than any individual value; see
