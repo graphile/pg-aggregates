@@ -16,6 +16,12 @@ const { version } = require("../package.json");
 
 const isNumberLike = (codec: PgCodec<any, any, any, any>): boolean =>
   !!codec.extensions?.isNumberLike;
+const isIntervalLike = (codec: PgCodec<any, any, any, any>): boolean =>
+  !!codec.extensions?.isIntervalLike;
+
+const isIntervalLikeOrNumberLike = (
+  codec: PgCodec<any, any, any, any>
+): boolean => isIntervalLike(codec) || isNumberLike(codec);
 
 export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
   name: "PgAggregatesSpecsPlugin",
@@ -27,11 +33,21 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
     hooks: {
       pgCodecs_PgCodec(_info, event) {
         const { pgType, pgCodec } = event;
-        if (pgType.typcategory === "N") {
+        const isReg =
+          pgType.getNamespace()?.nspname === "pg_catalog" &&
+          pgType.typname.startsWith("reg");
+        const isCatN = !isReg && pgType.typcategory === "N";
+        const isInterval = !isReg && pgType._id === INTERVAL_OID;
+        if (isCatN || isInterval) {
           if (!pgCodec.extensions) {
             pgCodec.extensions = Object.create(null);
           }
+        }
+        if (isCatN) {
           pgCodec.extensions!.isNumberLike = true;
+        }
+        if (isInterval) {
+          pgCodec.extensions!.isIntervalLike = true;
         }
       },
     },
@@ -72,9 +88,9 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
             id: "sum",
             humanLabel: "sum",
             HumanLabel: "Sum",
-            isSuitableType: isNumberLike,
+            isSuitableType: isIntervalLikeOrNumberLike,
             // I've wrapped it in `coalesce` so that it cannot be null
-            sqlAggregateWrap: (sqlFrag) => sql`coalesce(sum(${sqlFrag}), 0)`,
+            sqlAggregateWrap: (sqlFrag) => sql`coalesce(sum(${sqlFrag}), '0')`,
             isNonNull: true,
 
             // A SUM(...) often ends up significantly larger than any individual
@@ -110,21 +126,21 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
             id: "min",
             humanLabel: "minimum",
             HumanLabel: "Minimum",
-            isSuitableType: isNumberLike,
+            isSuitableType: isIntervalLikeOrNumberLike,
             sqlAggregateWrap: (sqlFrag) => sql`min(${sqlFrag})`,
           },
           {
             id: "max",
             humanLabel: "maximum",
             HumanLabel: "Maximum",
-            isSuitableType: isNumberLike,
+            isSuitableType: isIntervalLikeOrNumberLike,
             sqlAggregateWrap: (sqlFrag) => sql`max(${sqlFrag})`,
           },
           {
             id: "average",
             humanLabel: "mean average",
             HumanLabel: "Mean average",
-            isSuitableType: isNumberLike,
+            isSuitableType: isIntervalLikeOrNumberLike,
             sqlAggregateWrap: (sqlFrag) => sql`avg(${sqlFrag})`,
 
             // An AVG(...) ends up more precise than any individual value; see

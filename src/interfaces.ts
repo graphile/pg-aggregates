@@ -5,6 +5,7 @@ declare global {
   namespace DataplanPg {
     interface PgCodecExtensions {
       isNumberLike?: boolean;
+      isIntervalLike?: boolean;
     }
     interface PgConditionStepExtensions {
       pgFilterAttribute?: {
@@ -111,7 +112,7 @@ export interface AggregateSpec {
   shouldApplyToEntity?: (entity: AggregateTargetEntity) => boolean;
 
   /** Wraps the SQL in an aggregate call */
-  sqlAggregateWrap: (sqlFrag: SQL) => SQL;
+  sqlAggregateWrap: (sqlFrag: SQL, codec: PgCodec<any, any, any, any>) => SQL;
 
   /**
    * Used to translate the PostgreSQL return type for the aggregate; for example:
