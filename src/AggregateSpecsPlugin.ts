@@ -33,16 +33,18 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
     hooks: {
       pgCodecs_PgCodec(_info, event) {
         const { pgType, pgCodec } = event;
-        if (pgType.typcategory === "N" || pgType._id === INTERVAL_OID) {
+        const isCatN = pgType.typcategory === "N";
+        const isInterval = pgType._id === INTERVAL_OID;
+        if (isCatN || isInterval) {
           if (!pgCodec.extensions) {
             pgCodec.extensions = Object.create(null);
           }
         }
-        if (pgType._id === INTERVAL_OID) {
-          pgCodec.extensions!.isIntervalLike = true;
-        }
-        if (pgType.typcategory === "N") {
+        if (isCatN) {
           pgCodec.extensions!.isNumberLike = true;
+        }
+        if (isInterval) {
+          pgCodec.extensions!.isIntervalLike = true;
         }
       },
     },
