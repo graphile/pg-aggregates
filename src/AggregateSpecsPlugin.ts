@@ -87,10 +87,7 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
             HumanLabel: "Sum",
             isSuitableType: isIntervalLikeOrNumberLike,
             // I've wrapped it in `coalesce` so that it cannot be null
-            sqlAggregateWrap: (sqlFrag, codec) =>
-              isIntervalLike(codec)
-                ? sql`coalesce(sum(${sqlFrag}), interval '0 seconds')`
-                : sql`coalesce(sum(${sqlFrag}), 0)`,
+            sqlAggregateWrap: (sqlFrag) => sql`coalesce(sum(${sqlFrag}), '0')`,
             isNonNull: true,
 
             // A SUM(...) often ends up significantly larger than any individual
