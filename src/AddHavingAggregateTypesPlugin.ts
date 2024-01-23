@@ -321,7 +321,8 @@ const Plugin: GraphileConfig.Plugin = {
                             }.${sql.identifier(attributeName)}`;
                             const aggregateExpression =
                               aggregateSpec.sqlAggregateWrap(
-                                attributeExpression
+                                attributeExpression,
+                                attribute.codec
                               );
                             return new BooleanFilterStep(
                               $having,
@@ -432,7 +433,10 @@ const Plugin: GraphileConfig.Plugin = {
                               });
 
                               const aggregateExpression =
-                                aggregateSpec.sqlAggregateWrap(src);
+                                aggregateSpec.sqlAggregateWrap(
+                                  src,
+                                  computedAttributeResource.codec
+                                );
                               const $filter = new BooleanFilterStep(
                                 $having,
                                 aggregateExpression

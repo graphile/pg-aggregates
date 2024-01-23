@@ -543,7 +543,8 @@ group by true)`;
                             expression: spec.sqlAggregateWrap(
                               sql`${$col.alias}.${sql.identifier(
                                 attributeName
-                              )}`
+                              )}`,
+                              attribute.codec
                             ),
                           };
 

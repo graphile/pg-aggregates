@@ -232,13 +232,14 @@ const Plugin: GraphileConfig.Plugin = {
                         //TODO: add more details here
                       },
                       () => {
+                        const attributeCodec = attribute.codec;
                         return {
                           description: `${spec.HumanLabel} of ${fieldName} across the matching connection`,
                           type: spec.isNonNull
                             ? new GraphQLNonNull(Type)
                             : Type,
                           plan: EXPORTABLE(
-                            (attributeName, codec, spec, sql) =>
+                            (attributeCodec, attributeName, codec, spec, sql) =>
                               function plan(
                                 $pgSelectSingle: PgSelectSingleStep
                               ) {
@@ -248,14 +249,16 @@ const Plugin: GraphileConfig.Plugin = {
                                 const sqlAttribute = sql.fragment`${
                                   $pgSelectSingle.getClassStep().alias
                                 }.${sql.identifier(attributeName)}`;
-                                const sqlAggregate =
-                                  spec.sqlAggregateWrap(sqlAttribute);
+                                const sqlAggregate = spec.sqlAggregateWrap(
+                                  sqlAttribute,
+                                  attributeCodec
+                                );
                                 return $pgSelectSingle.select(
                                   sqlAggregate,
                                   codec
                                 );
                               },
-                            [attributeName, codec, spec, sql]
+                            [attributeCodec, attributeName, codec, spec, sql]
                           ),
                         };
                       }
@@ -330,6 +333,7 @@ const Plugin: GraphileConfig.Plugin = {
                           args: makeFieldArgs(),
                           plan: EXPORTABLE(
                             (
+                              codec,
                               computedAttributeResource,
                               makeExpression,
                               spec,
@@ -352,13 +356,17 @@ const Plugin: GraphileConfig.Plugin = {
                                   ],
                                 });
 
-                                const sqlAggregate = spec.sqlAggregateWrap(src);
+                                const sqlAggregate = spec.sqlAggregateWrap(
+                                  src,
+                                  codec
+                                );
                                 return $pgSelectSingle.select(
                                   sqlAggregate,
                                   targetCodec
                                 );
                               },
                             [
+                              codec,
                               computedAttributeResource,
                               makeExpression,
                               spec,

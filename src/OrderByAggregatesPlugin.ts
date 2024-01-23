@@ -185,7 +185,8 @@ where ${sql.parens(
 select ${aggregateSpec.sqlAggregateWrap(
                       sql.fragment`${tableAlias}.${sql.identifier(
                         attributeName
-                      )}`
+                      )}`,
+                      attribute.codec
                     )}
 from ${table.from} ${tableAlias}
 where ${sql.join(
