@@ -33,8 +33,11 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
     hooks: {
       pgCodecs_PgCodec(_info, event) {
         const { pgType, pgCodec } = event;
-        const isCatN = pgType.typcategory === "N";
-        const isInterval = pgType._id === INTERVAL_OID;
+        const isReg =
+          pgType.getNamespace()?.nspname === "pg_catalog" &&
+          pgType.typname.startsWith("reg");
+        const isCatN = !isReg && pgType.typcategory === "N";
+        const isInterval = !isReg && pgType._id === INTERVAL_OID;
         if (isCatN || isInterval) {
           if (!pgCodec.extensions) {
             pgCodec.extensions = Object.create(null);
