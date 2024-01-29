@@ -4,6 +4,7 @@
   "description": "Aggregates support for PostGraphile",
   "main": "dist/index.js",
   "scripts": {
+    "clean": "rm -Rf dist",
     "build": "tsc",
     "watch": "tsc --watch",
     "test": "jest -i",
