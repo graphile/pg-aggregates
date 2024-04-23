@@ -105,7 +105,7 @@ const Plugin: GraphileConfig.Plugin = {
                     `The method to use when grouping \`${tableTypeName}\` for these aggregates.`,
                     "arg"
                   ),
-                  applyPlan(_$parent, $pgSelect: PgSelectStep<any>, input) {
+                  applyPlan: EXPORTABLE( (getEnumValueConfig, TableGroupByType) => function (_$parent, $pgSelect: PgSelectStep<any>, input) {
                     const $value = input.getRaw();
                     const val = $value.eval();
                     if (!Array.isArray(val)) {
@@ -124,7 +124,7 @@ const Plugin: GraphileConfig.Plugin = {
                       }
                     }
                     return null;
-                  },
+                  }, [getEnumValueConfig, TableGroupByType]),
                   autoApplyAfterParentPlan: true,
                 },
                 ...(TableHavingInputType

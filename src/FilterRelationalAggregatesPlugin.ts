@@ -225,6 +225,7 @@ group by true)`;
         const {
           inflection,
           dataplanPg: { PgConditionStep },
+          EXPORTABLE,
         } = build;
 
         if (!inflection.filterType) {
@@ -278,7 +279,7 @@ group by true)`;
                       [filterFieldName]: {
                         description: `A filter that must pass for the relevant \`${foreignTableTypeName}\` object to be included within the aggregate.`,
                         type,
-                        applyPlan(
+                        applyPlan: EXPORTABLE( (PgConditionStep) => function (
                           $subquery: PgAggregateConditionStep<any>,
                           fieldArgs: FieldArgs
                         ) {
@@ -290,6 +291,7 @@ group by true)`;
                           );
                           fieldArgs.apply($condition);
                         },
+                        [PgConditionStep]),
                         // No need to auto-apply since we're applied manually via `fieldArgs.apply($subQuery)` below.
                       },
                     };
@@ -334,6 +336,7 @@ group by true)`;
           pgAggregateSpecs,
           dataplanPg: { PgConditionStep, pgWhereConditionSpecListToSQL },
           PgAggregateConditionStep,
+          EXPORTABLE,
         } = build;
 
         if (!inflection.filterType) {
@@ -383,7 +386,12 @@ group by true)`;
                 {
                   description: `Aggregates across related \`${foreignTableTypeName}\` match the filter criteria.`,
                   type: AggregateType,
-                  applyPlan(
+                  applyPlan: EXPORTABLE( 
+                    (
+                    PgAggregateConditionStep, 
+                    sql, 
+                    pgWhereConditionSpecListToSQL
+                    ) => function (
                     $where: PgConditionStep<any>,
                     fieldArgs: FieldArgs
                   ) {
@@ -420,6 +428,7 @@ group by true)`;
                     });
                     fieldArgs.apply($subQuery);
                   },
+                  [PgAggregateConditionStep, sql, pgWhereConditionSpecListToSQL]),
                   // No need to auto-apply, postgraphile-plugin-connection-filter explicitly calls fieldArgs.apply()
                 }
               ),
@@ -459,12 +468,13 @@ group by true)`;
                 [fieldName]: fieldWithHooks({ fieldName }, () => ({
                   type,
                   description: `${spec.HumanLabel} aggregate over matching \`${foreignTableTypeName}\` objects.`,
-                  applyPlan(
+                  applyPlan: EXPORTABLE( (spec) => function (
                     $subquery: PgAggregateConditionStep<any>,
                     fieldArgs: FieldArgs
                   ) {
                     fieldArgs.apply($subquery.forAggregate(spec));
                   },
+                  [spec]),
                   // No need to auto-apply since we're applied manually via `fieldArgs.apply($subQuery)` above.
                 })),
               },
@@ -533,7 +543,7 @@ group by true)`;
                     {
                       [fieldName]: {
                         type: OperatorsType,
-                        applyPlan(
+                        applyPlan: EXPORTABLE((PgConditionStep, codec, spec, sql, attributeName, attribute) => function (
                           $parent: PgAggregateConditionExpressionStep,
                           fieldArgs: FieldArgs
                         ) {
@@ -549,7 +559,7 @@ group by true)`;
                           };
 
                           fieldArgs.apply($col);
-                        },
+                        }, [PgConditionStep, codec, spec, sql, attributeName, attribute]),
                         // No need to auto-apply since we're called via `fieldArgs.apply($subquery.forAggregate(spec))` above
                       },
                     },

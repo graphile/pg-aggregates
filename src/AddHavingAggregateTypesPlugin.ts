@@ -14,6 +14,7 @@ import type { SQL } from "pg-sql2";
 import type { AggregateSpec } from "./interfaces.js";
 import { CORE_HAVING_FILTER_SPECS } from "./interfaces.js";
 import { getComputedAttributeResources } from "./utils.js";
+import { EXPORTABLE } from "./EXPORTABLE.js";
 
 const { version } = require("../package.json");
 
@@ -161,11 +162,11 @@ const Plugin: GraphileConfig.Plugin = {
                         build.getInputTypeByName(tableHavingInputTypeName)
                       )
                     ),
-                    applyPlan($where, input) {
+                    applyPlan: EXPORTABLE( (OrFilterStep) => ($where, input) => {
                       const $or = new OrFilterStep($where);
                       input.apply($or);
                       return null;
-                    },
+                    }, [OrFilterStep]),
                     // No need to auto-apply, the having field calls `fieldArgs.apply(...)`
                   },
                 };
@@ -315,7 +316,7 @@ const Plugin: GraphileConfig.Plugin = {
                         }
                         const newField = fieldWithHooks({ fieldName }, () => ({
                           type: HavingFilterType,
-                          applyPlan($having: PgConditionLikeStep) {
+                          applyPlan: EXPORTABLE( (sql, attributeName, aggregateSpec, attribute, BooleanFilterStep) => ($having: PgConditionLikeStep) => {
                             const attributeExpression = sql.fragment`${
                               $having.alias
                             }.${sql.identifier(attributeName)}`;
@@ -328,7 +329,7 @@ const Plugin: GraphileConfig.Plugin = {
                               $having,
                               aggregateExpression
                             );
-                          },
+                          }, [sql, attributeName, aggregateSpec, attribute, BooleanFilterStep]),
                           // No need to auto-apply, parent does `return $having;`
                         }));
                         return build.extend(
@@ -419,7 +420,7 @@ const Plugin: GraphileConfig.Plugin = {
                           { fieldName },
                           {
                             type: ComputedHavingInput,
-                            applyPlan($having, fieldArgs) {
+                            applyPlan: EXPORTABLE( (aggregateSpec, BooleanFilterStep) => ($having, fieldArgs) => {
                               // Because we require that the computed attribute is
                               // evaluated inline, we have to convert it to an
                               // expression here; this is only needed because of the
@@ -442,7 +443,7 @@ const Plugin: GraphileConfig.Plugin = {
                                 aggregateExpression
                               );
                               fieldArgs.apply($filter, "filter");
-                            },
+                            }, [aggregateSpec, BooleanFilterStep]),
                             // No need to auto-apply, parent does `return $having;`
                           }
                         );
@@ -476,6 +477,7 @@ const Plugin: GraphileConfig.Plugin = {
           sql,
           inflection,
           dataplanPg: { TYPES },
+          EXPORTABLE
         } = build;
         const {
           scope: {
@@ -574,14 +576,14 @@ const Plugin: GraphileConfig.Plugin = {
                   { fieldName },
                   {
                     type: FieldType,
-                    applyPlan($booleanFilter: BooleanFilterStep, input) {
+                    applyPlan: EXPORTABLE((sql, infix, codec) => ($booleanFilter: BooleanFilterStep, input) => {
                       const val = input.get();
                       $booleanFilter.having(
                         sql`(${sql.parens(
                           $booleanFilter.expression
                         )} ${infix} ${$booleanFilter.placeholder(val, codec!)})`
                       );
-                    },
+                    }, [sql, infix, codec]),
                     // No need to auto-apply
                   }
                 ),
@@ -595,12 +597,13 @@ const Plugin: GraphileConfig.Plugin = {
             case "float":
             case "bigfloat":
             case "datetime": {
-              addBinaryOp("equalTo", sql.fragment`=`);
-              addBinaryOp("notEqualTo", sql.fragment`<>`);
-              addBinaryOp("greaterThan", sql.fragment`>`);
-              addBinaryOp("greaterThanOrEqualTo", sql.fragment`>=`);
-              addBinaryOp("lessThan", sql.fragment`<`);
-              addBinaryOp("lessThanOrEqualTo", sql.fragment`<=`);
+              // TODO: WTF?
+              // addBinaryOp("equalTo", sql.fragment`=`);
+              // addBinaryOp("notEqualTo", sql.fragment`<>`);
+              // addBinaryOp("greaterThan", sql.fragment`>`);
+              // addBinaryOp("greaterThanOrEqualTo", sql.fragment`>=`);
+              // addBinaryOp("lessThan", sql.fragment`<`);
+              // addBinaryOp("lessThanOrEqualTo", sql.fragment`<=`);
             }
           }
           return fields;

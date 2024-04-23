@@ -7,6 +7,7 @@ import type {
   GraphQLEnumValueConfig,
   GraphQLEnumValueConfigMap,
 } from "graphql";
+import { EXPORTABLE } from "./EXPORTABLE.js";
 
 const { version } = require("../package.json");
 
@@ -63,13 +64,13 @@ const Plugin: GraphileConfig.Plugin = {
                   [fieldName]: {
                     extensions: {
                       grafast: {
-                        applyPlan($pgSelect: PgSelectStep<any>) {
+                        applyPlan: EXPORTABLE( (sql, attributeName) => function ($pgSelect: PgSelectStep<any>) {
                           $pgSelect.groupBy({
                             fragment: sql.fragment`${
                               $pgSelect.alias
                             }.${sql.identifier(attributeName)}`,
                           });
-                        },
+                        }, [sql, attributeName]),
                       },
                     },
                   },
@@ -99,7 +100,7 @@ const Plugin: GraphileConfig.Plugin = {
                       [fieldName]: {
                         extensions: {
                           grafast: {
-                            applyPlan($pgSelect: PgSelectStep<any>) {
+                            applyPlan: EXPORTABLE( (sql, attributeName, aggregateGroupBySpec) => function ($pgSelect: PgSelectStep<any>) {
                               $pgSelect.groupBy({
                                 fragment: aggregateGroupBySpec.sqlWrap(
                                   sql`${$pgSelect.alias}.${sql.identifier(
@@ -107,7 +108,7 @@ const Plugin: GraphileConfig.Plugin = {
                                   )}`
                                 ),
                               });
-                            },
+                            }, [sql, attributeName, aggregateGroupBySpec]),
                           },
                         },
                       } as GraphQLEnumValueConfig,
