@@ -316,7 +316,7 @@ const Plugin: GraphileConfig.Plugin = {
                         }
                         const newField = fieldWithHooks({ fieldName }, () => ({
                           type: HavingFilterType,
-                          applyPlan: EXPORTABLE( (sql, attributeName, aggregateSpec, attribute, BooleanFilterStep) => ($having: PgConditionLikeStep) => {
+                          applyPlan: EXPORTABLE( (BooleanFilterStep, aggregateSpec, attribute, attributeName, sql) => ($having: PgConditionLikeStep) => {
                             const attributeExpression = sql.fragment`${
                               $having.alias
                             }.${sql.identifier(attributeName)}`;
@@ -329,7 +329,7 @@ const Plugin: GraphileConfig.Plugin = {
                               $having,
                               aggregateExpression
                             );
-                          }, [sql, attributeName, aggregateSpec, attribute, BooleanFilterStep]),
+                          }, [BooleanFilterStep, aggregateSpec, attribute, attributeName, sql]),
                           // No need to auto-apply, parent does `return $having;`
                         }));
                         return build.extend(
@@ -420,7 +420,7 @@ const Plugin: GraphileConfig.Plugin = {
                           { fieldName },
                           {
                             type: ComputedHavingInput,
-                            applyPlan: EXPORTABLE( (aggregateSpec, BooleanFilterStep) => ($having, fieldArgs) => {
+                            applyPlan: EXPORTABLE( (BooleanFilterStep, aggregateSpec, computedAttributeResource, makeExpression) => ($having, fieldArgs) => {
                               // Because we require that the computed attribute is
                               // evaluated inline, we have to convert it to an
                               // expression here; this is only needed because of the
@@ -443,7 +443,7 @@ const Plugin: GraphileConfig.Plugin = {
                                 aggregateExpression
                               );
                               fieldArgs.apply($filter, "filter");
-                            }, [aggregateSpec, BooleanFilterStep]),
+                            }, [BooleanFilterStep, aggregateSpec, computedAttributeResource, makeExpression]),
                             // No need to auto-apply, parent does `return $having;`
                           }
                         );
@@ -576,14 +576,14 @@ const Plugin: GraphileConfig.Plugin = {
                   { fieldName },
                   {
                     type: FieldType,
-                    applyPlan: EXPORTABLE((sql, infix, codec) => ($booleanFilter: BooleanFilterStep, input) => {
+                    applyPlan: EXPORTABLE((codec, infix, sql) => ($booleanFilter: BooleanFilterStep, input) => {
                       const val = input.get();
                       $booleanFilter.having(
                         sql`(${sql.parens(
                           $booleanFilter.expression
                         )} ${infix()} ${$booleanFilter.placeholder(val, codec!)})`
                       );
-                    }, [sql, infix, codec]),
+                    }, [codec, infix, sql]),
                     // No need to auto-apply
                   }
                 ),

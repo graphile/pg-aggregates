@@ -86,7 +86,7 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
               });
 
             const makeTotalCountApplyPlan = (direction: "ASC" | "DESC") => {
-              return EXPORTABLE( (sql, table, relation, TYPES, direction) => function applyPlan($select: PgSelectStep<any>) {
+              return EXPORTABLE( (TYPES, direction, relation, sql, table) => function applyPlan($select: PgSelectStep<any>) {
                 const foreignTableAlias = $select.alias;
                 const conditions: SQL[] = [];
                 const tableAlias = sql.identifier(Symbol(table.name));
@@ -121,7 +121,7 @@ where ${sql.parens(
                   codec: TYPES.bigint,
                   direction,
                 });
-              }, [sql, table, relation, TYPES, direction]);
+              }, [TYPES, direction, relation, sql, table]);
             };
 
             memo = build.extend(
@@ -160,7 +160,7 @@ where ${sql.parens(
                   });
 
                 const makeApplyPlan = (direction: "ASC" | "DESC") => {
-                  return  EXPORTABLE( (sql, table, relation, aggregateSpec, attribute, attributeName, direction) => function applyPlan($select: PgSelectStep<any>) {
+                  return  EXPORTABLE( (aggregateSpec, attribute, attributeName, direction, relation, sql, table) => function applyPlan($select: PgSelectStep<any>) {
                     const foreignTableAlias = $select.alias;
                     const conditions: SQL[] = [];
                     const tableAlias = sql.identifier(Symbol(table.name));
@@ -201,7 +201,7 @@ where ${sql.join(
                         attribute.codec,
                       direction,
                     });
-                  }, [sql, table, relation, aggregateSpec, attribute, attributeName, direction]);
+                  }, [aggregateSpec, attribute, attributeName, direction, relation, sql, table]);
                 };
 
                 memo = build.extend(

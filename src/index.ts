@@ -27,8 +27,8 @@ export const PgAggregatesPreset: GraphileConfig.Preset = {
 };
 
 export {
-  AggregateSpec,
   AggregateGroupBySpec,
+  AggregateSpec,
   AggregateTargetEntity,
 } from "./interfaces.js";
 

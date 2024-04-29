@@ -11,9 +11,9 @@ import type {
   GrafastInputFieldConfigMap,
   ModifierStep,
 } from "grafast";
+import type {} from "graphile-build";
 import type { GraphQLInputObjectType } from "graphql";
 import type { PgSQL, SQL } from "pg-sql2";
-import type {} from "graphile-build";
 import type {} from "postgraphile-plugin-connection-filter";
 
 import type { AggregateSpec } from "./interfaces.js";
@@ -386,11 +386,7 @@ group by true)`;
                   description: `Aggregates across related \`${foreignTableTypeName}\` match the filter criteria.`,
                   type: AggregateType,
                   applyPlan: EXPORTABLE( 
-                    (
-                    PgAggregateConditionStep, 
-                    sql, 
-                    pgWhereConditionSpecListToSQL
-                    ) => function (
+                    (PgAggregateConditionStep, pgWhereConditionSpecListToSQL, sql) => function (
                     $where: PgConditionStep<any>,
                     fieldArgs: FieldArgs
                   ) {
@@ -427,7 +423,7 @@ group by true)`;
                     });
                     fieldArgs.apply($subQuery);
                   },
-                  [PgAggregateConditionStep, sql, pgWhereConditionSpecListToSQL]),
+                  [PgAggregateConditionStep, pgWhereConditionSpecListToSQL, sql]),
                   // No need to auto-apply, postgraphile-plugin-connection-filter explicitly calls fieldArgs.apply()
                 }
               ),
@@ -542,7 +538,7 @@ group by true)`;
                     {
                       [fieldName]: {
                         type: OperatorsType,
-                        applyPlan: EXPORTABLE((PgConditionStep, codec, spec, sql, attributeName, attribute) => function (
+                        applyPlan: EXPORTABLE((PgConditionStep, attribute, attributeName, codec, spec, sql) => function (
                           $parent: PgAggregateConditionExpressionStep,
                           fieldArgs: FieldArgs
                         ) {
@@ -558,7 +554,7 @@ group by true)`;
                           };
 
                           fieldArgs.apply($col);
-                        }, [PgConditionStep, codec, spec, sql, attributeName, attribute]),
+                        }, [PgConditionStep, attribute, attributeName, codec, spec, sql]),
                         // No need to auto-apply since we're called via `fieldArgs.apply($subquery.forAggregate(spec))` above
                       },
                     },

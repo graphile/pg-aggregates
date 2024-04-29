@@ -1,5 +1,6 @@
 import type { PgCodec } from "@dataplan/pg";
 
+import { EXPORTABLE } from "./EXPORTABLE.js";
 import type { AggregateGroupBySpec, AggregateSpec } from "./interfaces.js";
 import {
   BIGINT_OID,
@@ -11,7 +12,6 @@ import {
   MONEY_OID,
   NUMERIC_OID,
 } from "./interfaces.js";
-import { EXPORTABLE } from "./EXPORTABLE.js";
 
 const { version } = require("../package.json");
 
