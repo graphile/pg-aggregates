@@ -14,7 +14,6 @@ import type { SQL } from "pg-sql2";
 import type { AggregateSpec } from "./interfaces.js";
 import { CORE_HAVING_FILTER_SPECS } from "./interfaces.js";
 import { getComputedAttributeResources } from "./utils.js";
-import { EXPORTABLE } from "./EXPORTABLE.js";
 
 const { version } = require("../package.json");
 
@@ -93,6 +92,7 @@ const Plugin: GraphileConfig.Plugin = {
           inflection,
           sql,
           dataplanPg: { OrFilterStep, BooleanFilterStep },
+          EXPORTABLE,
         } = build;
 
         for (const spec of CORE_HAVING_FILTER_SPECS) {
@@ -568,7 +568,7 @@ const Plugin: GraphileConfig.Plugin = {
             return fields;
           }
 
-          function addBinaryOp(fieldName: string, infix: SQL) {
+          function addBinaryOp(fieldName: string, infix: () => SQL) {
             fields = build.extend(
               fields,
               {
@@ -581,7 +581,7 @@ const Plugin: GraphileConfig.Plugin = {
                       $booleanFilter.having(
                         sql`(${sql.parens(
                           $booleanFilter.expression
-                        )} ${infix} ${$booleanFilter.placeholder(val, codec!)})`
+                        )} ${infix()} ${$booleanFilter.placeholder(val, codec!)})`
                       );
                     }, [sql, infix, codec]),
                     // No need to auto-apply
@@ -597,13 +597,12 @@ const Plugin: GraphileConfig.Plugin = {
             case "float":
             case "bigfloat":
             case "datetime": {
-              // TODO: WTF?
-              // addBinaryOp("equalTo", sql.fragment`=`);
-              // addBinaryOp("notEqualTo", sql.fragment`<>`);
-              // addBinaryOp("greaterThan", sql.fragment`>`);
-              // addBinaryOp("greaterThanOrEqualTo", sql.fragment`>=`);
-              // addBinaryOp("lessThan", sql.fragment`<`);
-              // addBinaryOp("lessThanOrEqualTo", sql.fragment`<=`);
+              addBinaryOp("equalTo", EXPORTABLE((sql) => () => sql.fragment`=`, [sql]));
+              addBinaryOp("notEqualTo", EXPORTABLE((sql) => () => sql.fragment`<>`, [sql]));
+              addBinaryOp("greaterThan", EXPORTABLE((sql) => () => sql.fragment`>`, [sql]));
+              addBinaryOp("greaterThanOrEqualTo", EXPORTABLE((sql) => () => sql.fragment`>=`, [sql]));
+              addBinaryOp("lessThan", EXPORTABLE((sql) => () => sql.fragment`<`, [sql]));
+              addBinaryOp("lessThanOrEqualTo", EXPORTABLE((sql) => () => sql.fragment`<=`, [sql]));
             }
           }
           return fields;

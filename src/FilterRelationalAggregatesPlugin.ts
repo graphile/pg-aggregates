@@ -17,7 +17,6 @@ import type {} from "graphile-build";
 import type {} from "postgraphile-plugin-connection-filter";
 
 import type { AggregateSpec } from "./interfaces.js";
-import { EXPORTABLE } from "./EXPORTABLE.js";
 
 const { version } = require("../package.json");
 

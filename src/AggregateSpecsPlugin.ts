@@ -77,7 +77,7 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
         ) => {
           return EXPORTABLE((dataTypeToAggregateTypeMap, fallback) => (
             codec: PgCodec<any, any, any, any>
-          ): any => {
+          ): PgCodec<any, any, any, any> => {
             const oid = codec.extensions?.oid;
             const targetType =
               (oid ? dataTypeToAggregateTypeMap[oid] : null) ?? fallback;

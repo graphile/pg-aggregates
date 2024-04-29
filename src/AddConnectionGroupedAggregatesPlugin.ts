@@ -1,6 +1,5 @@
 import type { PgSelectStep } from "@dataplan/pg";
 import type { GraphQLEnumType, GraphQLObjectType } from "graphql";
-import { EXPORTABLE } from "./EXPORTABLE.js";
 
 const { version } = require("../package.json");
 
@@ -36,6 +35,7 @@ const Plugin: GraphileConfig.Plugin = {
           graphql: { GraphQLList, GraphQLNonNull },
           grafast: { getEnumValueConfig },
           inflection,
+          EXPORTABLE
         } = build;
         const {
           fieldWithHooks,
