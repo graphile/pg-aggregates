@@ -86,42 +86,46 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
               });
 
             const makeTotalCountApplyPlan = (direction: "ASC" | "DESC") => {
-              return EXPORTABLE( (TYPES, direction, relation, sql, table) => function applyPlan($select: PgSelectStep<any>) {
-                const foreignTableAlias = $select.alias;
-                const conditions: SQL[] = [];
-                const tableAlias = sql.identifier(Symbol(table.name));
-                relation.localAttributes.forEach(
-                  (localAttribute: string, i) => {
-                    const remoteAttribute = relation.remoteAttributes[
-                      i
-                    ] as string;
-                    conditions.push(
-                      sql.fragment`${tableAlias}.${sql.identifier(
-                        remoteAttribute
-                      )} = ${foreignTableAlias}.${sql.identifier(
-                        localAttribute
-                      )}`
+              return EXPORTABLE(
+                (TYPES, direction, relation, sql, table) =>
+                  function applyPlan($select: PgSelectStep<any>) {
+                    const foreignTableAlias = $select.alias;
+                    const conditions: SQL[] = [];
+                    const tableAlias = sql.identifier(Symbol(table.name));
+                    relation.localAttributes.forEach(
+                      (localAttribute: string, i) => {
+                        const remoteAttribute = relation.remoteAttributes[
+                          i
+                        ] as string;
+                        conditions.push(
+                          sql.fragment`${tableAlias}.${sql.identifier(
+                            remoteAttribute
+                          )} = ${foreignTableAlias}.${sql.identifier(
+                            localAttribute
+                          )}`
+                        );
+                      }
                     );
-                  }
-                );
-                if (typeof table.from === "function") {
-                  throw new Error(`Function source unsupported`);
-                }
-                // TODO: refactor this to use joins instead of subqueries
-                const fragment = sql`(${sql.indent`select count(*)
+                    if (typeof table.from === "function") {
+                      throw new Error(`Function source unsupported`);
+                    }
+                    // TODO: refactor this to use joins instead of subqueries
+                    const fragment = sql`(${sql.indent`select count(*)
 from ${table.from} ${tableAlias}
 where ${sql.parens(
-                  sql.join(
-                    conditions.map((c) => sql.parens(c)),
-                    " AND "
-                  )
-                )}`})`;
-                $select.orderBy({
-                  fragment,
-                  codec: TYPES.bigint,
-                  direction,
-                });
-              }, [TYPES, direction, relation, sql, table]);
+                      sql.join(
+                        conditions.map((c) => sql.parens(c)),
+                        " AND "
+                      )
+                    )}`})`;
+                    $select.orderBy({
+                      fragment,
+                      codec: TYPES.bigint,
+                      direction,
+                    });
+                  },
+                [TYPES, direction, relation, sql, table]
+              );
             };
 
             memo = build.extend(
@@ -160,48 +164,69 @@ where ${sql.parens(
                   });
 
                 const makeApplyPlan = (direction: "ASC" | "DESC") => {
-                  return  EXPORTABLE( (aggregateSpec, attribute, attributeName, direction, relation, sql, table) => function applyPlan($select: PgSelectStep<any>) {
-                    const foreignTableAlias = $select.alias;
-                    const conditions: SQL[] = [];
-                    const tableAlias = sql.identifier(Symbol(table.name));
-                    relation.localAttributes.forEach(
-                      (localAttribute: string, i) => {
-                        const remoteAttribute = relation.remoteAttributes[
-                          i
-                        ] as string;
-                        conditions.push(
-                          sql.fragment`${tableAlias}.${sql.identifier(
-                            remoteAttribute
-                          )} = ${foreignTableAlias}.${sql.identifier(
-                            localAttribute
-                          )}`
+                  return EXPORTABLE(
+                    (
+                      aggregateSpec,
+                      attribute,
+                      attributeName,
+                      direction,
+                      relation,
+                      sql,
+                      table
+                    ) =>
+                      function applyPlan($select: PgSelectStep<any>) {
+                        const foreignTableAlias = $select.alias;
+                        const conditions: SQL[] = [];
+                        const tableAlias = sql.identifier(Symbol(table.name));
+                        relation.localAttributes.forEach(
+                          (localAttribute: string, i) => {
+                            const remoteAttribute = relation.remoteAttributes[
+                              i
+                            ] as string;
+                            conditions.push(
+                              sql.fragment`${tableAlias}.${sql.identifier(
+                                remoteAttribute
+                              )} = ${foreignTableAlias}.${sql.identifier(
+                                localAttribute
+                              )}`
+                            );
+                          }
                         );
-                      }
-                    );
-                    if (typeof table.from === "function") {
-                      throw new Error(`Function source unsupported`);
-                    }
-                    // TODO: refactor this to use joins instead of subqueries
-                    const fragment = sql`(${sql.indent`
+                        if (typeof table.from === "function") {
+                          throw new Error(`Function source unsupported`);
+                        }
+                        // TODO: refactor this to use joins instead of subqueries
+                        const fragment = sql`(${sql.indent`
 select ${aggregateSpec.sqlAggregateWrap(
-                      sql.fragment`${tableAlias}.${sql.identifier(
-                        attributeName
-                      )}`,
-                      attribute.codec
-                    )}
+                          sql.fragment`${tableAlias}.${sql.identifier(
+                            attributeName
+                          )}`,
+                          attribute.codec
+                        )}
 from ${table.from} ${tableAlias}
 where ${sql.join(
-                      conditions.map((c) => sql.parens(c)),
-                      " AND "
-                    )}`})`;
-                    $select.orderBy({
-                      fragment,
-                      codec:
-                        aggregateSpec.pgTypeCodecModifier?.(attribute.codec) ??
-                        attribute.codec,
+                          conditions.map((c) => sql.parens(c)),
+                          " AND "
+                        )}`})`;
+                        $select.orderBy({
+                          fragment,
+                          codec:
+                            aggregateSpec.pgTypeCodecModifier?.(
+                              attribute.codec
+                            ) ?? attribute.codec,
+                          direction,
+                        });
+                      },
+                    [
+                      aggregateSpec,
+                      attribute,
+                      attributeName,
                       direction,
-                    });
-                  }, [aggregateSpec, attribute, attributeName, direction, relation, sql, table]);
+                      relation,
+                      sql,
+                      table,
+                    ]
+                  );
                 };
 
                 memo = build.extend(

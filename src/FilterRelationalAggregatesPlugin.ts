@@ -278,19 +278,22 @@ group by true)`;
                       [filterFieldName]: {
                         description: `A filter that must pass for the relevant \`${foreignTableTypeName}\` object to be included within the aggregate.`,
                         type,
-                        applyPlan: EXPORTABLE( (PgConditionStep) => function (
-                          $subquery: PgAggregateConditionStep<any>,
-                          fieldArgs: FieldArgs
-                        ) {
-                          // Enable all the helpers
-                          const $condition = new PgConditionStep(
-                            $subquery,
-                            false,
-                            "AND"
-                          );
-                          fieldArgs.apply($condition);
-                        },
-                        [PgConditionStep]),
+                        applyPlan: EXPORTABLE(
+                          (PgConditionStep) =>
+                            function (
+                              $subquery: PgAggregateConditionStep<any>,
+                              fieldArgs: FieldArgs
+                            ) {
+                              // Enable all the helpers
+                              const $condition = new PgConditionStep(
+                                $subquery,
+                                false,
+                                "AND"
+                              );
+                              fieldArgs.apply($condition);
+                            },
+                          [PgConditionStep]
+                        ),
                         // No need to auto-apply since we're applied manually via `fieldArgs.apply($subQuery)` below.
                       },
                     };
@@ -385,45 +388,55 @@ group by true)`;
                 {
                   description: `Aggregates across related \`${foreignTableTypeName}\` match the filter criteria.`,
                   type: AggregateType,
-                  applyPlan: EXPORTABLE( 
-                    (PgAggregateConditionStep, pgWhereConditionSpecListToSQL, sql) => function (
-                    $where: PgConditionStep<any>,
-                    fieldArgs: FieldArgs
-                  ) {
-                    // assertAllowed(fieldArgs, "object");
-                    if (!$where.extensions.pgFilterRelation) {
-                      throw new Error(
-                        `Invalid use of filter, 'pgFilterRelation' expected`
-                      );
-                    }
-                    const {
-                      localAttributes,
-                      remoteAttributes,
-                      tableExpression,
-                      alias,
-                    } = $where.extensions.pgFilterRelation;
-                    const $subQuery = new PgAggregateConditionStep(
-                      $where,
-                      {
-                        sql,
-                        tableExpression,
-                        alias,
+                  applyPlan: EXPORTABLE(
+                    (
+                      PgAggregateConditionStep,
+                      pgWhereConditionSpecListToSQL,
+                      sql
+                    ) =>
+                      function (
+                        $where: PgConditionStep<any>,
+                        fieldArgs: FieldArgs
+                      ) {
+                        // assertAllowed(fieldArgs, "object");
+                        if (!$where.extensions.pgFilterRelation) {
+                          throw new Error(
+                            `Invalid use of filter, 'pgFilterRelation' expected`
+                          );
+                        }
+                        const {
+                          localAttributes,
+                          remoteAttributes,
+                          tableExpression,
+                          alias,
+                        } = $where.extensions.pgFilterRelation;
+                        const $subQuery = new PgAggregateConditionStep(
+                          $where,
+                          {
+                            sql,
+                            tableExpression,
+                            alias,
+                          },
+                          pgWhereConditionSpecListToSQL
+                        );
+                        localAttributes.forEach((localAttribute, i) => {
+                          const remoteAttribute = remoteAttributes[i];
+                          $subQuery.where(
+                            sql`${$where.alias}.${sql.identifier(
+                              localAttribute as string
+                            )} = ${$subQuery.alias}.${sql.identifier(
+                              remoteAttribute as string
+                            )}`
+                          );
+                        });
+                        fieldArgs.apply($subQuery);
                       },
-                      pgWhereConditionSpecListToSQL
-                    );
-                    localAttributes.forEach((localAttribute, i) => {
-                      const remoteAttribute = remoteAttributes[i];
-                      $subQuery.where(
-                        sql`${$where.alias}.${sql.identifier(
-                          localAttribute as string
-                        )} = ${$subQuery.alias}.${sql.identifier(
-                          remoteAttribute as string
-                        )}`
-                      );
-                    });
-                    fieldArgs.apply($subQuery);
-                  },
-                  [PgAggregateConditionStep, pgWhereConditionSpecListToSQL, sql]),
+                    [
+                      PgAggregateConditionStep,
+                      pgWhereConditionSpecListToSQL,
+                      sql,
+                    ]
+                  ),
                   // No need to auto-apply, postgraphile-plugin-connection-filter explicitly calls fieldArgs.apply()
                 }
               ),
@@ -463,13 +476,16 @@ group by true)`;
                 [fieldName]: fieldWithHooks({ fieldName }, () => ({
                   type,
                   description: `${spec.HumanLabel} aggregate over matching \`${foreignTableTypeName}\` objects.`,
-                  applyPlan: EXPORTABLE( (spec) => function (
-                    $subquery: PgAggregateConditionStep<any>,
-                    fieldArgs: FieldArgs
-                  ) {
-                    fieldArgs.apply($subquery.forAggregate(spec));
-                  },
-                  [spec]),
+                  applyPlan: EXPORTABLE(
+                    (spec) =>
+                      function (
+                        $subquery: PgAggregateConditionStep<any>,
+                        fieldArgs: FieldArgs
+                      ) {
+                        fieldArgs.apply($subquery.forAggregate(spec));
+                      },
+                    [spec]
+                  ),
                   // No need to auto-apply since we're applied manually via `fieldArgs.apply($subQuery)` above.
                 })),
               },
@@ -538,23 +554,41 @@ group by true)`;
                     {
                       [fieldName]: {
                         type: OperatorsType,
-                        applyPlan: EXPORTABLE((PgConditionStep, attribute, attributeName, codec, spec, sql) => function (
-                          $parent: PgAggregateConditionExpressionStep,
-                          fieldArgs: FieldArgs
-                        ) {
-                          const $col = new PgConditionStep($parent);
-                          $col.extensions.pgFilterAttribute = {
+                        applyPlan: EXPORTABLE(
+                          (
+                            PgConditionStep,
+                            attribute,
+                            attributeName,
                             codec,
-                            expression: spec.sqlAggregateWrap(
-                              sql`${$col.alias}.${sql.identifier(
-                                attributeName
-                              )}`,
-                              attribute.codec
-                            ),
-                          };
+                            spec,
+                            sql
+                          ) =>
+                            function (
+                              $parent: PgAggregateConditionExpressionStep,
+                              fieldArgs: FieldArgs
+                            ) {
+                              const $col = new PgConditionStep($parent);
+                              $col.extensions.pgFilterAttribute = {
+                                codec,
+                                expression: spec.sqlAggregateWrap(
+                                  sql`${$col.alias}.${sql.identifier(
+                                    attributeName
+                                  )}`,
+                                  attribute.codec
+                                ),
+                              };
 
-                          fieldArgs.apply($col);
-                        }, [PgConditionStep, attribute, attributeName, codec, spec, sql]),
+                              fieldArgs.apply($col);
+                            },
+                          [
+                            PgConditionStep,
+                            attribute,
+                            attributeName,
+                            codec,
+                            spec,
+                            sql,
+                          ]
+                        ),
                         // No need to auto-apply since we're called via `fieldArgs.apply($subquery.forAggregate(spec))` above
                       },
                     },

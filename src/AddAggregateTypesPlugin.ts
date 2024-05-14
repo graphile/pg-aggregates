@@ -49,7 +49,7 @@ const Plugin: GraphileConfig.Plugin = {
           input: {
             pgRegistry: { pgResources },
           },
-          EXPORTABLE
+          EXPORTABLE,
         } = build;
 
         // TODO: should we be using the codec rather than the source here? What if two sources share the same codec?

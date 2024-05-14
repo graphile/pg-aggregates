@@ -8,7 +8,6 @@ import type {
   GraphQLEnumValueConfigMap,
 } from "graphql";
 
-
 const { version } = require("../package.json");
 
 const Plugin: GraphileConfig.Plugin = {
@@ -23,7 +22,8 @@ const Plugin: GraphileConfig.Plugin = {
     },
     hooks: {
       GraphQLEnumType_values(values, build, context) {
-        const { extend, inflection, sql, pgAggregateGroupBySpecs, EXPORTABLE } = build;
+        const { extend, inflection, sql, pgAggregateGroupBySpecs, EXPORTABLE } =
+          build;
         const {
           scope: { isPgAggregateGroupEnum, pgTypeResource: table },
         } = context;
@@ -64,13 +64,17 @@ const Plugin: GraphileConfig.Plugin = {
                   [fieldName]: {
                     extensions: {
                       grafast: {
-                        applyPlan: EXPORTABLE( (attributeName, sql) => function ($pgSelect: PgSelectStep<any>) {
-                          $pgSelect.groupBy({
-                            fragment: sql.fragment`${
-                              $pgSelect.alias
-                            }.${sql.identifier(attributeName)}`,
-                          });
-                        }, [attributeName, sql]),
+                        applyPlan: EXPORTABLE(
+                          (attributeName, sql) =>
+                            function ($pgSelect: PgSelectStep<any>) {
+                              $pgSelect.groupBy({
+                                fragment: sql.fragment`${
+                                  $pgSelect.alias
+                                }.${sql.identifier(attributeName)}`,
+                              });
+                            },
+                          [attributeName, sql]
+                        ),
                       },
                     },
                   },
@@ -100,15 +104,19 @@ const Plugin: GraphileConfig.Plugin = {
                       [fieldName]: {
                         extensions: {
                           grafast: {
-                            applyPlan: EXPORTABLE( (aggregateGroupBySpec, attributeName, sql) => function ($pgSelect: PgSelectStep<any>) {
-                              $pgSelect.groupBy({
-                                fragment: aggregateGroupBySpec.sqlWrap(
-                                  sql`${$pgSelect.alias}.${sql.identifier(
-                                    attributeName
-                                  )}`
-                                ),
-                              });
-                            }, [aggregateGroupBySpec, attributeName, sql]),
+                            applyPlan: EXPORTABLE(
+                              (aggregateGroupBySpec, attributeName, sql) =>
+                                function ($pgSelect: PgSelectStep<any>) {
+                                  $pgSelect.groupBy({
+                                    fragment: aggregateGroupBySpec.sqlWrap(
+                                      sql`${$pgSelect.alias}.${sql.identifier(
+                                        attributeName
+                                      )}`
+                                    ),
+                                  });
+                                },
+                              [aggregateGroupBySpec, attributeName, sql]
+                            ),
                           },
                         },
                       } as GraphQLEnumValueConfig,
