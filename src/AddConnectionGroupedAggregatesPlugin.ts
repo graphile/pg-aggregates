@@ -1,6 +1,5 @@
 import type { PgSelectStep } from "@dataplan/pg";
 import type { GraphQLEnumType, GraphQLObjectType } from "graphql";
-import { EXPORTABLE } from "./EXPORTABLE.js";
 
 const { version } = require("../package.json");
 
@@ -36,6 +35,7 @@ const Plugin: GraphileConfig.Plugin = {
           graphql: { GraphQLList, GraphQLNonNull },
           grafast: { getEnumValueConfig },
           inflection,
+          EXPORTABLE,
         } = build;
         const {
           fieldWithHooks,
@@ -105,26 +105,30 @@ const Plugin: GraphileConfig.Plugin = {
                     `The method to use when grouping \`${tableTypeName}\` for these aggregates.`,
                     "arg"
                   ),
-                  applyPlan(_$parent, $pgSelect: PgSelectStep<any>, input) {
-                    const $value = input.getRaw();
-                    const val = $value.eval();
-                    if (!Array.isArray(val)) {
-                      throw new Error("Invalid!");
-                    }
-                    for (const group of val) {
-                      const config = getEnumValueConfig(
-                        TableGroupByType,
-                        group
-                      );
-                      const plan = config?.extensions?.grafast?.applyPlan;
-                      if (typeof plan === "function") {
-                        plan($pgSelect);
-                      } else {
-                        // TODO: consider logging this lack of plan?
-                      }
-                    }
-                    return null;
-                  },
+                  applyPlan: EXPORTABLE(
+                    (TableGroupByType, getEnumValueConfig) =>
+                      function (_$parent, $pgSelect: PgSelectStep<any>, input) {
+                        const $value = input.getRaw();
+                        const val = $value.eval();
+                        if (!Array.isArray(val)) {
+                          throw new Error("Invalid!");
+                        }
+                        for (const group of val) {
+                          const config = getEnumValueConfig(
+                            TableGroupByType,
+                            group
+                          );
+                          const plan = config?.extensions?.grafast?.applyPlan;
+                          if (typeof plan === "function") {
+                            plan($pgSelect);
+                          } else {
+                            // TODO: consider logging this lack of plan?
+                          }
+                        }
+                        return null;
+                      },
+                    [TableGroupByType, getEnumValueConfig]
+                  ),
                   autoApplyAfterParentPlan: true,
                 },
                 ...(TableHavingInputType

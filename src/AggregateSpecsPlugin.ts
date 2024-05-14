@@ -1,5 +1,6 @@
 import type { PgCodec } from "@dataplan/pg";
 
+import { EXPORTABLE } from "./EXPORTABLE.js";
 import type { AggregateGroupBySpec, AggregateSpec } from "./interfaces.js";
 import {
   BIGINT_OID,
@@ -19,9 +20,12 @@ const isNumberLike = (codec: PgCodec<any, any, any, any>): boolean =>
 const isIntervalLike = (codec: PgCodec<any, any, any, any>): boolean =>
   !!codec.extensions?.isIntervalLike;
 
-const isIntervalLikeOrNumberLike = (
-  codec: PgCodec<any, any, any, any>
-): boolean => isIntervalLike(codec) || isNumberLike(codec);
+const isIntervalLikeOrNumberLike = EXPORTABLE(
+  (isIntervalLike, isNumberLike) =>
+    (codec: PgCodec<any, any, any, any>): boolean =>
+      isIntervalLike(codec) || isNumberLike(codec),
+  [isIntervalLike, isNumberLike]
+);
 
 export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
   name: "PgAggregatesSpecsPlugin",
@@ -62,6 +66,7 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
         const {
           sql,
           dataplanPg: { TYPES },
+          EXPORTABLE,
         } = build;
 
         /** Maps from the data type of the attribute to the data type of the sum aggregate */
@@ -72,15 +77,19 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
           },
           fallback: PgCodec<any, any, any, any>
         ) => {
-          return (
-            codec: PgCodec<any, any, any, any>
-          ): PgCodec<any, any, any, any> => {
-            const oid = codec.extensions?.oid;
-            const targetType =
-              (oid ? dataTypeToAggregateTypeMap[oid] : null) ?? fallback;
+          return EXPORTABLE(
+            (dataTypeToAggregateTypeMap, fallback) =>
+              (
+                codec: PgCodec<any, any, any, any>
+              ): PgCodec<any, any, any, any> => {
+                const oid = codec.extensions?.oid;
+                const targetType =
+                  (oid ? dataTypeToAggregateTypeMap[oid] : null) ?? fallback;
 
-            return targetType;
-          };
+                return targetType;
+              },
+            [dataTypeToAggregateTypeMap, fallback]
+          );
         };
 
         const pgAggregateSpecs: AggregateSpec[] = [
@@ -90,7 +99,10 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
             HumanLabel: "Sum",
             isSuitableType: isIntervalLikeOrNumberLike,
             // I've wrapped it in `coalesce` so that it cannot be null
-            sqlAggregateWrap: (sqlFrag) => sql`coalesce(sum(${sqlFrag}), '0')`,
+            sqlAggregateWrap: EXPORTABLE(
+              (sql) => (sqlFrag) => sql`coalesce(sum(${sqlFrag}), '0')`,
+              [sql]
+            ),
             isNonNull: true,
 
             // A SUM(...) often ends up significantly larger than any individual
@@ -116,7 +128,10 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
             humanLabel: "distinct count",
             HumanLabel: "Distinct count",
             isSuitableType: () => true,
-            sqlAggregateWrap: (sqlFrag) => sql`count(distinct ${sqlFrag})`,
+            sqlAggregateWrap: EXPORTABLE(
+              (sql) => (sqlFrag) => sql`count(distinct ${sqlFrag})`,
+              [sql]
+            ),
             pgTypeCodecModifier: convertWithMapAndFallback(
               {},
               TYPES.bigint /* always use bigint */
@@ -127,21 +142,30 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
             humanLabel: "minimum",
             HumanLabel: "Minimum",
             isSuitableType: isIntervalLikeOrNumberLike,
-            sqlAggregateWrap: (sqlFrag) => sql`min(${sqlFrag})`,
+            sqlAggregateWrap: EXPORTABLE(
+              (sql) => (sqlFrag) => sql`min(${sqlFrag})`,
+              [sql]
+            ),
           },
           {
             id: "max",
             humanLabel: "maximum",
             HumanLabel: "Maximum",
             isSuitableType: isIntervalLikeOrNumberLike,
-            sqlAggregateWrap: (sqlFrag) => sql`max(${sqlFrag})`,
+            sqlAggregateWrap: EXPORTABLE(
+              (sql) => (sqlFrag) => sql`max(${sqlFrag})`,
+              [sql]
+            ),
           },
           {
             id: "average",
             humanLabel: "mean average",
             HumanLabel: "Mean average",
             isSuitableType: isIntervalLikeOrNumberLike,
-            sqlAggregateWrap: (sqlFrag) => sql`avg(${sqlFrag})`,
+            sqlAggregateWrap: EXPORTABLE(
+              (sql) => (sqlFrag) => sql`avg(${sqlFrag})`,
+              [sql]
+            ),
 
             // An AVG(...) ends up more precise than any individual value; see
             // https://www.postgresql.org/docs/current/functions-aggregate.html for
@@ -164,7 +188,10 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
             humanLabel: "sample standard deviation",
             HumanLabel: "Sample standard deviation",
             isSuitableType: isNumberLike,
-            sqlAggregateWrap: (sqlFrag) => sql`stddev_samp(${sqlFrag})`,
+            sqlAggregateWrap: EXPORTABLE(
+              (sql) => (sqlFrag) => sql`stddev_samp(${sqlFrag})`,
+              [sql]
+            ),
 
             // See https://www.postgresql.org/docs/current/functions-aggregate.html
             // for how this aggregate changes result type.
@@ -181,7 +208,10 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
             humanLabel: "population standard deviation",
             HumanLabel: "Population standard deviation",
             isSuitableType: isNumberLike,
-            sqlAggregateWrap: (sqlFrag) => sql`stddev_pop(${sqlFrag})`,
+            sqlAggregateWrap: EXPORTABLE(
+              (sql) => (sqlFrag) => sql`stddev_pop(${sqlFrag})`,
+              [sql]
+            ),
 
             // See https://www.postgresql.org/docs/current/functions-aggregate.html
             // for how this aggregate changes result type.
@@ -198,7 +228,10 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
             humanLabel: "sample variance",
             HumanLabel: "Sample variance",
             isSuitableType: isNumberLike,
-            sqlAggregateWrap: (sqlFrag) => sql`var_samp(${sqlFrag})`,
+            sqlAggregateWrap: EXPORTABLE(
+              (sql) => (sqlFrag) => sql`var_samp(${sqlFrag})`,
+              [sql]
+            ),
 
             // See https://www.postgresql.org/docs/current/functions-aggregate.html
             // for how this aggregate changes result type.
@@ -215,7 +248,10 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
             humanLabel: "population variance",
             HumanLabel: "Population variance",
             isSuitableType: isNumberLike,
-            sqlAggregateWrap: (sqlFrag) => sql`var_pop(${sqlFrag})`,
+            sqlAggregateWrap: EXPORTABLE(
+              (sql) => (sqlFrag) => sql`var_pop(${sqlFrag})`,
+              [sql]
+            ),
 
             // See https://www.postgresql.org/docs/current/functions-aggregate.html
             // for how this aggregate changes result type.
@@ -232,15 +268,27 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
         const pgAggregateGroupBySpecs: AggregateGroupBySpec[] = [
           {
             id: "truncated-to-hour",
-            isSuitableType: (codec) =>
-              codec === TYPES.timestamp || codec === TYPES.timestamptz,
-            sqlWrap: (sqlFrag) => sql`date_trunc('hour', ${sqlFrag})`,
+            isSuitableType: EXPORTABLE(
+              (TYPES) => (codec) =>
+                codec === TYPES.timestamp || codec === TYPES.timestamptz,
+              [TYPES]
+            ),
+            sqlWrap: EXPORTABLE(
+              (sql) => (sqlFrag) => sql`date_trunc('hour', ${sqlFrag})`,
+              [sql]
+            ),
           },
           {
             id: "truncated-to-day",
-            isSuitableType: (codec) =>
-              codec === TYPES.timestamp || codec === TYPES.timestamptz,
-            sqlWrap: (sqlFrag) => sql`date_trunc('day', ${sqlFrag})`,
+            isSuitableType: EXPORTABLE(
+              (TYPES) => (codec) =>
+                codec === TYPES.timestamp || codec === TYPES.timestamptz,
+              [TYPES]
+            ),
+            sqlWrap: EXPORTABLE(
+              (sql) => (sqlFrag) => sql`date_trunc('day', ${sqlFrag})`,
+              [sql]
+            ),
           },
         ];
 

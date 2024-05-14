@@ -10,7 +10,6 @@ import type {} from "graphile-config";
 import type { GraphQLFieldConfigMap, GraphQLOutputType } from "graphql";
 
 import { getComputedAttributeResources } from "./utils.js";
-import { EXPORTABLE } from "./EXPORTABLE.js";
 
 // @ts-ignore
 const { version } = require("../package.json");
@@ -50,6 +49,7 @@ const Plugin: GraphileConfig.Plugin = {
           input: {
             pgRegistry: { pgResources },
           },
+          EXPORTABLE,
         } = build;
 
         // TODO: should we be using the codec rather than the source here? What if two sources share the same codec?
@@ -122,6 +122,7 @@ const Plugin: GraphileConfig.Plugin = {
           inflection,
           sql,
           graphql: { GraphQLNonNull, isOutputType },
+          EXPORTABLE,
         } = build;
         const {
           fieldWithHooks,

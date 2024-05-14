@@ -1,4 +1,5 @@
 import type { GraphQLObjectType } from "graphql";
+
 import { EXPORTABLE } from "./EXPORTABLE.js";
 
 const { version } = require("../package.json");

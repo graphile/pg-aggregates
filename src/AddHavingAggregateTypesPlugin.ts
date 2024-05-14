@@ -92,6 +92,7 @@ const Plugin: GraphileConfig.Plugin = {
           inflection,
           sql,
           dataplanPg: { OrFilterStep, BooleanFilterStep },
+          EXPORTABLE,
         } = build;
 
         for (const spec of CORE_HAVING_FILTER_SPECS) {
@@ -161,11 +162,14 @@ const Plugin: GraphileConfig.Plugin = {
                         build.getInputTypeByName(tableHavingInputTypeName)
                       )
                     ),
-                    applyPlan($where, input) {
-                      const $or = new OrFilterStep($where);
-                      input.apply($or);
-                      return null;
-                    },
+                    applyPlan: EXPORTABLE(
+                      (OrFilterStep) => ($where, input) => {
+                        const $or = new OrFilterStep($where);
+                        input.apply($or);
+                        return null;
+                      },
+                      [OrFilterStep]
+                    ),
                     // No need to auto-apply, the having field calls `fieldArgs.apply(...)`
                   },
                 };
@@ -315,20 +319,36 @@ const Plugin: GraphileConfig.Plugin = {
                         }
                         const newField = fieldWithHooks({ fieldName }, () => ({
                           type: HavingFilterType,
-                          applyPlan($having: PgConditionLikeStep) {
-                            const attributeExpression = sql.fragment`${
-                              $having.alias
-                            }.${sql.identifier(attributeName)}`;
-                            const aggregateExpression =
-                              aggregateSpec.sqlAggregateWrap(
-                                attributeExpression,
-                                attribute.codec
-                              );
-                            return new BooleanFilterStep(
-                              $having,
-                              aggregateExpression
-                            );
-                          },
+                          applyPlan: EXPORTABLE(
+                            (
+                                BooleanFilterStep,
+                                aggregateSpec,
+                                attribute,
+                                attributeName,
+                                sql
+                              ) =>
+                              ($having: PgConditionLikeStep) => {
+                                const attributeExpression = sql.fragment`${
+                                  $having.alias
+                                }.${sql.identifier(attributeName)}`;
+                                const aggregateExpression =
+                                  aggregateSpec.sqlAggregateWrap(
+                                    attributeExpression,
+                                    attribute.codec
+                                  );
+                                return new BooleanFilterStep(
+                                  $having,
+                                  aggregateExpression
+                                );
+                              },
+                            [
+                              BooleanFilterStep,
+                              aggregateSpec,
+                              attribute,
+                              attributeName,
+                              sql,
+                            ]
+                          ),
                           // No need to auto-apply, parent does `return $having;`
                         }));
                         return build.extend(
@@ -419,30 +439,44 @@ const Plugin: GraphileConfig.Plugin = {
                           { fieldName },
                           {
                             type: ComputedHavingInput,
-                            applyPlan($having, fieldArgs) {
-                              // Because we require that the computed attribute is
-                              // evaluated inline, we have to convert it to an
-                              // expression here; this is only needed because of the
-                              // aggregation.
-                              const src = makeExpression({
-                                $placeholderable: $having,
-                                resource: computedAttributeResource,
-                                fieldArgs,
-                                path: ["args"],
-                                initialArgs: [$having.alias],
-                              });
+                            applyPlan: EXPORTABLE(
+                              (
+                                  BooleanFilterStep,
+                                  aggregateSpec,
+                                  computedAttributeResource,
+                                  makeExpression
+                                ) =>
+                                ($having, fieldArgs) => {
+                                  // Because we require that the computed attribute is
+                                  // evaluated inline, we have to convert it to an
+                                  // expression here; this is only needed because of the
+                                  // aggregation.
+                                  const src = makeExpression({
+                                    $placeholderable: $having,
+                                    resource: computedAttributeResource,
+                                    fieldArgs,
+                                    path: ["args"],
+                                    initialArgs: [$having.alias],
+                                  });
 
-                              const aggregateExpression =
-                                aggregateSpec.sqlAggregateWrap(
-                                  src,
-                                  computedAttributeResource.codec
-                                );
-                              const $filter = new BooleanFilterStep(
-                                $having,
-                                aggregateExpression
-                              );
-                              fieldArgs.apply($filter, "filter");
-                            },
+                                  const aggregateExpression =
+                                    aggregateSpec.sqlAggregateWrap(
+                                      src,
+                                      computedAttributeResource.codec
+                                    );
+                                  const $filter = new BooleanFilterStep(
+                                    $having,
+                                    aggregateExpression
+                                  );
+                                  fieldArgs.apply($filter, "filter");
+                                },
+                              [
+                                BooleanFilterStep,
+                                aggregateSpec,
+                                computedAttributeResource,
+                                makeExpression,
+                              ]
+                            ),
                             // No need to auto-apply, parent does `return $having;`
                           }
                         );
@@ -476,6 +510,7 @@ const Plugin: GraphileConfig.Plugin = {
           sql,
           inflection,
           dataplanPg: { TYPES },
+          EXPORTABLE,
         } = build;
         const {
           scope: {
@@ -566,7 +601,7 @@ const Plugin: GraphileConfig.Plugin = {
             return fields;
           }
 
-          function addBinaryOp(fieldName: string, infix: SQL) {
+          function addBinaryOp(fieldName: string, infix: () => SQL) {
             fields = build.extend(
               fields,
               {
@@ -574,14 +609,21 @@ const Plugin: GraphileConfig.Plugin = {
                   { fieldName },
                   {
                     type: FieldType,
-                    applyPlan($booleanFilter: BooleanFilterStep, input) {
-                      const val = input.get();
-                      $booleanFilter.having(
-                        sql`(${sql.parens(
-                          $booleanFilter.expression
-                        )} ${infix} ${$booleanFilter.placeholder(val, codec!)})`
-                      );
-                    },
+                    applyPlan: EXPORTABLE(
+                      (codec, infix, sql) =>
+                        ($booleanFilter: BooleanFilterStep, input) => {
+                          const val = input.get();
+                          $booleanFilter.having(
+                            sql`(${sql.parens(
+                              $booleanFilter.expression
+                            )} ${infix()} ${$booleanFilter.placeholder(
+                              val,
+                              codec!
+                            )})`
+                          );
+                        },
+                      [codec, infix, sql]
+                    ),
                     // No need to auto-apply
                   }
                 ),
@@ -595,12 +637,30 @@ const Plugin: GraphileConfig.Plugin = {
             case "float":
             case "bigfloat":
             case "datetime": {
-              addBinaryOp("equalTo", sql.fragment`=`);
-              addBinaryOp("notEqualTo", sql.fragment`<>`);
-              addBinaryOp("greaterThan", sql.fragment`>`);
-              addBinaryOp("greaterThanOrEqualTo", sql.fragment`>=`);
-              addBinaryOp("lessThan", sql.fragment`<`);
-              addBinaryOp("lessThanOrEqualTo", sql.fragment`<=`);
+              addBinaryOp(
+                "equalTo",
+                EXPORTABLE((sql) => () => sql.fragment`=`, [sql])
+              );
+              addBinaryOp(
+                "notEqualTo",
+                EXPORTABLE((sql) => () => sql.fragment`<>`, [sql])
+              );
+              addBinaryOp(
+                "greaterThan",
+                EXPORTABLE((sql) => () => sql.fragment`>`, [sql])
+              );
+              addBinaryOp(
+                "greaterThanOrEqualTo",
+                EXPORTABLE((sql) => () => sql.fragment`>=`, [sql])
+              );
+              addBinaryOp(
+                "lessThan",
+                EXPORTABLE((sql) => () => sql.fragment`<`, [sql])
+              );
+              addBinaryOp(
+                "lessThanOrEqualTo",
+                EXPORTABLE((sql) => () => sql.fragment`<=`, [sql])
+              );
             }
           }
           return fields;
