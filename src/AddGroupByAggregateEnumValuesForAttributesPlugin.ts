@@ -8,7 +8,6 @@ import type {
   GraphQLEnumValueConfigMap,
 } from "graphql";
 
-import { EXPORTABLE } from "./EXPORTABLE.js";
 
 const { version } = require("../package.json");
 
@@ -24,7 +23,7 @@ const Plugin: GraphileConfig.Plugin = {
     },
     hooks: {
       GraphQLEnumType_values(values, build, context) {
-        const { extend, inflection, sql, pgAggregateGroupBySpecs } = build;
+        const { extend, inflection, sql, pgAggregateGroupBySpecs, EXPORTABLE } = build;
         const {
           scope: { isPgAggregateGroupEnum, pgTypeResource: table },
         } = context;
