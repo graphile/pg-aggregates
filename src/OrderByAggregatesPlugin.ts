@@ -154,6 +154,17 @@ where ${sql.parens(
               for (const [attributeName, attribute] of Object.entries(
                 table.codec.attributes as PgCodecAttributes
               )) {
+                if (
+                  (aggregateSpec.shouldApplyToEntity &&
+                    !aggregateSpec.shouldApplyToEntity({
+                      type: "attribute",
+                      codec: table.codec,
+                      attributeName: attributeName,
+                    })) ||
+                  !aggregateSpec.isSuitableType(attribute.codec)
+                ) {
+                  continue;
+                }
                 const baseName =
                   inflection.orderByAttributeAggregateOfManyRelationByKeys({
                     registry: foreignTable.registry,
