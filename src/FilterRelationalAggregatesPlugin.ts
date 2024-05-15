@@ -58,7 +58,7 @@ the sum of their points scored.`,
 
   schema: {
     entityBehavior: {
-      pgResource: "aggregates:filter aggregate:filterBy",
+      pgResource: "aggregates:filterBy aggregate:filterBy",
       pgCodecAttribute: "aggregate:filterBy",
     },
 
