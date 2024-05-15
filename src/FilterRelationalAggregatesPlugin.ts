@@ -58,7 +58,8 @@ the sum of their points scored.`,
 
   schema: {
     entityBehavior: {
-      pgResource: "aggregates:filterBy",
+      pgResource: "aggregates:filter aggregate:filterBy",
+      pgCodecAttribute: "aggregate:filterBy",
     },
 
     hooks: {
@@ -526,6 +527,14 @@ group by true)`;
             {
               ...Object.entries(attributes).reduce(
                 (memo, [attributeName, attribute]) => {
+                  if (
+                    !build.behavior.pgCodecAttributeMatches(
+                      [table.codec, attributeName],
+                      `${spec.id}:attribute:aggregate:filterBy`
+                    )
+                  ) {
+                    return memo;
+                  }
                   if (
                     (spec.shouldApplyToEntity &&
                       !spec.shouldApplyToEntity({

@@ -428,11 +428,11 @@ more information.
 
 ## Disable aggregates
 
-By default, aggregates are created for all tables. This significantly increases
-the size of your GraphQL schema, and could also be a security (DoS) concern as
-aggregates can be expensive. We recommend that you use the `-aggregates` default
-behavior to disable aggregates by default, and then enable them only for the
-tables you need:
+By default, aggregates are created for all tables, all columns, and all computed
+column functions. This significantly increases the size of your GraphQL schema,
+and could also be a security (DoS) concern as aggregates can be expensive. We
+recommend that you use the `-aggregates` default behavior to disable aggregates
+by default, and then enable them only for the tables you need:
 
 (This currently doesn't work due to a
 [bug in PostGraphile that's being worked on](https://github.com/graphile/crystal/pull/1803).)
@@ -448,14 +448,40 @@ export default {
 };
 ```
 
+For the specific aggregate behavior strings available, please see the
+[PostGraphile behavior documentation](https://postgraphile.org/postgraphile/next/behavior).
+
+The `aggregates` behavior is used to enable/disable the 'aggregates' field
+appearing on a table's connections.
+
+The `groupedAggregates` behavior is used to enable/disable the
+'groupedAggregates' field appearing on a table's connections.
+
+The `having` behavior is used to enable/disable the `having` filter on the
+'groupedAggregates' field appearing on a table's connections.
+
+The `aggregate` behavior is used to enable/disable a specific attribute (or
+computed column) from being aggregated on.
+
+The `groupBy` behavior is used to enable/disable a specific attribute (or
+computed column) from being used as the grouping clause in a grouped aggregate.
+
+The `havingBy` behavior is used to enable/disable aggregates of a specific
+attribute (or computed column) from being used in the having clause of a grouped
+aggregate.
+
 The `aggregates:filterBy` behavior is used to enable/disable the
-[filtering by aggregates](#filtering-by-aggregates)
+[filtering by aggregates](#filtering-by-aggregates) in general (e.g. used on
+tables, relationships), and the `aggregate:filterBy` behavior is used to
+enable/disable filtering by a specific aggregate (e.g. used on attributes,
+computed columns). You can further scope these, for example adding the behavior
+`-sum:attribute:aggregate:filterBy` to a specific column would disable filtering
+by the `sum` aggregate of this column whilst leaving all other aggregates as is.
 
 The `aggregates:orderBy` behavior is used to enable/disable the
-[ordering by aggregates](#ordering-by-aggregates)
-
-You can use any combination of `aggregates`, `aggregates:filterBy` and
-`aggregates:orderBy` behaviors.
+[ordering by aggregates](#ordering-by-aggregates) in general (e.g. used on
+tables, relationships), and the `aggregate:orderBy` is used to enable/disable
+ordering by a specific aggregate (e.g. used on attributes, computed columns).
 
 Enable aggregates for a specific table:
 

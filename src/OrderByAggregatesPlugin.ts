@@ -21,7 +21,9 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
 
   schema: {
     entityBehavior: {
+      pgResource: "relatedAggregates:orderBy",
       pgCodecRelation: "select aggregates:orderBy",
+      pgCodecAttribute: "aggregate:orderBy",
     },
 
     hooks: {
@@ -49,6 +51,14 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
           !foreignTable ||
           foreignTable.parameters ||
           !foreignTable.codec.attributes
+        ) {
+          return values;
+        }
+        if (
+          !build.behavior.pgResourceMatches(
+            foreignTable,
+            "resource:relatedAggregates:orderBy"
+          )
         ) {
           return values;
         }
@@ -163,6 +173,9 @@ where ${sql.parens(
                   `${aggregateSpec.id}:manyRelation:aggregates:orderBy`
                 )
               ) {
+                console.log(
+                  `Aggregate ${aggregateSpec.id} not permitted on ${relationName}`
+                );
                 return memo;
               }
               for (const [attributeName, attribute] of Object.entries(
@@ -171,10 +184,13 @@ where ${sql.parens(
                 if (
                   !build.behavior.pgCodecAttributeMatches(
                     [table.codec, attributeName],
-                    `${aggregateSpec.id}:attribute:aggregates:orderBy`
+                    `${aggregateSpec.id}:attribute:aggregate:orderBy`
                   )
                 ) {
-                  return memo;
+                  console.log(
+                    `Aggregate ${aggregateSpec.id} not permitted on ${table.codec.name}.${attributeName} (${aggregateSpec.id}:attribute:aggregate:orderBy)`
+                  );
+                  continue;
                 }
                 if (
                   (aggregateSpec.shouldApplyToEntity &&

@@ -25,7 +25,7 @@ const isSuitableSource = (
     return false;
   }
 
-  return !!build.behavior.pgResourceMatches(resource, "aggregates");
+  return !!build.behavior.pgResourceMatches(resource, "resource:aggregates");
 };
 const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddAggregateTypesPlugin",
@@ -39,6 +39,8 @@ attributes and computed columns.`,
   // Create the aggregates type for each table
   schema: {
     entityBehavior: {
+      // `aggregates` - for collection resources (e.g. returning a setof records)
+      // `aggregate` - for computed column resources (e.g. returning a scalar)
       pgResource: "select aggregates aggregate",
       pgCodecAttribute: "aggregate",
     },
@@ -105,6 +107,14 @@ attributes and computed columns.`,
               resource: resource,
               aggregateSpec,
             });
+            if (
+              !build.behavior.pgResourceMatches(
+                resource,
+                `${aggregateSpec.id}:resource:aggregates`
+              )
+            ) {
+              continue;
+            }
             build.registerObjectType(
               aggregateTypeName,
               {

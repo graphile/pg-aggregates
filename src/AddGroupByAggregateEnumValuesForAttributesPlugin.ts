@@ -20,7 +20,7 @@ const Plugin: GraphileConfig.Plugin = {
   // Now add group by attributes
   schema: {
     entityBehavior: {
-      pgCodecAttribute: "order aggregate:groupBy",
+      pgCodecAttribute: "order groupBy",
     },
     hooks: {
       GraphQLEnumType_values(values, build, context) {
@@ -53,7 +53,7 @@ const Plugin: GraphileConfig.Plugin = {
               if (
                 !build.behavior.pgCodecAttributeMatches(
                   [table.codec, attributeName],
-                  `attribute:aggregate:groupBy`
+                  `attribute:groupBy`
                 )
               ) {
                 return memo;

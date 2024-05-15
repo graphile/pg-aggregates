@@ -29,7 +29,10 @@ columns.`,
 
   schema: {
     entityBehavior: {
-      pgResource: "order having",
+      // having - for connections' groupedAggregates field
+      // havingBy - for computed column functions acting like attributes
+      pgResource: "order having havingBy",
+      pgCodecAttribute: "havingBy",
     },
 
     hooks: {
@@ -320,7 +323,7 @@ columns.`,
                         if (
                           !build.behavior.pgCodecAttributeMatches(
                             [resource.codec, attributeName],
-                            "attribute:groupedAggregates:havingBy"
+                            "attribute:havingBy"
                           )
                         ) {
                           return newFields;
@@ -392,7 +395,7 @@ columns.`,
                         if (
                           !build.behavior.pgResourceMatches(
                             computedAttributeResource,
-                            "resource:groupedAggregates:havingBy"
+                            "resource:havingBy"
                           )
                         ) {
                           return memo;
