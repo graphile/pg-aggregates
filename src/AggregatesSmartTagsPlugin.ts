@@ -55,13 +55,13 @@ function processTags(
     case "on":
       addBehaviorToTags(
         tags,
-        "+aggregates +aggregates:filterBy +aggregates:orderBy"
+        "+aggregates +aggregates:filterBy +aggregates:orderBy +aggregate +aggregate:filterBy +aggregate:orderBy"
       );
       break;
     case "off":
       addBehaviorToTags(
         tags,
-        "-aggregates -aggregates:filterBy -aggregates:orderBy"
+        "-aggregates -aggregates:filterBy -aggregates:orderBy -aggregate -aggregate:filterBy -aggregate:orderBy"
       );
       break;
   }

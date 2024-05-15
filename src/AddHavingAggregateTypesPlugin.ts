@@ -19,13 +19,20 @@ const { version } = require("../package.json");
 
 const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddHavingAggregateTypesPlugin",
+  description: `\
+Creates the types for the 'having' clause in groupedAggregates, the fields \
+below that for each aggregate spec, and adds fields for attributes and computed \
+columns.`,
   version,
   provides: ["aggregates"],
   after: ["PgBasicsPlugin"],
 
   schema: {
     entityBehavior: {
-      pgResource: "order",
+      // having - for connections' groupedAggregates field
+      // havingBy - for computed column functions acting like attributes
+      pgResource: "order having havingBy",
+      pgCodecAttribute: "havingBy",
     },
 
     hooks: {
@@ -122,6 +129,14 @@ const Plugin: GraphileConfig.Plugin = {
             continue;
           }
           if (!build.behavior.pgResourceMatches(resource, "order")) {
+            continue;
+          }
+          if (
+            !build.behavior.pgResourceMatches(
+              resource,
+              "resource:groupedAggregates:having"
+            )
+          ) {
             continue;
           }
 
@@ -305,6 +320,14 @@ const Plugin: GraphileConfig.Plugin = {
                         newFields,
                         [attributeName, attribute]: [string, PgCodecAttribute]
                       ) => {
+                        if (
+                          !build.behavior.pgCodecAttributeMatches(
+                            [resource.codec, attributeName],
+                            "attribute:havingBy"
+                          )
+                        ) {
+                          return newFields;
+                        }
                         const fieldName = inflection.attribute({
                           codec: resource.codec as PgCodecWithAttributes,
                           attributeName: attributeName,
@@ -369,6 +392,14 @@ const Plugin: GraphileConfig.Plugin = {
                     fields,
                     computedAttributeResources.reduce(
                       (memo, computedAttributeResource) => {
+                        if (
+                          !build.behavior.pgResourceMatches(
+                            computedAttributeResource,
+                            "resource:havingBy"
+                          )
+                        ) {
+                          return memo;
+                        }
                         const codec = computedAttributeResource.codec;
                         if (
                           (aggregateSpec.shouldApplyToEntity &&
@@ -535,6 +566,14 @@ const Plugin: GraphileConfig.Plugin = {
             fields,
             build.pgAggregateSpecs.reduce(
               (aggregateFields: any, aggregateSpec: AggregateSpec) => {
+                if (
+                  !build.behavior.pgResourceMatches(
+                    table,
+                    `${aggregateSpec.id}:resource:groupedAggregates:having`
+                  )
+                ) {
+                  return aggregateFields;
+                }
                 const typeName = inflection.aggregateHavingAggregateInputType({
                   resource: table,
                   aggregateSpec,

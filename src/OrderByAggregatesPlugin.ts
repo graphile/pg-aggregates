@@ -1,6 +1,6 @@
 import type {
-  PgCodecAttributes,
   PgCodecRelation,
+  PgCodecWithAttributes,
   PgResource,
   PgSelectStep,
 } from "@dataplan/pg";
@@ -13,12 +13,16 @@ const { version } = require("../package.json");
 
 export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
   name: "PgAggregatesOrderByAggregatesPlugin",
+  description:
+    "Adds enum values to the OrderBy enum to allow ordering by aggregates on relations.",
   version,
   provides: ["aggregates"],
 
   schema: {
     entityBehavior: {
+      pgResource: "relatedAggregates:orderBy",
       pgCodecRelation: "select aggregates:orderBy",
+      pgCodecAttribute: "aggregate:orderBy",
     },
 
     hooks: {
@@ -49,6 +53,14 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
         ) {
           return values;
         }
+        if (
+          !build.behavior.pgResourceMatches(
+            foreignTable,
+            "resource:relatedAggregates:orderBy"
+          )
+        ) {
+          return values;
+        }
 
         const relations = foreignTable.getRelations() as {
           [relName: string]: PgCodecRelation<any, any>;
@@ -65,12 +77,15 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
             if (
               !build.behavior.pgCodecRelationMatches(
                 relation,
-                "aggregates:orderBy"
+                "manyRelation:aggregates:orderBy"
               )
             ) {
               return memo;
             }
-            const table = relation.remoteResource as PgResource;
+            const table = relation.remoteResource as PgResource<
+              string,
+              PgCodecWithAttributes
+            >;
             const isUnique = !!relation.isUnique;
             if (isUnique) {
               // No point aggregating over a relation that's unique
@@ -151,9 +166,36 @@ where ${sql.parens(
 
             // Add other aggregates
             pgAggregateSpecs.forEach((aggregateSpec) => {
+              if (
+                !build.behavior.pgCodecRelationMatches(
+                  relation,
+                  `${aggregateSpec.id}:manyRelation:aggregates:orderBy`
+                )
+              ) {
+                return;
+              }
               for (const [attributeName, attribute] of Object.entries(
-                table.codec.attributes as PgCodecAttributes
+                table.codec.attributes
               )) {
+                if (
+                  !build.behavior.pgCodecAttributeMatches(
+                    [table.codec, attributeName],
+                    `${aggregateSpec.id}:attribute:aggregate:orderBy`
+                  )
+                ) {
+                  continue;
+                }
+                if (
+                  (aggregateSpec.shouldApplyToEntity &&
+                    !aggregateSpec.shouldApplyToEntity({
+                      type: "attribute",
+                      codec: table.codec,
+                      attributeName: attributeName,
+                    })) ||
+                  !aggregateSpec.isSuitableType(attribute.codec)
+                ) {
+                  continue;
+                }
                 const baseName =
                   inflection.orderByAttributeAggregateOfManyRelationByKeys({
                     registry: foreignTable.registry,

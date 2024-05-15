@@ -25,17 +25,24 @@ const isSuitableSource = (
     return false;
   }
 
-  return !!build.behavior.pgResourceMatches(resource, "aggregates");
+  return !!build.behavior.pgResourceMatches(resource, "resource:aggregates");
 };
 const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddAggregateTypesPlugin",
+  description: `\
+Creates the FooAggregates type for each suitable resource, creates the 'sum' \
+and similar fields on this type, and the entries within these types for \
+attributes and computed columns.`,
   version,
   provides: ["aggregates"],
 
   // Create the aggregates type for each table
   schema: {
     entityBehavior: {
-      pgResource: "select aggregates",
+      // `aggregates` - for collection resources (e.g. returning a setof records)
+      // `aggregate` - for computed column resources (e.g. returning a scalar)
+      pgResource: "select aggregates aggregate",
+      pgCodecAttribute: "aggregate",
     },
 
     hooks: {
@@ -100,6 +107,14 @@ const Plugin: GraphileConfig.Plugin = {
               resource: resource,
               aggregateSpec,
             });
+            if (
+              !build.behavior.pgResourceMatches(
+                resource,
+                `${aggregateSpec.id}:resource:aggregates`
+              )
+            ) {
+              continue;
+            }
             build.registerObjectType(
               aggregateTypeName,
               {
@@ -144,6 +159,14 @@ const Plugin: GraphileConfig.Plugin = {
             fields,
             build.pgAggregateSpecs.reduce((memo, aggregateSpec) => {
               return build.recoverable(memo, () => {
+                if (
+                  !build.behavior.pgResourceMatches(
+                    resource,
+                    `${aggregateSpec.id}:resource:aggregates`
+                  )
+                ) {
+                  return memo;
+                }
                 const aggregateTypeName = inflection.aggregateType({
                   resource: resource,
                   aggregateSpec,
@@ -196,6 +219,14 @@ const Plugin: GraphileConfig.Plugin = {
                 memo: GraphQLFieldConfigMap<any, any>,
                 [attributeName, attribute]: [string, PgCodecAttribute]
               ) => {
+                if (
+                  !build.behavior.pgCodecAttributeMatches(
+                    [resource.codec, attributeName],
+                    `${spec.id}:attribute:aggregate`
+                  )
+                ) {
+                  return memo;
+                }
                 if (
                   (spec.shouldApplyToEntity &&
                     !spec.shouldApplyToEntity({
@@ -281,6 +312,14 @@ const Plugin: GraphileConfig.Plugin = {
             fields,
             computedAttributeSources.reduce(
               (memo, computedAttributeResource) => {
+                if (
+                  !build.behavior.pgResourceMatches(
+                    computedAttributeResource,
+                    `${spec.id}:resource:aggregate`
+                  )
+                ) {
+                  return memo;
+                }
                 const codec = computedAttributeResource.codec;
                 if (
                   (spec.shouldApplyToEntity &&

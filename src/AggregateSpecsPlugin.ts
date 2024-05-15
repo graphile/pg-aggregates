@@ -29,6 +29,8 @@ const isIntervalLikeOrNumberLike = EXPORTABLE(
 
 export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
   name: "PgAggregatesSpecsPlugin",
+  description:
+    "Created the default (extensible) aggregate specs and group-by specs used throughout this preset.",
   version,
   provides: ["aggregates"],
   after: ["PgBasicsPlugin"],

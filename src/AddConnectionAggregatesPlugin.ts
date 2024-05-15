@@ -6,6 +6,7 @@ const { version } = require("../package.json");
 
 const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddConnectionAggregatesPlugin",
+  description: "Adds the `aggregates` field to connections.",
   version,
   provides: ["aggregates"],
 
@@ -38,6 +39,10 @@ const Plugin: GraphileConfig.Plugin = {
           table.parameters ||
           !table.codec.attributes
         ) {
+          return fields;
+        }
+
+        if (!build.behavior.pgResourceMatches(table, `resource:aggregates`)) {
           return fields;
         }
 
