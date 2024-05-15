@@ -1,6 +1,7 @@
 import type {
   PgCodecAttributes,
   PgCodecRelation,
+  PgCodecWithAttributes,
   PgResource,
   PgSelectStep,
 } from "@dataplan/pg";
@@ -13,6 +14,8 @@ const { version } = require("../package.json");
 
 export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
   name: "PgAggregatesOrderByAggregatesPlugin",
+  description:
+    "Adds enum values to the OrderBy enum to allow ordering by aggregates on relations.",
   version,
   provides: ["aggregates"],
 
@@ -65,12 +68,15 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
             if (
               !build.behavior.pgCodecRelationMatches(
                 relation,
-                "aggregates:orderBy"
+                "manyRelation:aggregates:orderBy"
               )
             ) {
               return memo;
             }
-            const table = relation.remoteResource as PgResource;
+            const table = relation.remoteResource as PgResource<
+              string,
+              PgCodecWithAttributes
+            >;
             const isUnique = !!relation.isUnique;
             if (isUnique) {
               // No point aggregating over a relation that's unique
@@ -151,9 +157,25 @@ where ${sql.parens(
 
             // Add other aggregates
             pgAggregateSpecs.forEach((aggregateSpec) => {
+              if (
+                !build.behavior.pgCodecRelationMatches(
+                  relation,
+                  `${aggregateSpec.id}:manyRelation:aggregates:orderBy`
+                )
+              ) {
+                return memo;
+              }
               for (const [attributeName, attribute] of Object.entries(
-                table.codec.attributes as PgCodecAttributes
+                table.codec.attributes
               )) {
+                if (
+                  !build.behavior.pgCodecAttributeMatches(
+                    [table.codec, attributeName],
+                    `${aggregateSpec.id}:attribute:aggregates:orderBy`
+                  )
+                ) {
+                  return memo;
+                }
                 if (
                   (aggregateSpec.shouldApplyToEntity &&
                     !aggregateSpec.shouldApplyToEntity({

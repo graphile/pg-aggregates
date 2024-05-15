@@ -127,6 +127,7 @@ declare global {
 
 export const PgAggregatesInflectorsPlugin: GraphileConfig.Plugin = {
   name: "PgAggregatesInflectorsPlugin",
+  description: "Adds the inflectors used by the pg-aggregates preset.",
   version,
   provides: ["aggregates"],
 

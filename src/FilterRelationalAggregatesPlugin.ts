@@ -31,6 +31,10 @@ declare global {
 
 export const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesFilterRelationalAggregatesPlugin",
+  description: `\
+Adds the ability to filter a collection by aggregates on relationships if you \
+have postgraphile-plugin-connection-filter, e.g. filtering all players based on \
+the sum of their points scored.`,
   version,
 
   // This has to run AFTER any plugins that provide `build.pgAggregateSpecs`
@@ -242,7 +246,7 @@ group by true)`;
           if (
             !build.behavior.pgResourceMatches(
               foreignTable,
-              "aggregates:filterBy"
+              "resource:aggregates:filterBy"
             )
           ) {
             continue;
@@ -306,6 +310,14 @@ group by true)`;
 
           // Register the aggregate spec filter type for each aggreage spec for each source
           for (const spec of build.pgAggregateSpecs) {
+            if (
+              !build.behavior.pgResourceMatches(
+                foreignTable,
+                `${spec.id}:resource:aggregates:filterBy`
+              )
+            ) {
+              continue;
+            }
             const filterTypeName = inflection.filterTableAggregateType(
               foreignTable,
               spec

@@ -12,13 +12,15 @@ const { version } = require("../package.json");
 
 const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddGroupByAggregateEnumValuesForAttributesPlugin",
+  description:
+    "Adds values representing table attributes to the enum that defines the groupedAggregates groupings.",
   version,
   provides: ["aggregates"],
 
   // Now add group by attributes
   schema: {
     entityBehavior: {
-      pgCodecAttribute: "order",
+      pgCodecAttribute: "order aggregate:groupBy",
     },
     hooks: {
       GraphQLEnumType_values(values, build, context) {
@@ -44,6 +46,14 @@ const Plugin: GraphileConfig.Plugin = {
                 !build.behavior.pgCodecAttributeMatches(
                   [table.codec, attributeName],
                   "order"
+                )
+              ) {
+                return memo;
+              }
+              if (
+                !build.behavior.pgCodecAttributeMatches(
+                  [table.codec, attributeName],
+                  `attribute:aggregate:groupBy`
                 )
               ) {
                 return memo;
@@ -82,6 +92,7 @@ const Plugin: GraphileConfig.Plugin = {
                 `Adding groupBy enum value for ${table.name}.${attributeName}.`
               );
 
+              // Derivatives of this attribute
               pgAggregateGroupBySpecs.forEach((aggregateGroupBySpec) => {
                 if (
                   (!aggregateGroupBySpec.shouldApplyToEntity ||

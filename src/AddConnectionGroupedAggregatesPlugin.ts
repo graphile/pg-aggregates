@@ -25,6 +25,7 @@ function isValidEnum(
 
 const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddConnectionGroupedAggregatesPlugin",
+  description: "Adds the groupedAggregates field to connections.",
   version,
   provides: ["aggregates"],
 
@@ -60,6 +61,12 @@ const Plugin: GraphileConfig.Plugin = {
           !table ||
           table.parameters ||
           !table.codec.attributes
+        ) {
+          return fields;
+        }
+
+        if (
+          !build.behavior.pgResourceMatches(table, `resource:groupedAggregates`)
         ) {
           return fields;
         }

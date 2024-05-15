@@ -2,12 +2,13 @@ const { version } = require("../package.json");
 
 const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddGroupByAggregateEnumsPlugin",
+  description: "Creates the enum types used for grouping in groupedAggregates.",
   version,
   provides: ["aggregates"],
 
   schema: {
     entityBehavior: {
-      pgResource: "select order",
+      pgResource: "select order groupedAggregates",
     },
 
     hooks: {
@@ -29,6 +30,14 @@ const Plugin: GraphileConfig.Plugin = {
             continue;
           }
           if (!build.behavior.pgResourceMatches(resource, "order")) {
+            continue;
+          }
+          if (
+            !build.behavior.pgResourceMatches(
+              resource,
+              "resource:groupedAggregates"
+            )
+          ) {
             continue;
           }
 
