@@ -208,7 +208,7 @@ the sum of their points scored.`,
 select ${boolExpr}
 from ${this.tableExpression} as ${this.alias}
 ${where}`}
-group by true)`;
+group by ())`;
                 return this.$parent.where(subquery);
               }
             } as PgAggregateConditionStepClass,
