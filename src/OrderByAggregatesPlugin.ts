@@ -1,5 +1,4 @@
 import type {
-  PgCodecAttributes,
   PgCodecRelation,
   PgCodecWithAttributes,
   PgResource,

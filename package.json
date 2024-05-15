@@ -55,8 +55,10 @@
   },
   "devDependencies": {
     "@types/node": "^18.15.11",
+    "@typescript-eslint/eslint-plugin": "^7.9.0",
+    "@typescript-eslint/parser": "^7.9.0",
     "concurrently": "^5.3.0",
-    "eslint": "^8.44.0",
+    "eslint": "8.x",
     "eslint-config-prettier": "^8.8.0",
     "eslint-plugin-graphile-export": "^0.0.2-beta.3",
     "eslint-plugin-graphql": "^4.0.0",
