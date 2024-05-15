@@ -172,10 +172,7 @@ where ${sql.parens(
                   `${aggregateSpec.id}:manyRelation:aggregates:orderBy`
                 )
               ) {
-                console.log(
-                  `Aggregate ${aggregateSpec.id} not permitted on ${relationName}`
-                );
-                return memo;
+                return;
               }
               for (const [attributeName, attribute] of Object.entries(
                 table.codec.attributes
@@ -186,9 +183,6 @@ where ${sql.parens(
                     `${aggregateSpec.id}:attribute:aggregate:orderBy`
                   )
                 ) {
-                  console.log(
-                    `Aggregate ${aggregateSpec.id} not permitted on ${table.codec.name}.${attributeName} (${aggregateSpec.id}:attribute:aggregate:orderBy)`
-                  );
                   continue;
                 }
                 if (
