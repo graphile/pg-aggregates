@@ -460,8 +460,25 @@ The `groupedAggregates` behavior is used to enable/disable the
 The `having` behavior is used to enable/disable the `having` filter on the
 'groupedAggregates' field appearing on a table's connections.
 
-The `aggregate` behavior is used to enable/disable a specific attribute (or
-computed column) from being aggregated on.
+The `aggregates:filterBy` behavior is used to enable/disable the
+[filtering by aggregates](#filtering-by-aggregates) in general (e.g. used on
+tables, relationships).
+
+The `aggregates:orderBy` behavior is used to enable/disable the
+[ordering by aggregates](#ordering-by-aggregates) in general (e.g. used on
+tables, relationships).
+
+The `aggregate` (note: singular!) behavior is used to enable/disable a specific
+attribute (or computed column) from being aggregated on.
+
+The `aggregate:filterBy` behavior is used to enable/disable filtering by a
+specific aggregate (e.g. used on attributes, computed columns). You can further
+scope these, for example adding the behavior `-sum:attribute:aggregate:filterBy`
+to a specific column would disable filtering by the `sum` aggregate of this
+column whilst leaving all other aggregates as is.
+
+The `aggregate:orderBy` is used to enable/disable ordering by a specific
+aggregate (e.g. used on attributes, computed columns).
 
 The `groupBy` behavior is used to enable/disable a specific attribute (or
 computed column) from being used as the grouping clause in a grouped aggregate.
@@ -469,19 +486,6 @@ computed column) from being used as the grouping clause in a grouped aggregate.
 The `havingBy` behavior is used to enable/disable aggregates of a specific
 attribute (or computed column) from being used in the having clause of a grouped
 aggregate.
-
-The `aggregates:filterBy` behavior is used to enable/disable the
-[filtering by aggregates](#filtering-by-aggregates) in general (e.g. used on
-tables, relationships), and the `aggregate:filterBy` behavior is used to
-enable/disable filtering by a specific aggregate (e.g. used on attributes,
-computed columns). You can further scope these, for example adding the behavior
-`-sum:attribute:aggregate:filterBy` to a specific column would disable filtering
-by the `sum` aggregate of this column whilst leaving all other aggregates as is.
-
-The `aggregates:orderBy` behavior is used to enable/disable the
-[ordering by aggregates](#ordering-by-aggregates) in general (e.g. used on
-tables, relationships), and the `aggregate:orderBy` is used to enable/disable
-ordering by a specific aggregate (e.g. used on attributes, computed columns).
 
 Enable aggregates for a specific table:
 
