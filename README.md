@@ -428,11 +428,12 @@ more information.
 
 ## Disable aggregates
 
-By default, aggregates are created for all tables, all columns, and all computed
-column functions. This significantly increases the size of your GraphQL schema,
-and could also be a security (DoS) concern as aggregates can be expensive. We
-recommend that you use the `-aggregates` default behavior to disable aggregates
-by default, and then enable them only for the tables you need:
+By default, aggregates are created for all suitable tables, all suitable
+columns, and all suitable computed column functions. This significantly
+increases the size of your GraphQL schema, and could also be a security (DoS)
+concern as aggregates can be expensive. We recommend that you use the
+`-aggregates` default behavior to disable aggregates by default, and then enable
+them only for the tables you need:
 
 (This currently doesn't work due to a
 [bug in PostGraphile that's being worked on](https://github.com/graphile/crystal/pull/1803).)
