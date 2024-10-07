@@ -17,6 +17,28 @@ import { getComputedAttributeResources } from "./utils.js";
 
 const { version } = require("../package.json");
 
+declare global {
+  namespace GraphileBuild {
+    interface BehaviorStrings {
+      "resource:groupedAggregates:having": true;
+      having: true;
+      "resource:havingBy": true;
+      "attribute:havingBy": true;
+      havingBy: true;
+
+      "sum:resource:groupedAggregates:having": true;
+      "distinctCount:resource:groupedAggregates:having": true;
+      "min:resource:groupedAggregates:having": true;
+      "max:resource:groupedAggregates:having": true;
+      "average:resource:groupedAggregates:having": true;
+      "stddevSample:resource:groupedAggregates:having": true;
+      "stddevPopulation:resource:groupedAggregates:having": true;
+      "varianceSample:resource:groupedAggregates:having": true;
+      "variancePopulation:resource:groupedAggregates:having": true;
+    }
+  }
+}
+
 const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddHavingAggregateTypesPlugin",
   description: `\
@@ -28,11 +50,26 @@ columns.`,
   after: ["PgBasicsPlugin"],
 
   schema: {
+    behaviorRegistry: {
+      add: {
+        having: {
+          description:
+            "Should we add a 'having' option to aggregates on this resource?",
+          entities: ["pgResource"],
+        },
+        havingBy: {
+          description:
+            "Should this function-like resource, or attribute, be usable in the 'having' clause when aggregating?",
+          entities: ["pgResource", "pgCodecAttribute"],
+        },
+      },
+    },
+
     entityBehavior: {
       // having - for connections' groupedAggregates field
       // havingBy - for computed column functions acting like attributes
-      pgResource: "order having havingBy",
-      pgCodecAttribute: "havingBy",
+      pgResource: ["order", "having", "havingBy"],
+      pgCodecAttribute: ["havingBy"],
     },
 
     hooks: {
@@ -152,7 +189,6 @@ columns.`,
               isPgAggregateHavingInputType: true,
             },
             (): Omit<GraphileBuild.GrafastInputObjectTypeConfig, "name"> => ({
-              name: inflection.aggregateHavingInputType({ resource: resource }),
               description: build.wrapDescription(
                 `Conditions for \`${tableTypeName}\` aggregates.`,
                 "type"

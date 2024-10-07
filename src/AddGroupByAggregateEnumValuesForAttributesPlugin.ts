@@ -10,6 +10,15 @@ import type {
 
 const { version } = require("../package.json");
 
+declare global {
+  namespace GraphileBuild {
+    interface BehaviorStrings {
+      "attribute:groupBy": true;
+      groupBy: true;
+    }
+  }
+}
+
 const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddGroupByAggregateEnumValuesForAttributesPlugin",
   description:
@@ -19,9 +28,23 @@ const Plugin: GraphileConfig.Plugin = {
 
   // Now add group by attributes
   schema: {
-    entityBehavior: {
-      pgCodecAttribute: "order groupBy",
+    behaviorRegistry: {
+      add: {
+        "attribute:groupBy": {
+          description: "Can we group by this attribute when aggregating?",
+          entities: ["pgCodecAttribute"],
+        },
+        groupBy: {
+          description: "Can we group by this attribute when aggregating?",
+          entities: ["pgCodecAttribute"],
+        },
+      },
     },
+
+    entityBehavior: {
+      pgCodecAttribute: ["order", "groupBy"],
+    },
+
     hooks: {
       GraphQLEnumType_values(values, build, context) {
         const { extend, inflection, sql, pgAggregateGroupBySpecs, EXPORTABLE } =

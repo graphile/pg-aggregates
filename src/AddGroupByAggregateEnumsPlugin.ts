@@ -8,7 +8,7 @@ const Plugin: GraphileConfig.Plugin = {
 
   schema: {
     entityBehavior: {
-      pgResource: "select order groupedAggregates",
+      pgResource: ["select", "order", "groupedAggregates"],
     },
 
     hooks: {

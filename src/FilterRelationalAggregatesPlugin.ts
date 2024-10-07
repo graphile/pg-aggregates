@@ -26,6 +26,31 @@ declare global {
       PgAggregateConditionStep: PgAggregateConditionStepClass;
       PgAggregateConditionExpressionStep: PgAggregateConditionExpressionStepClass;
     }
+    interface BehaviorStrings {
+      "resource:aggregates:filterBy": true;
+      "aggregates:filterBy": true;
+      "aggregate:filterBy": true;
+
+      "sum:resource:aggregates:filterBy": true;
+      "distinctCount:resource:aggregates:filterBy": true;
+      "min:resource:aggregates:filterBy": true;
+      "max:resource:aggregates:filterBy": true;
+      "average:resource:aggregates:filterBy": true;
+      "stddevSample:resource:aggregates:filterBy": true;
+      "stddevPopulation:resource:aggregates:filterBy": true;
+      "varianceSample:resource:aggregates:filterBy": true;
+      "variancePopulation:resource:aggregates:filterBy": true;
+
+      "sum:attribute:aggregate:filterBy": true;
+      "distinctCount:attribute:aggregate:filterBy": true;
+      "min:attribute:aggregate:filterBy": true;
+      "max:attribute:aggregate:filterBy": true;
+      "average:attribute:aggregate:filterBy": true;
+      "stddevSample:attribute:aggregate:filterBy": true;
+      "stddevPopulation:attribute:aggregate:filterBy": true;
+      "varianceSample:attribute:aggregate:filterBy": true;
+      "variancePopulation:attribute:aggregate:filterBy": true;
+    }
   }
 }
 
@@ -57,9 +82,23 @@ the sum of their points scored.`,
   },
 
   schema: {
+    behaviorRegistry: {
+      add: {
+        "aggregates:filterBy": {
+          description:
+            "Can we filter by the details of this resource whilst aggregating the resource?",
+          entities: ["pgResource"],
+        },
+        "aggregate:filterBy": {
+          description: "Can we filter using the value of this attribute",
+          entities: ["pgCodecAttribute"],
+        },
+      },
+    },
+
     entityBehavior: {
-      pgResource: "aggregates:filterBy aggregate:filterBy",
-      pgCodecAttribute: "aggregate:filterBy",
+      pgResource: ["aggregates:filterBy", "aggregate:filterBy"],
+      pgCodecAttribute: ["aggregate:filterBy"],
     },
 
     hooks: {
@@ -269,7 +308,7 @@ group by ())`;
                 pgResource: foreignTable,
                 isPgConnectionAggregateFilter: true,
               },
-              (): GraphileBuild.GrafastInputObjectTypeConfig => {
+              () => {
                 return {
                   description: `A filter to be used against aggregates of \`${foreignTableTypeName}\` object types.`,
                   fields: () => {
@@ -277,10 +316,10 @@ group by ())`;
                       foreignTableFilterTypeName
                     ) as GraphQLInputObjectType;
                     if (!type) {
-                      return {} as GrafastInputFieldConfigMap<any, any>;
+                      return {};
                     }
                     return {
-                      [filterFieldName]: {
+                      [filterFieldName as string]: {
                         description: `A filter that must pass for the relevant \`${foreignTableTypeName}\` object to be included within the aggregate.`,
                         type,
                         applyPlan: EXPORTABLE(

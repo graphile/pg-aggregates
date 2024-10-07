@@ -32,4 +32,23 @@ export {
   AggregateTargetEntity,
 } from "./interfaces.js";
 
+declare global {
+  namespace GraphileBuild {
+    interface AggregateSpecIds {
+      sum: true;
+      distinctCount: true;
+      min: true;
+      max: true;
+      average: true;
+      stddevSample: true;
+      stddevPopulation: true;
+      varianceSample: true;
+      variancePopulation: true;
+    }
+    interface BehaviorStrings {
+      "resource:groupedAggregates": true;
+    }
+  }
+}
+
 // :args src/InflectionPlugin.ts src/AggregateSpecsPlugin.ts src/AddGroupByAggregateEnumsPlugin.ts src/AddGroupByAggregateEnumValuesForAttributesPlugin.ts src/AddHavingAggregateTypesPlugin.ts src/AddAggregateTypesPlugin.ts src/AddConnectionAggregatesPlugin.ts src/AddConnectionGroupedAggregatesPlugin.ts src/OrderByAggregatesPlugin.ts src/FilterRelationalAggregatesPlugin.ts src/AggregatesSmartTagsPlugin.ts

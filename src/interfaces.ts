@@ -97,7 +97,7 @@ export interface AggregateGroupBySpec {
 
 export interface AggregateSpec {
   /** Must not change since it's used in type names/etc */
-  id: string;
+  id: keyof GraphileBuild.AggregateSpecIds;
 
   /** Used in descriptions, starts with lowercase */
   humanLabel: string;

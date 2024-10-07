@@ -11,6 +11,46 @@ import type { GraphQLFieldConfigMap, GraphQLOutputType } from "graphql";
 
 import { getComputedAttributeResources } from "./utils.js";
 
+declare global {
+  namespace GraphileBuild {
+    interface BehaviorStrings {
+      "resource:aggregates": true;
+      aggregates: true;
+      aggregate: true;
+
+      "sum:resource:aggregates": true;
+      "distinctCount:resource:aggregates": true;
+      "min:resource:aggregates": true;
+      "max:resource:aggregates": true;
+      "average:resource:aggregates": true;
+      "stddevSample:resource:aggregates": true;
+      "stddevPopulation:resource:aggregates": true;
+      "varianceSample:resource:aggregates": true;
+      "variancePopulation:resource:aggregates": true;
+
+      "sum:resource:aggregate": true;
+      "distinctCount:resource:aggregate": true;
+      "min:resource:aggregate": true;
+      "max:resource:aggregate": true;
+      "average:resource:aggregate": true;
+      "stddevSample:resource:aggregate": true;
+      "stddevPopulation:resource:aggregate": true;
+      "varianceSample:resource:aggregate": true;
+      "variancePopulation:resource:aggregate": true;
+
+      "sum:attribute:aggregate": true;
+      "distinctCount:attribute:aggregate": true;
+      "min:attribute:aggregate": true;
+      "max:attribute:aggregate": true;
+      "average:attribute:aggregate": true;
+      "stddevSample:attribute:aggregate": true;
+      "stddevPopulation:attribute:aggregate": true;
+      "varianceSample:attribute:aggregate": true;
+      "variancePopulation:attribute:aggregate": true;
+    }
+  }
+}
+
 // @ts-ignore
 const { version } = require("../package.json");
 
@@ -27,6 +67,7 @@ const isSuitableSource = (
 
   return !!build.behavior.pgResourceMatches(resource, "resource:aggregates");
 };
+
 const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddAggregateTypesPlugin",
   description: `\
@@ -38,10 +79,25 @@ attributes and computed columns.`,
 
   // Create the aggregates type for each table
   schema: {
+    behaviorRegistry: {
+      add: {
+        aggregates: {
+          description:
+            "For collection resources (e.g. returning a setof records)",
+          entities: ["pgResource"],
+        },
+        aggregate: {
+          description:
+            "for computed column resources (e.g. returning a scalar)",
+          entities: ["pgResource"],
+        },
+      },
+    },
+
     entityBehavior: {
       // `aggregates` - for collection resources (e.g. returning a setof records)
       // `aggregate` - for computed column resources (e.g. returning a scalar)
-      pgResource: "select aggregates aggregate",
+      pgResource: ["select", "aggregates", "aggregate"],
       pgCodecAttribute: "aggregate",
     },
 

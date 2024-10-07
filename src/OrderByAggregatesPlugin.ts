@@ -11,6 +11,39 @@ import type { AggregateSpec } from "./interfaces.js";
 
 const { version } = require("../package.json");
 
+declare global {
+  namespace GraphileBuild {
+    interface BehaviorStrings {
+      "relatedAggregates:orderBy": true;
+      "resource:relatedAggregates:orderBy": true;
+      "aggregates:orderBy": true;
+      "manyRelation:aggregates:orderBy": true;
+      "aggregate:orderBy": true;
+      "attribute:aggregate:orderBy": true;
+
+      "sum:manyRelation:aggregates:orderBy": true;
+      "distinctCount:manyRelation:aggregates:orderBy": true;
+      "min:manyRelation:aggregates:orderBy": true;
+      "max:manyRelation:aggregates:orderBy": true;
+      "average:manyRelation:aggregates:orderBy": true;
+      "stddevSample:manyRelation:aggregates:orderBy": true;
+      "stddevPopulation:manyRelation:aggregates:orderBy": true;
+      "varianceSample:manyRelation:aggregates:orderBy": true;
+      "variancePopulation:manyRelation:aggregates:orderBy": true;
+
+      "sum:attribute:aggregate:orderBy": true;
+      "distinctCount:attribute:aggregate:orderBy": true;
+      "min:attribute:aggregate:orderBy": true;
+      "max:attribute:aggregate:orderBy": true;
+      "average:attribute:aggregate:orderBy": true;
+      "stddevSample:attribute:aggregate:orderBy": true;
+      "stddevPopulation:attribute:aggregate:orderBy": true;
+      "varianceSample:attribute:aggregate:orderBy": true;
+      "variancePopulation:attribute:aggregate:orderBy": true;
+    }
+  }
+}
+
 export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
   name: "PgAggregatesOrderByAggregatesPlugin",
   description:
@@ -19,10 +52,27 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
   provides: ["aggregates"],
 
   schema: {
+    behaviorRegistry: {
+      add: {
+        "relatedAggregates:orderBy": {
+          description: "",
+          entities: ["pgResource"],
+        },
+        "aggregates:orderBy": {
+          description: "",
+          entities: ["pgCodecRelation"],
+        },
+        "aggregate:orderBy": {
+          description: "",
+          entities: ["pgCodecAttribute"],
+        },
+      },
+    },
+
     entityBehavior: {
       pgResource: "relatedAggregates:orderBy",
-      pgCodecRelation: "select aggregates:orderBy",
-      pgCodecAttribute: "aggregate:orderBy",
+      pgCodecRelation: ["select", "aggregates:orderBy"],
+      pgCodecAttribute: ["aggregate:orderBy"],
     },
 
     hooks: {

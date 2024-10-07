@@ -23,6 +23,15 @@ function isValidEnum(
   return true;
 }
 
+declare global {
+  namespace GraphileBuild {
+    interface BehaviorStrings {
+      "resource:groupedAggregates": true;
+      groupedAggregates: true;
+    }
+  }
+}
+
 const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddConnectionGroupedAggregatesPlugin",
   description: "Adds the groupedAggregates field to connections.",
@@ -30,6 +39,15 @@ const Plugin: GraphileConfig.Plugin = {
   provides: ["aggregates"],
 
   schema: {
+    behaviorRegistry: {
+      add: {
+        groupedAggregates: {
+          description: "Should we enable grouped aggregates on this resource?",
+          entities: ["pgResource"],
+        },
+      },
+    },
+
     hooks: {
       GraphQLObjectType_fields(fields, build, context) {
         const {
