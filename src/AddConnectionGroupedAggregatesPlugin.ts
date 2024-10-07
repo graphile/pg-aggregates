@@ -41,6 +41,10 @@ const Plugin: GraphileConfig.Plugin = {
   schema: {
     behaviorRegistry: {
       add: {
+        "resource:groupedAggregates": {
+          description: "Should we enable grouped aggregates on this resource?",
+          entities: ["pgResource"],
+        },
         groupedAggregates: {
           description: "Should we enable grouped aggregates on this resource?",
           entities: ["pgResource"],
