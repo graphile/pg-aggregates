@@ -1,0 +1,38 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`GroupedAggregatesOrderBy: result 1`] = `
+{
+  "allMatchStats": {
+    "top": [
+      {
+        "keys": [
+          "1",
+        ],
+        "sum": {
+          "points": "2175",
+        },
+      },
+      {
+        "keys": [
+          "2",
+        ],
+        "sum": {
+          "points": "1771",
+        },
+      },
+    ],
+  },
+}
+`;
+
+exports[`GroupedAggregatesOrderBy: sql 1`] = `
+[
+  "select
+  (coalesce(sum(__match_stats__."points"), '0'))::text as "0",
+  __match_stats__."player_id"::text as "1"
+from "test"."match_stats" as __match_stats__
+group by __match_stats__."player_id"
+order by __match_stats__."player_id" asc, coalesce(sum(__match_stats__."points"), '0') desc
+limit 2;",
+]
+`;

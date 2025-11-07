@@ -6,10 +6,10 @@ exports[`AverageDurationByYearOfRelease: result 1`] = `
     "groupedAggregates": [
       {
         "average": {
-          "durationInMinutes": "139.0000000000000000",
+          "durationInMinutes": "195.0000000000000000",
         },
         "keys": [
-          "2017",
+          "1997",
         ],
       },
       {
@@ -22,34 +22,10 @@ exports[`AverageDurationByYearOfRelease: result 1`] = `
       },
       {
         "average": {
-          "durationInMinutes": "116.5000000000000000",
+          "durationInMinutes": "142.0000000000000000",
         },
         "keys": [
-          "2013",
-        ],
-      },
-      {
-        "average": {
-          "durationInMinutes": "195.0000000000000000",
-        },
-        "keys": [
-          "1997",
-        ],
-      },
-      {
-        "average": {
-          "durationInMinutes": "147.0000000000000000",
-        },
-        "keys": [
-          "2016",
-        ],
-      },
-      {
-        "average": {
-          "durationInMinutes": "130.6000000000000000",
-        },
-        "keys": [
-          "2018",
+          "2011",
         ],
       },
       {
@@ -62,6 +38,14 @@ exports[`AverageDurationByYearOfRelease: result 1`] = `
       },
       {
         "average": {
+          "durationInMinutes": "116.5000000000000000",
+        },
+        "keys": [
+          "2013",
+        ],
+      },
+      {
+        "average": {
           "durationInMinutes": "126.0000000000000000",
         },
         "keys": [
@@ -70,10 +54,26 @@ exports[`AverageDurationByYearOfRelease: result 1`] = `
       },
       {
         "average": {
-          "durationInMinutes": "142.0000000000000000",
+          "durationInMinutes": "147.0000000000000000",
         },
         "keys": [
-          "2011",
+          "2016",
+        ],
+      },
+      {
+        "average": {
+          "durationInMinutes": "139.0000000000000000",
+        },
+        "keys": [
+          "2017",
+        ],
+      },
+      {
+        "average": {
+          "durationInMinutes": "130.6000000000000000",
+        },
+        "keys": [
+          "2018",
         ],
       },
     ],
@@ -87,6 +87,7 @@ exports[`AverageDurationByYearOfRelease: sql 1`] = `
   (avg(__films__."duration_in_minutes"))::text as "0",
   __films__."year_of_release"::text as "1"
 from "test"."films" as __films__
-group by __films__."year_of_release";",
+group by __films__."year_of_release"
+order by __films__."year_of_release" asc;",
 ]
 `;

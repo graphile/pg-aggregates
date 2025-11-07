@@ -105,11 +105,18 @@ const Plugin: GraphileConfig.Plugin = {
                       apply: EXPORTABLE(
                         (attrCodec, attributeName, sql) =>
                           function ($pgSelect: PgSelectQueryBuilder) {
+                            const fragment = sql.fragment`${
+                              $pgSelect.alias
+                            }.${sql.identifier(attributeName)}`;
                             $pgSelect.groupBy({
-                              fragment: sql.fragment`${
-                                $pgSelect.alias
-                              }.${sql.identifier(attributeName)}`,
+                              fragment,
                               codec: attrCodec,
+                            });
+                            // Default ordering by GROUP BY columns for deterministic results
+                            $pgSelect.orderBy({
+                              fragment,
+                              codec: attrCodec,
+                              direction: "ASC",
                             });
                           },
                         [attrCodec, attributeName, sql]
@@ -152,16 +159,22 @@ const Plugin: GraphileConfig.Plugin = {
                               sql
                             ) =>
                               function ($pgSelect: PgSelectQueryBuilder) {
+                                const fragment = aggregateGroupBySpec.sqlWrap(
+                                  sql`${$pgSelect.alias}.${sql.identifier(
+                                    attributeName
+                                  )}`
+                                );
+                                const codec =
+                                  aggregateGroupBySpec.sqlWrapCodec(attrCodec);
                                 $pgSelect.groupBy({
-                                  fragment: aggregateGroupBySpec.sqlWrap(
-                                    sql`${$pgSelect.alias}.${sql.identifier(
-                                      attributeName
-                                    )}`
-                                  ),
-                                  codec:
-                                    aggregateGroupBySpec.sqlWrapCodec(
-                                      attrCodec
-                                    ),
+                                  fragment,
+                                  codec,
+                                });
+                                // Default ordering by GROUP BY columns for deterministic results
+                                $pgSelect.orderBy({
+                                  fragment,
+                                  codec,
+                                  direction: "ASC",
                                 });
                               },
                             [

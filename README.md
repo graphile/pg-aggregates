@@ -271,15 +271,32 @@ See
 [Defining your own grouping derivatives](#defining-your-own-grouping-derivatives)
 below for details on how to add your own grouping derivatives.
 
+The `groupedAggregates` field accepts a few arguments in addition to `groupBy`:
+
+- `orderBy` – controls how groups are sorted. You can order by any aggregate
+  that appears in the grouped output (e.g. `SUM_POINTS_DESC`). If not specified,
+  results are ordered by the `groupBy` columns in ascending order for
+  deterministic results.
+- `first` – limit the results to only the first `n` groups.
+
+When using `first`, consider specifying an explicit `orderBy` to control which
+groups are returned (e.g., top performers by sum). Without `orderBy`, groups are
+ordered by their `groupBy` values.
+
 The aggregates supported over groups are the same as over the connection as a
 whole (see [Aggregates](#aggregates) above), but in addition you may also
-determine the `keys` that were used for the aggregate. There will be one key for
-each of the `groupBy` values; for example in this query:
+determine the `keys` that were used for the aggregate, and optionally limit the
+groups returned. There will be one key for each of the `groupBy` values; for
+example in this query:
 
 ```graphql
-query AverageDurationByYearOfRelease {
+query TopTwoYearsByAverageDuration {
   allFilms {
-    groupedAggregates(groupBy: [YEAR_OF_RELEASE]) {
+    groupedAggregates(
+      groupBy: [YEAR_OF_RELEASE]
+      orderBy: [AVERAGE_DURATION_IN_MINUTES_DESC]
+      first: 2
+    ) {
       keys
       average {
         durationInMinutes
@@ -307,6 +324,8 @@ query AverageGoalsOnDaysWithAveragePointsOver200 {
     byDay: groupedAggregates(
       groupBy: [CREATED_AT_TRUNCATED_TO_DAY]
       having: { average: { points: { greaterThan: 200 } } }
+      orderBy: [AVERAGE_GOALS_DESC]
+      first: 3
     ) {
       keys
       average {
@@ -458,6 +477,16 @@ appearing on a table's connections.
 The `groupedAggregates` behavior is used to enable/disable the
 'groupedAggregates' field appearing on a table's connections.
 
+The `groupedAggregates:orderBy` behavior (available at both resource and
+attribute level) is used to enable/disable the `orderBy` argument on the
+'groupedAggregates' field. This is **disabled by default** as it adds 18 enum
+values per aggregatable attribute (2 directions × 9 aggregate types), which can
+cause significant schema bloat with many aggregatable attributes. You can
+further scope these, for example adding the behavior
+`+sum:attribute:aggregate:groupedAggregates:orderBy` to a specific column would
+enable ordering groupedAggregates by the `sum` aggregate of this column whilst
+leaving all other aggregates disabled.
+
 The `having` behavior is used to enable/disable the `having` filter on the
 'groupedAggregates' field appearing on a table's connections.
 
@@ -493,6 +522,28 @@ Enable aggregates for a specific table:
 ```sql
 COMMENT ON TABLE my_schema.my_table IS E'@behavior +aggregates +aggregates:filterBy +aggregates:orderBy';
 ```
+
+Enable `groupedAggregates` orderBy for a specific table:
+
+```sql
+COMMENT ON TABLE my_schema.my_table IS E'@behavior +resource:groupedAggregates:orderBy';
+```
+
+Or enable it only for specific columns:
+
+```sql
+COMMENT ON COLUMN my_schema.my_table.my_column IS E'@behavior +attribute:aggregate:groupedAggregates:orderBy';
+```
+
+Or enable only specific aggregates for a column (e.g., only SUM and AVERAGE):
+
+```sql
+COMMENT ON COLUMN my_schema.my_table.my_column IS E'@behavior -attribute:aggregate:groupedAggregates:orderBy +sum:attribute:aggregate:groupedAggregates:orderBy +average:attribute:aggregate:groupedAggregates:orderBy';
+```
+
+Note: When using per-aggregate behaviors, you must first disable the generic
+`attribute:aggregate:groupedAggregates:orderBy` behavior to prevent all
+aggregates from being enabled.
 
 You also can keep aggregates enabled by default, but disable aggregates for
 specific tables:

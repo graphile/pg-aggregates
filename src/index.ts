@@ -3,6 +3,7 @@ import { PgAggregatesAddConnectionAggregatesPlugin } from "./AddConnectionAggreg
 import { PgAggregatesAddConnectionGroupedAggregatesPlugin } from "./AddConnectionGroupedAggregatesPlugin.js";
 import { PgAggregatesAddGroupByAggregateEnumsPlugin } from "./AddGroupByAggregateEnumsPlugin.js";
 import { PgAggregatesAddGroupByAggregateEnumValuesForAttributesPlugin } from "./AddGroupByAggregateEnumValuesForAttributesPlugin.js";
+import { PgAggregatesAddGroupedAggregatesOrderByPlugin } from "./AddGroupedAggregatesOrderByPlugin.js";
 import { PgAggregatesAddHavingAggregateTypesPlugin } from "./AddHavingAggregateTypesPlugin.js";
 import { PgAggregatesSpecsPlugin } from "./AggregateSpecsPlugin.js";
 import { PgAggregatesSmartTagsPlugin } from "./AggregatesSmartTagsPlugin.js";
@@ -20,6 +21,7 @@ export const PgAggregatesPreset: GraphileConfig.Preset = {
     PgAggregatesAddHavingAggregateTypesPlugin,
     PgAggregatesAddAggregateTypesPlugin,
     PgAggregatesAddConnectionAggregatesPlugin,
+    PgAggregatesAddGroupedAggregatesOrderByPlugin,
     PgAggregatesAddConnectionGroupedAggregatesPlugin,
     PgAggregatesOrderByAggregatesPlugin,
     PgAggregatesFilterRelationalAggregatesPlugin,
@@ -51,4 +53,4 @@ declare global {
   }
 }
 
-// :args src/InflectionPlugin.ts src/AggregateSpecsPlugin.ts src/AddGroupByAggregateEnumsPlugin.ts src/AddGroupByAggregateEnumValuesForAttributesPlugin.ts src/AddHavingAggregateTypesPlugin.ts src/AddAggregateTypesPlugin.ts src/AddConnectionAggregatesPlugin.ts src/AddConnectionGroupedAggregatesPlugin.ts src/OrderByAggregatesPlugin.ts src/FilterRelationalAggregatesPlugin.ts src/AggregatesSmartTagsPlugin.ts
+// :args src/InflectionPlugin.ts src/AggregateSpecsPlugin.ts src/AddGroupByAggregateEnumsPlugin.ts src/AddGroupByAggregateEnumValuesForAttributesPlugin.ts src/AddHavingAggregateTypesPlugin.ts src/AddAggregateTypesPlugin.ts src/AddConnectionAggregatesPlugin.ts src/AddGroupedAggregatesOrderByPlugin.ts src/AddConnectionGroupedAggregatesPlugin.ts src/OrderByAggregatesPlugin.ts src/FilterRelationalAggregatesPlugin.ts src/AggregatesSmartTagsPlugin.ts

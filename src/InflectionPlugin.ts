@@ -56,6 +56,12 @@ declare global {
           resource: PgResource<any, any, any, any, any>;
         }
       ): string;
+      aggregateGroupedAggregatesOrderByType(
+        this: Inflection,
+        details: {
+          resource: PgResource<any, any, any, any, any>;
+        }
+      ): string;
       aggregateGroupByAttributeEnum(
         this: Inflection,
         details: {
@@ -157,6 +163,13 @@ export const PgAggregatesInflectorsPlugin: GraphileConfig.Plugin = {
       aggregateGroupByType(_preset, details) {
         return this.upperCamelCase(
           `${this._singularizedCodecName(details.resource.codec)}-group-by`
+        );
+      },
+      aggregateGroupedAggregatesOrderByType(_preset, details) {
+        return this.upperCamelCase(
+          `${this._singularizedCodecName(
+            details.resource.codec
+          )}-grouped-aggregates-order-by`
         );
       },
       aggregateGroupByAttributeEnum(_preset, details) {
