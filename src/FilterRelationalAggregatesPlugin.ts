@@ -27,6 +27,7 @@ declare global {
     interface Build {
       PgAggregateCondition: PgAggregateConditionClass;
       PgAggregateConditionExpression: PgAggregateConditionExpressionClass;
+      pgAggregateApplyOrder: ($where: PgCondition<any>, input: unknown) => void;
     }
     interface BehaviorStrings {
       "resource:aggregates:filterBy": true;
@@ -108,7 +109,21 @@ the sum of their points scored.`,
         const {
           EXPORTABLE,
           grafast: { Modifier },
+          sql,
         } = build;
+
+        if (!sql) {
+          throw new Error(
+            `PgAggregatesFilterRelationalAggregatesPlugin must run after build.sql is registered`
+          );
+        }
+        if (!build.dataplanPg) {
+          throw new Error(
+            `PgAggregatesFilterRelationalAggregatesPlugin must run after build.dataplanPg is registered`
+          );
+        }
+
+        const { pgWhereConditionSpecListToSQL } = build.dataplanPg!;
 
         if (!build.allPgCodecs) {
           throw new Error(
@@ -247,6 +262,46 @@ group by ())`;
           {
             PgAggregateCondition,
             PgAggregateConditionExpression,
+            pgAggregateApplyOrder: EXPORTABLE(
+              (PgAggregateCondition, pgWhereConditionSpecListToSQL, sql) =>
+                ($where, input) => {
+                  if (input == null) return;
+                  // assertAllowed(fieldArgs, "object");
+                  if (!$where.extensions.pgFilterRelation) {
+                    throw new Error(
+                      `Invalid use of filter, 'pgFilterRelation' expected`
+                    );
+                  }
+                  const {
+                    localAttributes,
+                    remoteAttributes,
+                    tableExpression,
+                    alias,
+                  } = $where.extensions.pgFilterRelation;
+                  const $subQuery = new PgAggregateCondition(
+                    $where,
+                    {
+                      sql: sql!,
+                      tableExpression,
+                      alias,
+                    },
+                    pgWhereConditionSpecListToSQL
+                  );
+                  localAttributes.forEach((localAttribute, i) => {
+                    const remoteAttribute = remoteAttributes[i];
+                    $subQuery.where(
+                      sql`${$where.alias}.${sql.identifier(
+                        localAttribute as string
+                      )} = ${$subQuery.alias}.${sql.identifier(
+                        remoteAttribute as string
+                      )}`
+                    );
+                  });
+                  return $subQuery;
+                },
+              [PgAggregateCondition, pgWhereConditionSpecListToSQL, sql],
+              "pgAggregateApplyOrder"
+            ),
           },
           "Adding step classes from postgraphile-plugin-connection-filter"
         );
@@ -377,9 +432,9 @@ group by ())`;
           inflection,
           sql,
           pgAggregateSpecs,
-          dataplanPg: { PgCondition, pgWhereConditionSpecListToSQL },
-          PgAggregateCondition,
+          dataplanPg: { PgCondition },
           EXPORTABLE,
+          pgAggregateApplyOrder,
         } = build;
 
         if (!inflection.filterType) {
@@ -430,47 +485,11 @@ group by ())`;
                   description: `Aggregates across related \`${foreignTableTypeName}\` match the filter criteria.`,
                   type: AggregateType,
                   apply: EXPORTABLE(
-                    (
-                      PgAggregateCondition,
-                      pgWhereConditionSpecListToSQL,
-                      sql
-                    ) =>
+                    (pgAggregateApplyOrder) =>
                       function ($where: PgCondition<any>, input: unknown) {
-                        if (input == null) return;
-                        // assertAllowed(fieldArgs, "object");
-                        if (!$where.extensions.pgFilterRelation) {
-                          throw new Error(
-                            `Invalid use of filter, 'pgFilterRelation' expected`
-                          );
-                        }
-                        const {
-                          localAttributes,
-                          remoteAttributes,
-                          tableExpression,
-                          alias,
-                        } = $where.extensions.pgFilterRelation;
-                        const $subQuery = new PgAggregateCondition(
-                          $where,
-                          {
-                            sql,
-                            tableExpression,
-                            alias,
-                          },
-                          pgWhereConditionSpecListToSQL
-                        );
-                        localAttributes.forEach((localAttribute, i) => {
-                          const remoteAttribute = remoteAttributes[i];
-                          $subQuery.where(
-                            sql`${$where.alias}.${sql.identifier(
-                              localAttribute as string
-                            )} = ${$subQuery.alias}.${sql.identifier(
-                              remoteAttribute as string
-                            )}`
-                          );
-                        });
-                        return $subQuery;
+                        pgAggregateApplyOrder($where, input);
                       },
-                    [PgAggregateCondition, pgWhereConditionSpecListToSQL, sql]
+                    [pgAggregateApplyOrder]
                   ),
                   // No need to auto-apply, postgraphile-plugin-connection-filter explicitly calls fieldArgs.apply()
                 }

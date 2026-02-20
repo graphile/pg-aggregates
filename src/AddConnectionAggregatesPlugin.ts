@@ -1,8 +1,21 @@
+import type { PgSelectStep } from "graphile-build-pg/@dataplan/pg";
 import type { GraphQLObjectType } from "graphql";
+import type { ConnectionStep } from "postgraphile/grafast";
 
 import { EXPORTABLE } from "./EXPORTABLE.js";
 
 const { version } = require("../package.json");
+
+const pgAggregatesCloneSubplanWithoutPaginationSingle = EXPORTABLE(
+  () =>
+    function plan(
+      $connection: ConnectionStep<any, any, any, any, any, PgSelectStep>
+    ) {
+      return $connection.cloneSubplanWithoutPagination("aggregate").single();
+    },
+  [],
+  "pgAggregatesCloneSubplanWithoutPaginationSingle"
+);
 
 const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddConnectionAggregatesPlugin",
@@ -67,15 +80,7 @@ const Plugin: GraphileConfig.Plugin = {
             return {
               description: `Aggregates across the matching connection (ignoring before/after/first/last/offset)`,
               type: AggregateContainerType,
-              plan: EXPORTABLE(
-                () =>
-                  function plan($connection) {
-                    return $connection
-                      .cloneSubplanWithoutPagination("aggregate")
-                      .single();
-                  },
-                []
-              ),
+              plan: pgAggregatesCloneSubplanWithoutPaginationSingle,
             };
           }),
         };

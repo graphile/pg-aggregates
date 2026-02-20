@@ -4,6 +4,9 @@ import type {
   GraphQLInputType,
   GraphQLObjectType,
 } from "graphql";
+import type { ConnectionStep } from "postgraphile/grafast";
+
+import { EXPORTABLE } from "./EXPORTABLE";
 
 const { version } = require("../package.json");
 
@@ -35,6 +38,13 @@ declare global {
     }
   }
 }
+const pgAggregateCloneSubplanWithoutPaginationAsAggregate = EXPORTABLE(
+  () =>
+    function plan($connection: ConnectionStep<any>) {
+      return $connection.cloneSubplanWithoutPagination("aggregate");
+    },
+  []
+);
 
 const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddConnectionGroupedAggregatesPlugin",
@@ -176,15 +186,7 @@ const Plugin: GraphileConfig.Plugin = {
                     }
                   : null),
               },
-              plan: EXPORTABLE(
-                () =>
-                  function plan($connection) {
-                    return $connection.cloneSubplanWithoutPagination(
-                      "aggregate"
-                    );
-                  },
-                []
-              ),
+              plan: pgAggregateCloneSubplanWithoutPaginationAsAggregate,
             };
           }),
         };

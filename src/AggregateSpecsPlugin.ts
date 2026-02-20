@@ -309,6 +309,21 @@ export const PgAggregatesSpecsPlugin: GraphileConfig.Plugin = {
           "Adding aggregate specs to build"
         );
       },
+      finalize(schema, build) {
+        build.pgAggregateSpecs.forEach((spec) => {
+          build.exportNameHint(
+            spec,
+            `pgAggregateSpec_${spec.id.replace(/-/g, "_")}`
+          );
+        });
+        build.pgAggregateGroupBySpecs.forEach((spec) => {
+          build.exportNameHint(
+            spec,
+            `pgAggregateGroupBySpec_${spec.id.replace(/-/g, "_")}`
+          );
+        });
+        return schema;
+      },
     },
   },
 };
