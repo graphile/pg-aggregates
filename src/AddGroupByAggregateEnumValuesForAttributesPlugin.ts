@@ -1,12 +1,17 @@
 import type {
+  PgCodec,
   PgCodecAttribute,
   PgResourceUnique,
   PgSelectQueryBuilder,
 } from "@dataplan/pg";
+import type { PgSQL } from "graphile-build-pg/pg-sql2";
 import type {
   GraphQLEnumValueConfig,
   GraphQLEnumValueConfigMap,
 } from "graphql";
+
+import type { AggregateGroupBySpec } from ".";
+import { EXPORTABLE } from "./EXPORTABLE";
 
 const { version } = require("../package.json");
 
@@ -18,6 +23,41 @@ declare global {
     }
   }
 }
+
+const applyGroupByAggregateSpec = EXPORTABLE(
+  () =>
+    (
+      sql: PgSQL,
+      aggregateGroupBySpec: AggregateGroupBySpec,
+      attributeName: string,
+      attrCodec: PgCodec,
+      qb: PgSelectQueryBuilder
+    ) => {
+      qb.groupBy({
+        fragment: aggregateGroupBySpec.sqlWrap(
+          sql`${qb.alias}.${sql.identifier(attributeName)}`
+        ),
+        codec: aggregateGroupBySpec.sqlWrapCodec(attrCodec),
+      });
+    },
+  []
+);
+
+const applyGroupByAttribute = EXPORTABLE(
+  () =>
+    (
+      sql: PgSQL,
+      attributeName: string,
+      attrCodec: PgCodec,
+      qb: PgSelectQueryBuilder
+    ) => {
+      qb.groupBy({
+        fragment: sql.fragment`${qb.alias}.${sql.identifier(attributeName)}`,
+        codec: attrCodec,
+      });
+    },
+  []
+);
 
 const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddGroupByAggregateEnumValuesForAttributesPlugin",
@@ -103,16 +143,21 @@ const Plugin: GraphileConfig.Plugin = {
                   extensions: {
                     grafast: {
                       apply: EXPORTABLE(
-                        (attrCodec, attributeName, sql) =>
+                        (
+                          applyGroupByAttribute,
+                          attrCodec,
+                          attributeName,
+                          sql
+                        ) =>
                           function ($pgSelect: PgSelectQueryBuilder) {
-                            $pgSelect.groupBy({
-                              fragment: sql.fragment`${
-                                $pgSelect.alias
-                              }.${sql.identifier(attributeName)}`,
-                              codec: attrCodec,
-                            });
+                            applyGroupByAttribute(
+                              sql,
+                              attributeName,
+                              attrCodec,
+                              $pgSelect
+                            );
                           },
-                        [attrCodec, attributeName, sql]
+                        [applyGroupByAttribute, attrCodec, attributeName, sql]
                       ),
                     },
                   },
@@ -147,25 +192,23 @@ const Plugin: GraphileConfig.Plugin = {
                           apply: EXPORTABLE(
                             (
                               aggregateGroupBySpec,
+                              applyGroupByAggregateSpec,
                               attrCodec,
                               attributeName,
                               sql
                             ) =>
-                              function ($pgSelect: PgSelectQueryBuilder) {
-                                $pgSelect.groupBy({
-                                  fragment: aggregateGroupBySpec.sqlWrap(
-                                    sql`${$pgSelect.alias}.${sql.identifier(
-                                      attributeName
-                                    )}`
-                                  ),
-                                  codec:
-                                    aggregateGroupBySpec.sqlWrapCodec(
-                                      attrCodec
-                                    ),
-                                });
+                              function (qb: PgSelectQueryBuilder) {
+                                applyGroupByAggregateSpec(
+                                  sql,
+                                  aggregateGroupBySpec,
+                                  attributeName,
+                                  attrCodec,
+                                  qb
+                                );
                               },
                             [
                               aggregateGroupBySpec,
+                              applyGroupByAggregateSpec,
                               attrCodec,
                               attributeName,
                               sql,
