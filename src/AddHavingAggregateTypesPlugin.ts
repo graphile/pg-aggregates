@@ -4,11 +4,17 @@ import type {
   PgCodecAttribute,
   PgCodecWithAttributes,
   PgCondition,
+  PgConditionCapableParent,
   PgConditionLike,
   PgResource,
   PgResourceParameter,
+  PgSelectArgumentDigest,
 } from "@dataplan/pg";
-import type { GrafastInputFieldConfigMap } from "grafast";
+import type {
+  FieldInfo,
+  GrafastInputFieldConfigMap,
+  InputObjectFieldApplyResolver,
+} from "grafast";
 import type {
   GraphQLInputObjectType,
   GraphQLInputType,
@@ -19,6 +25,7 @@ import type { SQL } from "pg-sql2";
 import type { AggregateSpec } from "./interfaces.js";
 import { CORE_HAVING_FILTER_SPECS } from "./interfaces.js";
 import { getComputedAttributeResources } from "./utils.js";
+import { EXPORTABLE } from "./EXPORTABLE.js";
 
 const { version } = require("../package.json");
 
@@ -43,6 +50,153 @@ declare global {
     }
   }
 }
+
+const pgAggregatesApplyAnd = EXPORTABLE(
+  () =>
+    function apply($where: PgConditionCapableParent) {
+      return $where;
+    },
+  [],
+  "pgAggregatesApplyAnd"
+);
+
+const pgAggregatesApplyHaving = EXPORTABLE(
+  () =>
+    function apply($filter: PgConditionLike) {
+      return $filter;
+    },
+  [],
+  "pgAggregatesApplyHaving"
+);
+
+const pgAggregatesApplyAttributeFilter = EXPORTABLE(
+  () =>
+    (
+      PgBooleanFilter: GraphileBuild.Build["dataplanPg"]["PgBooleanFilter"],
+      aggregateSpec: AggregateSpec,
+      attribute: PgCodecAttribute,
+      attributeName: string,
+      sql: GraphileBuild.Build["sql"],
+      $having: PgConditionLike
+    ) => {
+      const attributeExpression = sql.fragment`${
+        $having.alias
+      }.${sql.identifier(attributeName)}`;
+      const aggregateExpression = aggregateSpec.sqlAggregateWrap(
+        attributeExpression,
+        attribute.codec
+      );
+      return new PgBooleanFilter($having, aggregateExpression);
+    },
+  [],
+  "pgAggregatesApplyAttributeFilter"
+);
+
+const pgAggregatesApplyComputedColumnFilter = EXPORTABLE(
+  () =>
+    (
+      PgBooleanFilter: GraphileBuild.Build["dataplanPg"]["PgBooleanFilter"],
+      aggregateSpec: AggregateSpec,
+      computedAttributeResource: PgResource,
+      from: (...args: PgSelectArgumentDigest[]) => SQL,
+      getNullableType: GraphileBuild.Build["graphql"]["getNullableType"],
+      isInputObjectType: GraphileBuild.Build["graphql"]["isInputObjectType"],
+      makeArgsRuntime: ReturnType<
+        GraphileBuild.Build["pgGetArgDetailsFromParameters"]
+      >["makeArgsRuntime"],
+      parameterAnalysis: ReturnType<
+        GraphileBuild.Build["dataplanPg"]["generatePgParameterAnalysis"]
+      >,
+      parameters: readonly PgResourceParameter[] | undefined,
+      pgFromExpressionRuntime: GraphileBuild.Build["dataplanPg"]["pgFromExpressionRuntime"],
+      $having: PgCondition,
+      input: Record<string, unknown> | null,
+      { field, schema }: Parameters<InputObjectFieldApplyResolver>[2]
+    ) => {
+      if (input == null) {
+        return;
+      }
+      const fieldType = getNullableType(field.type);
+      if (!isInputObjectType(fieldType)) {
+        throw new Error(`Expected an input object type (${field.type})`);
+      }
+      const argsField = fieldType.getFields().args;
+      const firstArg = {
+        placeholder: $having.alias,
+        position: 0,
+      };
+      let src: SQL;
+      if (argsField && input.args != null) {
+        const argsType = getNullableType(fieldType.getFields().args.type);
+        if (!isInputObjectType(argsType)) {
+          throw new Error(`Expected an input object type (${argsType})`);
+        }
+        const fields = argsType.getFields();
+        // Because we require that the computed attribute is
+        // evaluated inline, we have to convert it to an
+        // expression here; this is only needed because of the
+        // aggregation.
+        src = pgFromExpressionRuntime(
+          from,
+          parameters!,
+          [firstArg, ...makeArgsRuntime(schema, fields, input.args)],
+          parameterAnalysis
+        );
+      } else {
+        src = pgFromExpressionRuntime(
+          from,
+          parameters!,
+          [firstArg],
+          parameterAnalysis
+        );
+      }
+
+      const aggregateExpression = aggregateSpec.sqlAggregateWrap(
+        src,
+        computedAttributeResource.codec
+      );
+      const $filter = new PgBooleanFilter($having, aggregateExpression);
+      // fieldArgs.apply($filter, "filter");
+      return $filter;
+    },
+  [],
+  "pgAggregatesApplyComputedColumnFilter"
+);
+
+const pgAggregatesPlanAggregatesField = EXPORTABLE(
+  () =>
+    function apply($having: PgConditionLike) {
+      return $having;
+    },
+  [],
+  "pgAggregatesPlanAggregatesField"
+);
+
+const pgAggregatesApplyHavingBinaryOperation = EXPORTABLE(
+  () =>
+    (
+      codec:
+        | GraphileBuild.Build["dataplanPg"]["TYPES"]["int"]
+        | GraphileBuild.Build["dataplanPg"]["TYPES"]["bigint"]
+        | GraphileBuild.Build["dataplanPg"]["TYPES"]["float"]
+        | GraphileBuild.Build["dataplanPg"]["TYPES"]["numeric"]
+        | GraphileBuild.Build["dataplanPg"]["TYPES"]["timestamptz"],
+      infix: () => SQL,
+      sql: GraphileBuild.Build["sql"],
+      sqlValueWithCodec: GraphileBuild.Build["dataplanPg"]["sqlValueWithCodec"],
+      $booleanFilter: PgBooleanFilter,
+      input: unknown
+    ) => {
+      if (input == null) return;
+      $booleanFilter.having(
+        sql`(${sql.parens(
+          $booleanFilter.expression
+        )} ${infix()} ${sqlValueWithCodec(input, codec!)})`
+      );
+    },
+  [],
+  "pgAggregatesApplyHavingBinaryOperation"
+);
 
 const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddHavingAggregateTypesPlugin",
@@ -216,13 +370,7 @@ columns.`,
                         build.getInputTypeByName(tableHavingInputTypeName)
                       )
                     ),
-                    apply: EXPORTABLE(
-                      () =>
-                        function apply($where) {
-                          return $where;
-                        },
-                      []
-                    ),
+                    apply: pgAggregatesApplyAnd,
                     // No need to auto-apply, the having field calls `fieldArgs.apply(...)`
                   },
                   OR: {
@@ -232,10 +380,7 @@ columns.`,
                       )
                     ),
                     apply: EXPORTABLE(
-                      (PgOrFilter) => ($where) => {
-                        const $or = new PgOrFilter($where);
-                        return $or;
-                      },
+                      (PgOrFilter) => ($where) => new PgOrFilter($where),
                       [PgOrFilter]
                     ),
                     // No need to auto-apply, the having field calls `fieldArgs.apply(...)`
@@ -334,13 +479,7 @@ columns.`,
                           : null),
                         filter: {
                           type: new GraphQLNonNull(HavingFilterType),
-                          apply: EXPORTABLE(
-                            () =>
-                              function apply($filter) {
-                                return $filter;
-                              },
-                            []
-                          ),
+                          apply: pgAggregatesApplyHaving,
                           // No need to auto-apply, parent calls `fieldArgs.apply($filter, "filter")` below
                         },
                       } as GrafastInputFieldConfigMap<any>;
@@ -407,17 +546,13 @@ columns.`,
                                 sql
                               ) =>
                               ($having: PgConditionLike) => {
-                                const attributeExpression = sql.fragment`${
-                                  $having.alias
-                                }.${sql.identifier(attributeName)}`;
-                                const aggregateExpression =
-                                  aggregateSpec.sqlAggregateWrap(
-                                    attributeExpression,
-                                    attribute.codec
-                                  );
-                                return new PgBooleanFilter(
-                                  $having,
-                                  aggregateExpression
+                                return pgAggregatesApplyAttributeFilter(
+                                  PgBooleanFilter,
+                                  aggregateSpec,
+                                  attribute,
+                                  attributeName,
+                                  sql,
+                                  $having
                                 );
                               },
                             [
@@ -547,70 +682,23 @@ columns.`,
                                 (
                                   $having: PgCondition,
                                   input: Record<string, unknown> | null,
-                                  { field, schema }
+                                  info
                                 ) => {
-                                  if (input == null) {
-                                    return;
-                                  }
-                                  const fieldType = getNullableType(field.type);
-                                  if (!isInputObjectType(fieldType)) {
-                                    throw new Error(
-                                      `Expected an input object type (${field.type})`
-                                    );
-                                  }
-                                  const argsField = fieldType.getFields().args;
-                                  const firstArg = {
-                                    placeholder: $having.alias,
-                                    position: 0,
-                                  };
-                                  let src: SQL;
-                                  if (argsField && input.args != null) {
-                                    const argsType = getNullableType(
-                                      fieldType.getFields().args.type
-                                    );
-                                    if (!isInputObjectType(argsType)) {
-                                      throw new Error(
-                                        `Expected an input object type (${argsType})`
-                                      );
-                                    }
-                                    const fields = argsType.getFields();
-                                    // Because we require that the computed attribute is
-                                    // evaluated inline, we have to convert it to an
-                                    // expression here; this is only needed because of the
-                                    // aggregation.
-                                    src = pgFromExpressionRuntime(
-                                      from,
-                                      parameters!,
-                                      [
-                                        firstArg,
-                                        ...makeArgsRuntime(
-                                          schema,
-                                          fields,
-                                          input.args
-                                        ),
-                                      ],
-                                      parameterAnalysis
-                                    );
-                                  } else {
-                                    src = pgFromExpressionRuntime(
-                                      from,
-                                      parameters!,
-                                      [firstArg],
-                                      parameterAnalysis
-                                    );
-                                  }
-
-                                  const aggregateExpression =
-                                    aggregateSpec.sqlAggregateWrap(
-                                      src,
-                                      computedAttributeResource.codec
-                                    );
-                                  const $filter = new PgBooleanFilter(
+                                  return pgAggregatesApplyComputedColumnFilter(
+                                    PgBooleanFilter,
+                                    aggregateSpec,
+                                    computedAttributeResource,
+                                    from,
+                                    getNullableType,
+                                    isInputObjectType,
+                                    makeArgsRuntime,
+                                    parameterAnalysis,
+                                    parameters,
+                                    pgFromExpressionRuntime,
                                     $having,
-                                    aggregateExpression
+                                    input,
+                                    info
                                   );
-                                  // fieldArgs.apply($filter, "filter");
-                                  return $filter;
                                 },
                               [
                                 PgBooleanFilter,
@@ -706,13 +794,7 @@ columns.`,
                       { fieldName }, // e.g. 'average' or 'stddevPopulation'
                       {
                         type: SpecInput,
-                        apply: EXPORTABLE(
-                          () =>
-                            function apply($having) {
-                              return $having;
-                            },
-                          []
-                        ),
+                        apply: pgAggregatesPlanAggregatesField,
                         // No need to auto-apply, `filter` field does `return new PgBooleanFilter($having, aggregateExpression)`
                       }
                     ),
@@ -730,7 +812,7 @@ columns.`,
           if (!isPgHavingFilterInputType) {
             return fields;
           }
-          const codec = (() => {
+          const rawCodec = (() => {
             switch (pgHavingFilterSpec) {
               case "int":
                 return TYPES.int;
@@ -748,9 +830,10 @@ columns.`,
             }
           })();
 
-          if (codec === null) {
+          if (rawCodec === null) {
             return fields;
           }
+          const codec = rawCodec;
           const FieldType = build.getGraphQLTypeByPgCodec(
             codec,
             "input"
@@ -770,11 +853,13 @@ columns.`,
                     apply: EXPORTABLE(
                       (codec, infix, sql, sqlValueWithCodec) =>
                         ($booleanFilter: PgBooleanFilter, input: unknown) => {
-                          if (input == null) return;
-                          $booleanFilter.having(
-                            sql`(${sql.parens(
-                              $booleanFilter.expression
-                            )} ${infix()} ${sqlValueWithCodec(input, codec!)})`
+                          return pgAggregatesApplyHavingBinaryOperation(
+                            codec,
+                            infix,
+                            sql,
+                            sqlValueWithCodec,
+                            $booleanFilter,
+                            input
                           );
                         },
                       [codec, infix, sql, sqlValueWithCodec]

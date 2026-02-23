@@ -4,7 +4,7 @@ import type {
   GraphQLInputType,
   GraphQLObjectType,
 } from "graphql";
-import type { ConnectionStep } from "postgraphile/grafast";
+import type { ConnectionStep, FieldArg } from "postgraphile/grafast";
 
 import { EXPORTABLE } from "./EXPORTABLE";
 
@@ -47,6 +47,30 @@ const pgAggregateCloneSubplanWithoutPaginationAsAggregate = EXPORTABLE(
   "pgAggregateCloneSubplanWithoutPaginationAsAggregate"
 );
 
+const pgAggregatesApplyGroupedAggregate = EXPORTABLE(
+  () =>
+    function (_$parent: any, $pgSelect: PgSelectStep, input: FieldArg) {
+      return input.apply($pgSelect);
+    },
+  [],
+  "pgAggregatesApplyGroupedAggregate"
+);
+
+const pgAggregatesApplyConditionsToGroupedAggregates = EXPORTABLE(
+  () =>
+    function applyPlan(
+      _$parent: unknown,
+      $pgSelect: PgSelectStep,
+      input: FieldArg
+    ) {
+      return input.apply($pgSelect, (queryBuilder) =>
+        queryBuilder.havingBuilder()
+      );
+    },
+  [],
+  "pgAggregatesApplyConditionsToGroupedAggregates"
+);
+
 const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddConnectionGroupedAggregatesPlugin",
   description: "Adds the groupedAggregates field to connections.",
@@ -78,7 +102,6 @@ const Plugin: GraphileConfig.Plugin = {
         const {
           graphql: { GraphQLList, GraphQLNonNull },
           inflection,
-          EXPORTABLE,
         } = build;
         const {
           fieldWithHooks,
@@ -154,13 +177,7 @@ const Plugin: GraphileConfig.Plugin = {
                     `The method to use when grouping \`${tableTypeName}\` for these aggregates.`,
                     "arg"
                   ),
-                  applyPlan: EXPORTABLE(
-                    () =>
-                      function (_$parent, $pgSelect: PgSelectStep, input) {
-                        return input.apply($pgSelect);
-                      },
-                    []
-                  ),
+                  applyPlan: pgAggregatesApplyGroupedAggregate,
                 },
                 ...(TableHavingInputType
                   ? {
@@ -170,19 +187,8 @@ const Plugin: GraphileConfig.Plugin = {
                           `Conditions on the grouped aggregates.`,
                           "arg"
                         ),
-                        applyPlan: EXPORTABLE(
-                          () =>
-                            function applyPlan(
-                              _$parent,
-                              $pgSelect: PgSelectStep,
-                              input
-                            ) {
-                              return input.apply($pgSelect, (queryBuilder) =>
-                                queryBuilder.havingBuilder()
-                              );
-                            },
-                          []
-                        ),
+                        applyPlan:
+                          pgAggregatesApplyConditionsToGroupedAggregates,
                       },
                     }
                   : null),
