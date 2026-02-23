@@ -1,4 +1,5 @@
 import type {
+  PgCodec,
   PgCodecAttribute,
   PgResource,
   PgResourceParameter,
@@ -9,6 +10,8 @@ import type {} from "graphile-build-pg";
 import type {} from "graphile-config";
 import type { GraphQLFieldConfigMap, GraphQLOutputType } from "graphql";
 
+import { EXPORTABLE } from "./EXPORTABLE.js";
+import type { AggregateSpec } from "./interfaces.js";
 import { getComputedAttributeResources } from "./utils.js";
 
 declare global {
@@ -67,6 +70,99 @@ const isSuitableSource = (
 
   return !!build.behavior.pgResourceMatches(resource, "resource:aggregates");
 };
+
+const pgAggregatesPlanKeys = EXPORTABLE(
+  () =>
+    (
+      lambda: GraphileBuild.Build["grafast"]["lambda"],
+      $pgSelectSingle: PgSelectSingleStep<any>
+    ) => {
+      const $pgSelect = $pgSelectSingle.getClassStep();
+      const $groupDetails = $pgSelect.getGroupDetails();
+      return lambda(
+        [$groupDetails, $pgSelectSingle],
+        ([groupDetails, item]) => {
+          if (groupDetails.indicies.length === 0 || item == null) {
+            return null;
+          } else {
+            return groupDetails.indicies.map(({ index }) => item[index]);
+          }
+        }
+      );
+    },
+  [],
+  "pgAggregatesPlanKeys"
+);
+
+const pgAggregatesPlanAggregates = EXPORTABLE(
+  () =>
+    function plan($pgSelectSingle: PgSelectSingleStep<any>) {
+      return $pgSelectSingle;
+    },
+  [],
+  "pgAggregatesPlanAggregates"
+);
+
+const pgAggregatesPlanAggregateAttribute = EXPORTABLE(
+  () =>
+    (
+      attributeCodec: PgCodec,
+      attributeName: string,
+      codec: PgCodec,
+      spec: AggregateSpec,
+      sql: GraphileBuild.Build["sql"],
+      $pgSelectSingle: PgSelectSingleStep
+    ) => {
+      // Note this expression is just an sql fragment, so you
+      // could add CASE statements, function calls, or whatever
+      // you need here
+      const sqlAttribute = sql.fragment`${
+        $pgSelectSingle.getClassStep().alias
+      }.${sql.identifier(attributeName)}`;
+      const sqlAggregate = spec.sqlAggregateWrap(sqlAttribute, attributeCodec);
+      return $pgSelectSingle.select(sqlAggregate, codec);
+    },
+  [],
+  "pgAggregatesPlanAggregateAttribute"
+);
+
+const pgAggregatesPlanComputedColumnAggregates = EXPORTABLE(
+  () =>
+    (
+      codec: PgCodec,
+      computedAttributeResource: PgResource,
+      makeArgs: ReturnType<
+        GraphileBuild.Build["pgGetArgDetailsFromParameters"]
+      >["makeArgs"],
+      pgFromExpression: GraphileBuild.Build["dataplanPg"]["pgFromExpression"],
+      spec: AggregateSpec,
+      targetCodec: PgCodec,
+      $pgSelectSingle: PgSelectSingleStep<any>,
+      fieldArgs: FieldArgs
+    ) => {
+      // Because we require that the computed attribute is
+      // evaluated inline, we have to convert it to an
+      // expression here; this is only needed because of the
+      // aggregation.
+      const src = pgFromExpression(
+        $pgSelectSingle,
+        computedAttributeResource.from,
+        computedAttributeResource.parameters!,
+        [
+          {
+            placeholder: $pgSelectSingle.getClassStep().alias,
+            position: 0,
+          },
+          ...makeArgs(fieldArgs),
+        ]
+      );
+
+      const sqlAggregate = spec.sqlAggregateWrap(src, codec);
+      return $pgSelectSingle.select(sqlAggregate, targetCodec);
+    },
+  [],
+  "pgAggregatesPlanComputedColumnAggregates"
+);
 
 const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesAddAggregateTypesPlugin",
@@ -133,27 +229,11 @@ attributes and computed columns.`,
                 keys: {
                   type: new GraphQLList(GraphQLString),
                   plan: EXPORTABLE(
-                    (lambda) =>
+                    (lambda, pgAggregatesPlanKeys) =>
                       function plan($pgSelectSingle: PgSelectSingleStep<any>) {
-                        const $pgSelect = $pgSelectSingle.getClassStep();
-                        const $groupDetails = $pgSelect.getGroupDetails();
-                        return lambda(
-                          [$groupDetails, $pgSelectSingle],
-                          ([groupDetails, item]) => {
-                            if (
-                              groupDetails.indicies.length === 0 ||
-                              item == null
-                            ) {
-                              return null;
-                            } else {
-                              return groupDetails.indicies.map(
-                                ({ index }) => item[index]
-                              );
-                            }
-                          }
-                        );
+                        return pgAggregatesPlanKeys(lambda, $pgSelectSingle);
                       },
-                    [lambda]
+                    [lambda, pgAggregatesPlanKeys]
                   ),
                 },
               },
@@ -249,15 +329,7 @@ attributes and computed columns.`,
                       () => ({
                         description: `${aggregateSpec.HumanLabel} aggregates across the matching connection (ignoring before/after/first/last/offset)`,
                         type: AggregateType,
-                        plan: EXPORTABLE(
-                          () =>
-                            function plan(
-                              $pgSelectSingle: PgSelectSingleStep<any>
-                            ) {
-                              return $pgSelectSingle;
-                            },
-                          []
-                        ),
+                        plan: pgAggregatesPlanAggregates,
                       })
                     ),
                   },
@@ -330,24 +402,32 @@ attributes and computed columns.`,
                         description: `${spec.HumanLabel} of ${fieldName} across the matching connection`,
                         type: spec.isNonNull ? new GraphQLNonNull(Type) : Type,
                         plan: EXPORTABLE(
-                          (attributeCodec, attributeName, codec, spec, sql) =>
+                          (
+                            attributeCodec,
+                            attributeName,
+                            codec,
+                            pgAggregatesPlanAggregateAttribute,
+                            spec,
+                            sql
+                          ) =>
                             function plan($pgSelectSingle: PgSelectSingleStep) {
-                              // Note this expression is just an sql fragment, so you
-                              // could add CASE statements, function calls, or whatever
-                              // you need here
-                              const sqlAttribute = sql.fragment`${
-                                $pgSelectSingle.getClassStep().alias
-                              }.${sql.identifier(attributeName)}`;
-                              const sqlAggregate = spec.sqlAggregateWrap(
-                                sqlAttribute,
-                                attributeCodec
-                              );
-                              return $pgSelectSingle.select(
-                                sqlAggregate,
-                                codec
+                              return pgAggregatesPlanAggregateAttribute(
+                                attributeCodec,
+                                attributeName,
+                                codec,
+                                spec,
+                                sql,
+                                $pgSelectSingle
                               );
                             },
-                          [attributeCodec, attributeName, codec, spec, sql]
+                          [
+                            attributeCodec,
+                            attributeName,
+                            codec,
+                            pgAggregatesPlanAggregateAttribute,
+                            spec,
+                            sql,
+                          ]
                         ),
                       };
                     }
@@ -433,6 +513,7 @@ attributes and computed columns.`,
                               codec,
                               computedAttributeResource,
                               makeArgs,
+                              pgAggregatesPlanComputedColumnAggregates,
                               pgFromExpression,
                               spec,
                               targetCodec
@@ -441,37 +522,22 @@ attributes and computed columns.`,
                                 $pgSelectSingle: PgSelectSingleStep<any>,
                                 fieldArgs: FieldArgs
                               ) {
-                                // Because we require that the computed attribute is
-                                // evaluated inline, we have to convert it to an
-                                // expression here; this is only needed because of the
-                                // aggregation.
-                                const src = pgFromExpression(
+                                return pgAggregatesPlanComputedColumnAggregates(
+                                  codec,
+                                  computedAttributeResource,
+                                  makeArgs,
+                                  pgFromExpression,
+                                  spec,
+                                  targetCodec,
                                   $pgSelectSingle,
-                                  computedAttributeResource.from,
-                                  computedAttributeResource.parameters!,
-                                  [
-                                    {
-                                      placeholder:
-                                        $pgSelectSingle.getClassStep().alias,
-                                      position: 0,
-                                    },
-                                    ...makeArgs(fieldArgs),
-                                  ]
-                                );
-
-                                const sqlAggregate = spec.sqlAggregateWrap(
-                                  src,
-                                  codec
-                                );
-                                return $pgSelectSingle.select(
-                                  sqlAggregate,
-                                  targetCodec
+                                  fieldArgs
                                 );
                               },
                             [
                               codec,
                               computedAttributeResource,
                               makeArgs,
+                              pgAggregatesPlanComputedColumnAggregates,
                               pgFromExpression,
                               spec,
                               targetCodec,
