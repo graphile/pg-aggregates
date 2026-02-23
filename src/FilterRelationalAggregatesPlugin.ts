@@ -19,6 +19,7 @@ import type { PgSQL, SQL } from "pg-sql2";
 import type {} from "postgraphile-plugin-connection-filter";
 
 import type { AggregateSpec } from "./interfaces.js";
+import { EXPORTABLE } from "./EXPORTABLE.js";
 
 const { version } = require("../package.json");
 
@@ -27,7 +28,6 @@ declare global {
     interface Build {
       PgAggregateCondition: PgAggregateConditionClass;
       PgAggregateConditionExpression: PgAggregateConditionExpressionClass;
-      pgAggregateApplyOrder: ($where: PgCondition<any>, input: unknown) => void;
     }
     interface BehaviorStrings {
       "resource:aggregates:filterBy": true;
@@ -56,6 +56,118 @@ declare global {
     }
   }
 }
+
+const pgAggregateApplyAttributeOrder = EXPORTABLE(
+  () =>
+    (
+      PgCondition: GraphileBuild.Build["dataplanPg"]["PgCondition"],
+      sql: GraphileBuild.Build["sql"],
+      spec: AggregateSpec,
+      attributeName: string,
+      attrCodec: PgCodec,
+      rawAttrCodec: PgCodec,
+      $parent: PgAggregateConditionExpression,
+      input: unknown
+    ) => {
+      if (input == null) return;
+      const $col = new PgCondition($parent);
+      $col.extensions.pgFilterAttribute = {
+        codec: attrCodec,
+        expression: spec.sqlAggregateWrap(
+          sql`${$col.alias}.${sql.identifier(attributeName)}`,
+          rawAttrCodec
+        ),
+      };
+
+      return $col;
+    },
+  [],
+  "pgAggregateApplyAttributeOrder"
+);
+
+const pgAggregateApplyComputedAttributeOrder = EXPORTABLE(
+  () =>
+    (
+      PgCondition: GraphileBuild.Build["dataplanPg"]["PgCondition"],
+      sql: GraphileBuild.Build["sql"],
+      spec: AggregateSpec,
+      proc: PgResource,
+      attrCodec: PgCodec,
+      $parent: PgAggregateConditionExpression,
+      input: unknown
+    ) => {
+      if (input == null) return;
+      const $col = new PgCondition($parent);
+      const sqlComputedAttributeCall = sql.query`${
+        typeof proc.from === "function"
+          ? proc.from({ placeholder: $col.alias })
+          : proc.from
+      }`;
+      $col.extensions.pgFilterAttribute = {
+        codec: attrCodec,
+        expression: spec.sqlAggregateWrap(sqlComputedAttributeCall, proc.codec),
+      };
+
+      return $col;
+    },
+  [],
+  "pgAggregateApplyComputedAttributeOrder"
+);
+
+const pgAggregateApplyForeignCondition = EXPORTABLE(
+  () =>
+    function (
+      PgCondition: GraphileBuild.Build["dataplanPg"]["PgCondition"],
+      $subquery: PgAggregateCondition<any>,
+      input: unknown
+    ) {
+      if (input == null) return;
+      // Enable all the helpers
+      const $condition = new PgCondition($subquery, false, "AND");
+      return $condition;
+    },
+  [],
+  "pgAggregateApplyForeignCondition"
+);
+
+const pgAggregatesApply = EXPORTABLE(
+  () =>
+    (
+      PgAggregateCondition: PgAggregateConditionClass,
+      pgWhereConditionSpecListToSQL: GraphileBuild.Build["dataplanPg"]["pgWhereConditionSpecListToSQL"],
+      sql: GraphileBuild.Build["sql"],
+      $where: PgCondition<any>,
+      input: unknown
+    ) => {
+      if (input == null) return;
+      // assertAllowed(fieldArgs, "object");
+      if (!$where.extensions.pgFilterRelation) {
+        throw new Error(`Invalid use of filter, 'pgFilterRelation' expected`);
+      }
+      const { localAttributes, remoteAttributes, tableExpression, alias } =
+        $where.extensions.pgFilterRelation;
+      const $subQuery = new PgAggregateCondition(
+        $where,
+        {
+          sql,
+          tableExpression,
+          alias,
+        },
+        pgWhereConditionSpecListToSQL
+      );
+      localAttributes.forEach((localAttribute, i) => {
+        const remoteAttribute = remoteAttributes[i];
+        $subQuery.where(
+          sql`${$where.alias}.${sql.identifier(localAttribute as string)} = ${
+            $subQuery.alias
+          }.${sql.identifier(remoteAttribute as string)}`
+        );
+      });
+      return $subQuery;
+    },
+  [],
+  "pgAggregatesApply"
+);
 
 export const Plugin: GraphileConfig.Plugin = {
   name: "PgAggregatesFilterRelationalAggregatesPlugin",
@@ -109,21 +221,7 @@ the sum of their points scored.`,
         const {
           EXPORTABLE,
           grafast: { Modifier },
-          sql,
         } = build;
-
-        if (!sql) {
-          throw new Error(
-            `PgAggregatesFilterRelationalAggregatesPlugin must run after build.sql is registered`
-          );
-        }
-        if (!build.dataplanPg) {
-          throw new Error(
-            `PgAggregatesFilterRelationalAggregatesPlugin must run after build.dataplanPg is registered`
-          );
-        }
-
-        const { pgWhereConditionSpecListToSQL } = build.dataplanPg!;
 
         if (!build.allPgCodecs) {
           throw new Error(
@@ -262,46 +360,6 @@ group by ())`;
           {
             PgAggregateCondition,
             PgAggregateConditionExpression,
-            pgAggregateApplyOrder: EXPORTABLE(
-              (PgAggregateCondition, pgWhereConditionSpecListToSQL, sql) =>
-                ($where, input) => {
-                  if (input == null) return;
-                  // assertAllowed(fieldArgs, "object");
-                  if (!$where.extensions.pgFilterRelation) {
-                    throw new Error(
-                      `Invalid use of filter, 'pgFilterRelation' expected`
-                    );
-                  }
-                  const {
-                    localAttributes,
-                    remoteAttributes,
-                    tableExpression,
-                    alias,
-                  } = $where.extensions.pgFilterRelation;
-                  const $subQuery = new PgAggregateCondition(
-                    $where,
-                    {
-                      sql: sql!,
-                      tableExpression,
-                      alias,
-                    },
-                    pgWhereConditionSpecListToSQL
-                  );
-                  localAttributes.forEach((localAttribute, i) => {
-                    const remoteAttribute = remoteAttributes[i];
-                    $subQuery.where(
-                      sql`${$where.alias}.${sql.identifier(
-                        localAttribute as string
-                      )} = ${$subQuery.alias}.${sql.identifier(
-                        remoteAttribute as string
-                      )}`
-                    );
-                  });
-                  return $subQuery;
-                },
-              [PgAggregateCondition, pgWhereConditionSpecListToSQL, sql],
-              "pgAggregateApplyOrder"
-            ),
           },
           "Adding step classes from postgraphile-plugin-connection-filter"
         );
@@ -366,21 +424,18 @@ group by ())`;
                         description: `A filter that must pass for the relevant \`${foreignTableTypeName}\` object to be included within the aggregate.`,
                         type,
                         apply: EXPORTABLE(
-                          (PgCondition) =>
-                            function (
+                          (PgCondition, pgAggregateApplyForeignCondition) =>
+                            (
                               $subquery: PgAggregateCondition<any>,
                               input: unknown
-                            ) {
-                              if (input == null) return;
-                              // Enable all the helpers
-                              const $condition = new PgCondition(
+                            ) =>
+                              pgAggregateApplyForeignCondition(
+                                PgCondition,
                                 $subquery,
-                                false,
-                                "AND"
-                              );
-                              return $condition;
-                            },
-                          [PgCondition]
+                                input
+                              ),
+                          [PgCondition, pgAggregateApplyForeignCondition],
+                          `${filterFieldName}Apply`
                         ),
                         // No need to auto-apply since we're applied manually via `fieldArgs.apply($subQuery)` below.
                       },
@@ -432,9 +487,9 @@ group by ())`;
           inflection,
           sql,
           pgAggregateSpecs,
-          dataplanPg: { PgCondition },
+          dataplanPg: { PgCondition, pgWhereConditionSpecListToSQL },
+          PgAggregateCondition,
           EXPORTABLE,
-          pgAggregateApplyOrder,
         } = build;
 
         if (!inflection.filterType) {
@@ -485,11 +540,21 @@ group by ())`;
                   description: `Aggregates across related \`${foreignTableTypeName}\` match the filter criteria.`,
                   type: AggregateType,
                   apply: EXPORTABLE(
-                    (pgAggregateApplyOrder) =>
+                    (
+                      PgAggregateCondition,
+                      pgWhereConditionSpecListToSQL,
+                      sql
+                    ) =>
                       function ($where: PgCondition<any>, input: unknown) {
-                        pgAggregateApplyOrder($where, input);
+                        return pgAggregatesApply(
+                          PgAggregateCondition,
+                          pgWhereConditionSpecListToSQL,
+                          sql,
+                          $where,
+                          input
+                        );
                       },
-                    [pgAggregateApplyOrder]
+                    [PgAggregateCondition, pgWhereConditionSpecListToSQL, sql]
                   ),
                   // No need to auto-apply, postgraphile-plugin-connection-filter explicitly calls fieldArgs.apply()
                 }
@@ -589,6 +654,7 @@ group by ())`;
                   ) {
                     return memo;
                   }
+                  const rawAttrCodec = attribute.codec;
                   const attrCodec = spec.pgTypeCodecModifier
                     ? spec.pgTypeCodecModifier(attribute.codec)
                     : attribute.codec;
@@ -619,7 +685,7 @@ group by ())`;
                           (
                             PgCondition,
                             attrCodec,
-                            attribute,
+                            rawAttrCodec,
                             attributeName,
                             spec,
                             sql
@@ -628,24 +694,21 @@ group by ())`;
                               $parent: PgAggregateConditionExpression,
                               input: unknown
                             ) {
-                              if (input == null) return;
-                              const $col = new PgCondition($parent);
-                              $col.extensions.pgFilterAttribute = {
-                                codec: attrCodec,
-                                expression: spec.sqlAggregateWrap(
-                                  sql`${$col.alias}.${sql.identifier(
-                                    attributeName
-                                  )}`,
-                                  attribute.codec
-                                ),
-                              };
-
-                              return $col;
+                              return pgAggregateApplyAttributeOrder(
+                                PgCondition,
+                                sql,
+                                spec,
+                                attributeName,
+                                attrCodec,
+                                rawAttrCodec,
+                                $parent,
+                                input
+                              );
                             },
                           [
                             PgCondition,
                             attrCodec,
-                            attribute,
+                            rawAttrCodec,
                             attributeName,
                             spec,
                             sql,
@@ -724,22 +787,15 @@ group by ())`;
                             $parent: PgAggregateConditionExpression,
                             input: unknown
                           ) {
-                            if (input == null) return;
-                            const $col = new PgCondition($parent);
-                            const sqlComputedAttributeCall = sql.query`${
-                              typeof proc.from === "function"
-                                ? proc.from({ placeholder: $col.alias })
-                                : proc.from
-                            }`;
-                            $col.extensions.pgFilterAttribute = {
-                              codec: attrCodec,
-                              expression: spec.sqlAggregateWrap(
-                                sqlComputedAttributeCall,
-                                proc.codec
-                              ),
-                            };
-
-                            return $col;
+                            return pgAggregateApplyComputedAttributeOrder(
+                              PgCondition,
+                              sql,
+                              spec,
+                              proc,
+                              attrCodec,
+                              $parent,
+                              input
+                            );
                           },
                         [PgCondition, attrCodec, proc, spec, sql]
                       ),
