@@ -18,8 +18,8 @@ import type {
 import type { PgSQL, SQL } from "pg-sql2";
 import type {} from "postgraphile-plugin-connection-filter";
 
-import type { AggregateSpec } from "./interfaces.js";
 import { EXPORTABLE } from "./EXPORTABLE.js";
+import type { AggregateSpec } from "./interfaces.js";
 
 const { version } = require("../package.json");
 
@@ -542,6 +542,7 @@ group by ())`;
                   apply: EXPORTABLE(
                     (
                       PgAggregateCondition,
+                      pgAggregatesApply,
                       pgWhereConditionSpecListToSQL,
                       sql
                     ) =>
@@ -554,7 +555,12 @@ group by ())`;
                           input
                         );
                       },
-                    [PgAggregateCondition, pgWhereConditionSpecListToSQL, sql]
+                    [
+                      PgAggregateCondition,
+                      pgAggregatesApply,
+                      pgWhereConditionSpecListToSQL,
+                      sql,
+                    ]
                   ),
                   // No need to auto-apply, postgraphile-plugin-connection-filter explicitly calls fieldArgs.apply()
                 }
@@ -685,8 +691,9 @@ group by ())`;
                           (
                             PgCondition,
                             attrCodec,
-                            rawAttrCodec,
                             attributeName,
+                            pgAggregateApplyAttributeOrder,
+                            rawAttrCodec,
                             spec,
                             sql
                           ) =>
@@ -708,8 +715,9 @@ group by ())`;
                           [
                             PgCondition,
                             attrCodec,
-                            rawAttrCodec,
                             attributeName,
+                            pgAggregateApplyAttributeOrder,
+                            rawAttrCodec,
                             spec,
                             sql,
                           ]
@@ -782,7 +790,14 @@ group by ())`;
                     [fieldName]: {
                       type: OperatorsType,
                       apply: EXPORTABLE(
-                        (PgCondition, attrCodec, proc, spec, sql) =>
+                        (
+                          PgCondition,
+                          attrCodec,
+                          pgAggregateApplyComputedAttributeOrder,
+                          proc,
+                          spec,
+                          sql
+                        ) =>
                           function apply(
                             $parent: PgAggregateConditionExpression,
                             input: unknown
@@ -797,7 +812,14 @@ group by ())`;
                               input
                             );
                           },
-                        [PgCondition, attrCodec, proc, spec, sql]
+                        [
+                          PgCondition,
+                          attrCodec,
+                          pgAggregateApplyComputedAttributeOrder,
+                          proc,
+                          spec,
+                          sql,
+                        ]
                       ),
                     },
                   },

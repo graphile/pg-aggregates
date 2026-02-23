@@ -1,15 +1,15 @@
 import type {
+  PgCodecAttribute,
   PgCodecRelation,
   PgCodecWithAttributes,
-  PgCodecAttribute,
   PgResource,
   PgSelectQueryBuilder,
 } from "@dataplan/pg";
 import type { GraphQLEnumValueConfigMap } from "graphql";
 import type { SQL } from "pg-sql2";
 
-import type { AggregateSpec } from "./interfaces.js";
 import { EXPORTABLE } from "./EXPORTABLE.js";
+import type { AggregateSpec } from "./interfaces.js";
 
 const { version } = require("../package.json");
 
@@ -246,7 +246,14 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
 
             const makeTotalCountApply = (direction: "ASC" | "DESC") => {
               return EXPORTABLE(
-                (TYPES, direction, relation, sql, table) =>
+                (
+                  TYPES,
+                  direction,
+                  pgAggregatesApplyOrderByTotalCount,
+                  relation,
+                  sql,
+                  table
+                ) =>
                   function apply($select: PgSelectQueryBuilder) {
                     pgAggregatesApplyOrderByTotalCount(
                       TYPES,
@@ -257,7 +264,14 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
                       $select
                     );
                   },
-                [TYPES, direction, relation, sql, table]
+                [
+                  TYPES,
+                  direction,
+                  pgAggregatesApplyOrderByTotalCount,
+                  relation,
+                  sql,
+                  table,
+                ]
               );
             };
 
@@ -330,6 +344,7 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
                       attribute,
                       attributeName,
                       direction,
+                      pgAggregatesApplyOrderByAttribute,
                       relation,
                       sql,
                       table
@@ -351,6 +366,7 @@ export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
                       attribute,
                       attributeName,
                       direction,
+                      pgAggregatesApplyOrderByAttribute,
                       relation,
                       sql,
                       table,
