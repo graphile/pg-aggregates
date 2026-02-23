@@ -40,7 +40,8 @@ const applyGroupByAggregateSpec = EXPORTABLE(
         codec: aggregateGroupBySpec.sqlWrapCodec(attrCodec),
       });
     },
-  []
+  [],
+  "applyGroupByAggregateSpec"
 );
 
 const applyGroupByAttribute = EXPORTABLE(
@@ -56,7 +57,8 @@ const applyGroupByAttribute = EXPORTABLE(
         codec: attrCodec,
       });
     },
-  []
+  [],
+  "applyGroupByAttribute"
 );
 
 const Plugin: GraphileConfig.Plugin = {

@@ -43,7 +43,8 @@ const pgAggregateCloneSubplanWithoutPaginationAsAggregate = EXPORTABLE(
     function plan($connection: ConnectionStep<any>) {
       return $connection.cloneSubplanWithoutPagination("aggregate");
     },
-  []
+  [],
+  "pgAggregateCloneSubplanWithoutPaginationAsAggregate"
 );
 
 const Plugin: GraphileConfig.Plugin = {
