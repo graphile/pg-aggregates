@@ -11,7 +11,6 @@ import type {
   PgSelectArgumentDigest,
 } from "@dataplan/pg";
 import type {
-  FieldInfo,
   GrafastInputFieldConfigMap,
   InputObjectFieldApplyResolver,
 } from "grafast";
@@ -22,10 +21,10 @@ import type {
 } from "graphql";
 import type { SQL } from "pg-sql2";
 
+import { EXPORTABLE } from "./EXPORTABLE.js";
 import type { AggregateSpec } from "./interfaces.js";
 import { CORE_HAVING_FILTER_SPECS } from "./interfaces.js";
 import { getComputedAttributeResources } from "./utils.js";
-import { EXPORTABLE } from "./EXPORTABLE.js";
 
 const { version } = require("../package.json");
 
@@ -543,6 +542,7 @@ columns.`,
                                 aggregateSpec,
                                 attribute,
                                 attributeName,
+                                pgAggregatesApplyAttributeFilter,
                                 sql
                               ) =>
                               ($having: PgConditionLike) => {
@@ -560,6 +560,7 @@ columns.`,
                               aggregateSpec,
                               attribute,
                               attributeName,
+                              pgAggregatesApplyAttributeFilter,
                               sql,
                             ]
                           ),
@@ -677,6 +678,7 @@ columns.`,
                                   makeArgsRuntime,
                                   parameterAnalysis,
                                   parameters,
+                                  pgAggregatesApplyComputedColumnFilter,
                                   pgFromExpressionRuntime
                                 ) =>
                                 (
@@ -710,6 +712,7 @@ columns.`,
                                 makeArgsRuntime,
                                 parameterAnalysis,
                                 parameters,
+                                pgAggregatesApplyComputedColumnFilter,
                                 pgFromExpressionRuntime,
                               ]
                             ),
@@ -851,7 +854,13 @@ columns.`,
                   {
                     type: FieldType,
                     apply: EXPORTABLE(
-                      (codec, infix, sql, sqlValueWithCodec) =>
+                      (
+                          codec,
+                          infix,
+                          pgAggregatesApplyHavingBinaryOperation,
+                          sql,
+                          sqlValueWithCodec
+                        ) =>
                         ($booleanFilter: PgBooleanFilter, input: unknown) => {
                           return pgAggregatesApplyHavingBinaryOperation(
                             codec,
@@ -862,7 +871,13 @@ columns.`,
                             input
                           );
                         },
-                      [codec, infix, sql, sqlValueWithCodec]
+                      [
+                        codec,
+                        infix,
+                        pgAggregatesApplyHavingBinaryOperation,
+                        sql,
+                        sqlValueWithCodec,
+                      ]
                     ),
                     // No need to auto-apply
                   }
