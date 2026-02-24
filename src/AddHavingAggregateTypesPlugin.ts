@@ -414,7 +414,8 @@ columns.`,
                       const { argDetails } =
                         build.pgGetArgDetailsFromParameters(
                           computedAttributeResource,
-                          computedAttributeResource.parameters!.slice(1)
+                          computedAttributeResource.parameters,
+                          1
                         );
                       return argDetails.reduce(
                         (memo, { inputType, graphqlArgName }) => {
@@ -653,10 +654,14 @@ columns.`,
                         const { makeArgsRuntime } =
                           build.pgGetArgDetailsFromParameters(
                             computedAttributeResource,
-                            parameters!.slice(1)
+                            parameters,
+                            1
                           );
-                        const parameterAnalysis = generatePgParameterAnalysis(
-                          parameters!
+                        const parameterAnalysis = EXPORTABLE(
+                          (generatePgParameterAnalysis, parameters) =>
+                            generatePgParameterAnalysis(parameters!),
+                          [generatePgParameterAnalysis, parameters],
+                          `${computedAttributeResource.name}ParameterAnalysis`
                         );
                         const from =
                           typeof rawFrom === "function"

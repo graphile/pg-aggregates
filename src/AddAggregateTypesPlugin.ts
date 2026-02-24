@@ -495,7 +495,8 @@ attributes and computed columns.`,
                         const { makeFieldArgs, makeArgs } =
                           build.pgGetArgDetailsFromParameters(
                             computedAttributeResource,
-                            computedAttributeResource.parameters!.slice(1)
+                            computedAttributeResource.parameters,
+                            1
                           );
 
                         return {
