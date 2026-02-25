@@ -4,12 +4,14 @@ import type {
   PgCodecWithAttributes,
   PgResource,
   PgSelectQueryBuilder,
+  sql,
 } from "@dataplan/pg";
 import type { GraphQLEnumValueConfigMap } from "graphql";
-import type { SQL } from "pg-sql2";
 
 import { EXPORTABLE } from "./EXPORTABLE.js";
 import type { AggregateSpec } from "./interfaces.js";
+
+type SQL = ReturnType<typeof sql>;
 
 const { version } = require("../package.json");
 

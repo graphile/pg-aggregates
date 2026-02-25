@@ -9,6 +9,7 @@ import type {
   PgResource,
   PgResourceParameter,
   PgSelectArgumentDigest,
+  sql,
 } from "@dataplan/pg";
 import type {
   GrafastInputFieldConfigMap,
@@ -19,12 +20,13 @@ import type {
   GraphQLInputType,
   GraphQLNamedType,
 } from "graphql";
-import type { SQL } from "pg-sql2";
 
 import { EXPORTABLE } from "./EXPORTABLE.js";
 import type { AggregateSpec } from "./interfaces.js";
 import { CORE_HAVING_FILTER_SPECS } from "./interfaces.js";
 import { getComputedAttributeResources } from "./utils.js";
+
+type SQL = ReturnType<typeof sql>;
 
 const { version } = require("../package.json");
 

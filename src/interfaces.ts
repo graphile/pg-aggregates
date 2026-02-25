@@ -1,5 +1,5 @@
-import type { PgCodec, PgResource } from "@dataplan/pg";
-import type { SQL } from "pg-sql2";
+import type { PgCodec, PgResource, sql } from "@dataplan/pg";
+type SQL = ReturnType<typeof sql>;
 
 declare global {
   namespace DataplanPg {

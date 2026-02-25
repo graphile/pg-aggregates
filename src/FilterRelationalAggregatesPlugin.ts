@@ -7,6 +7,7 @@ import type {
   PgResource,
   PgResourceParameter,
   PgWhereConditionSpec,
+  sql,
 } from "@dataplan/pg";
 import type { GrafastInputFieldConfigMap, Modifier } from "grafast";
 import type {} from "graphile-build";
@@ -15,11 +16,13 @@ import type {
   GraphQLInputObjectTypeConfig,
   GraphQLInputType,
 } from "graphql";
-import type { PgSQL, SQL } from "pg-sql2";
 import type {} from "postgraphile-plugin-connection-filter";
 
 import { EXPORTABLE } from "./EXPORTABLE.js";
 import type { AggregateSpec } from "./interfaces.js";
+
+type PgSQL = typeof sql;
+type SQL = ReturnType<PgSQL>;
 
 const { version } = require("../package.json");
 
