@@ -411,9 +411,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@dataplan/pg@npm:^1.0.0-rc.6":
-  version: 1.0.0-rc.6
-  resolution: "@dataplan/pg@npm:1.0.0-rc.6"
+"@dataplan/pg@npm:^1.0.0-rc.7":
+  version: 1.0.0-rc.7
+  resolution: "@dataplan/pg@npm:1.0.0-rc.7"
   dependencies:
     "@dataplan/json": "npm:^1.0.0-rc.5"
     "@graphile/lru": "npm:^5.0.0-rc.4"
@@ -436,7 +436,7 @@ __metadata:
   peerDependenciesMeta:
     pg:
       optional: true
-  checksum: 10/c4b6012200c77309f596b50fc830a5a11a59ca9ef5e98adcb7813869971420c12d7c7de4a6f9d6641a7abbeffe164da736788e545e73c80f28744c239bc19f71
+  checksum: 10/4e4dfd5b355f85e953399b24685eecc0dca653d81a80d405f67763d6684738a8146f24e520a9a6ea45ad257bbe1e2f95f552f5949dfe389bf0767230e729aaf9
   languageName: node
   linkType: hard
 
@@ -616,21 +616,21 @@ __metadata:
     eslint-plugin-simple-import-sort: "npm:^12.1.1"
     eslint-plugin-tsdoc: "npm:^0.3.0"
     graphile-build: "npm:^5.0.0-rc.5"
-    graphile-build-pg: "npm:^5.0.0-rc.6"
+    graphile-build-pg: "npm:^5.0.0-rc.7"
     graphql: "npm:^16.9.0"
     jest: "npm:^29.6.4"
     jest-serializer-graphql-schema: "npm:^5.0.0-rc.4"
     jest-serializer-simple: "npm:^5.0.0-rc.4"
     nodemon: "npm:^2.0.22"
     pg: "npm:^8.5.1"
-    postgraphile: "npm:^5.0.0-rc.8"
-    postgraphile-plugin-connection-filter: "npm:^3.0.0-rc.2"
+    postgraphile: "npm:^5.0.0-rc.9"
+    postgraphile-plugin-connection-filter: "npm:^3.0.0-rc.3"
     prettier: "npm:^2.8.7"
     typescript: "npm:^5.0.4"
     typescript-eslint: "npm:^8.36.0"
   peerDependencies:
-    graphile-build: "*"
-    graphile-build-pg: "*"
+    graphile-build: ^5.0.0-rc.1
+    graphile-build-pg: ^5.0.0-rc.1
     graphql: ^16.1.0-experimental-stream-defer.6
   peerDependenciesMeta:
     graphile-build:
@@ -4643,9 +4643,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"graphile-build-pg@npm:^5.0.0-rc.6":
-  version: 5.0.0-rc.6
-  resolution: "graphile-build-pg@npm:5.0.0-rc.6"
+"graphile-build-pg@npm:^5.0.0-rc.7":
+  version: 5.0.0-rc.7
+  resolution: "graphile-build-pg@npm:5.0.0-rc.7"
   dependencies:
     "@types/node": "npm:^22.19.1"
     debug: "npm:^4.4.3"
@@ -4655,7 +4655,7 @@ __metadata:
     pg-sql2: "npm:^5.0.0-rc.4"
     tslib: "npm:^2.8.1"
   peerDependencies:
-    "@dataplan/pg": ^1.0.0-rc.6
+    "@dataplan/pg": ^1.0.0-rc.7
     grafast: ^1.0.0-rc.8
     graphile-build: ^5.0.0-rc.5
     graphile-config: ^1.0.0-rc.5
@@ -4666,7 +4666,7 @@ __metadata:
   peerDependenciesMeta:
     pg:
       optional: true
-  checksum: 10/ab5f5f2c975f85582b593e2cbf71319ae7bf099315aaf2c3d5816283dca4cb5395bb22634da2d1f5eb9059d1a9fc6b21ef0e50c46bbfa2e057267bbc9b78bc10
+  checksum: 10/c33b31e3aad85803e111082fe879c40ca9b735162ec1ab56c78c3fe5bd2dbd80e156b283611439f906cf2cab57529b80f85dce5d3c94dceae7f8821d593ca062
   languageName: node
   linkType: hard
 
@@ -7121,22 +7121,22 @@ __metadata:
   languageName: node
   linkType: hard
 
-"postgraphile-plugin-connection-filter@npm:^3.0.0-rc.2":
-  version: 3.0.0-rc.2
-  resolution: "postgraphile-plugin-connection-filter@npm:3.0.0-rc.2"
+"postgraphile-plugin-connection-filter@npm:^3.0.0-rc.3":
+  version: 3.0.0-rc.3
+  resolution: "postgraphile-plugin-connection-filter@npm:3.0.0-rc.3"
   dependencies:
     "@tsconfig/node20": "npm:^20.1.4"
     tslib: "npm:^2.5.0"
-  checksum: 10/50325409cb5b0befd62d15d16d5c4b3558d7414d5d6c5dd445cc021aec695f95982477eaca0637e21efe0def89cef2f75dd61ec1fd49e4b9d926d1b7ed76e6cf
+  checksum: 10/5b12fb78186f390dd071ef1c517e31066d551bcb0f4f92c8502020465704ab4d508cebdeb79a270b90600fc3db624d5b9706a10df575f65a06685c39553827d4
   languageName: node
   linkType: hard
 
-"postgraphile@npm:^5.0.0-rc.8":
-  version: 5.0.0-rc.8
-  resolution: "postgraphile@npm:5.0.0-rc.8"
+"postgraphile@npm:^5.0.0-rc.9":
+  version: 5.0.0-rc.9
+  resolution: "postgraphile@npm:5.0.0-rc.9"
   dependencies:
     "@dataplan/json": "npm:^1.0.0-rc.5"
-    "@dataplan/pg": "npm:^1.0.0-rc.6"
+    "@dataplan/pg": "npm:^1.0.0-rc.7"
     "@graphile/lru": "npm:^5.0.0-rc.4"
     "@types/node": "npm:^22.19.1"
     "@types/pg": "npm:^8.15.6"
@@ -7144,7 +7144,7 @@ __metadata:
     grafast: "npm:^1.0.0-rc.8"
     grafserv: "npm:^1.0.0-rc.6"
     graphile-build: "npm:^5.0.0-rc.5"
-    graphile-build-pg: "npm:^5.0.0-rc.6"
+    graphile-build-pg: "npm:^5.0.0-rc.7"
     graphile-config: "npm:^1.0.0-rc.5"
     graphile-utils: "npm:^5.0.0-rc.7"
     graphql: "npm:^16.9.0"
@@ -7157,12 +7157,12 @@ __metadata:
     ws: "npm:^8.18.3"
   peerDependencies:
     "@dataplan/json": ^1.0.0-rc.5
-    "@dataplan/pg": ^1.0.0-rc.6
+    "@dataplan/pg": ^1.0.0-rc.7
     "@envelop/core": ^5.0.0
     grafast: ^1.0.0-rc.8
     grafserv: ^1.0.0-rc.6
     graphile-build: ^5.0.0-rc.5
-    graphile-build-pg: ^5.0.0-rc.6
+    graphile-build-pg: ^5.0.0-rc.7
     graphile-config: ^1.0.0-rc.5
     graphql: ^16.9.0
     pg: ^8.7.1
@@ -7173,7 +7173,7 @@ __metadata:
       optional: true
   bin:
     postgraphile: dist/cli-run.js
-  checksum: 10/e096fa3df89e363c2202d5145369d2c169a756a361b7928b905951ae29bda846c99d69b656559f89bb0d93d8c607fcb92145897dc0417aa8ce33ee921afc17a6
+  checksum: 10/0516bbeacea92ebbd21ac1b31addb2b5c7be54347b6fc90000c4bf2241b1c7011cddc45af597284de79530e092dcbb3606cff1d2b6b9397aab7870e76b4891fb
   languageName: node
   linkType: hard
 
