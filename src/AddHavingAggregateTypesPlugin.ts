@@ -466,7 +466,7 @@ columns.`,
                         computedAttributeResource.parameters as PgResourceParameter[]
                       )
                         .slice(1)
-                        .some((p) => p.required);
+                        .some((p) => !p.optional);
                       return {
                         ...(ArgsType
                           ? {

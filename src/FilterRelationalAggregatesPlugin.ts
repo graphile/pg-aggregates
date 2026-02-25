@@ -751,7 +751,7 @@ group by ())`;
             > =>
               isComputedScalarAttributeResource(s) &&
               s.parameters[0].codec === table.codec &&
-              s.parameters.slice(1).every((p) => p.required === false)
+              s.parameters.slice(1).every((p) => p.optional)
           );
 
           fields = extend(
