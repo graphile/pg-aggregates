@@ -38,7 +38,7 @@ a semver minor release.
 
 ## Usage
 
-Requires PostGraphile v4.12.0-alpha.0 or higher.
+Requires PostGraphile V5.
 
 Install with:
 
@@ -46,21 +46,24 @@ Install with:
 yarn add postgraphile @graphile/pg-aggregates
 ```
 
-CLI usage via `--append-plugins`:
-
-```
-postgraphile --append-plugins @graphile/pg-aggregates -c postgres://localhost/my_db ...
-```
-
-Library usage via `appendPlugins`:
+Add the preset to your Graphile config:
 
 ```ts
-import PgAggregatesPlugin from "@graphile/pg-aggregates";
-// or: const PgAggregatesPlugin = require("@graphile/pg-aggregates").default;
+import { makePgService } from "postgraphile/adaptors/pg";
+import { PostGraphileAmberPreset } from "postgraphile/presets/amber";
+import { PgAggregatesPreset } from "@graphile/pg-aggregates";
 
-const middleware = postgraphile(DATABASE_URL, SCHEMAS, {
-  appendPlugins: [PgAggregatesPlugin],
-});
+const preset: GraphileConfig.Preset = {
+  extends: [PostGraphileAmberPreset, PgAggregatesPreset],
+  pgServices: [
+    makePgService({
+      connectionString: process.env.DATABASE_URL!,
+      schemas: ["app_public"],
+    }),
+  ],
+};
+
+export default preset;
 ```
 
 If you want you could install our [example schema](__tests__/schema.sql) and
@@ -127,17 +130,22 @@ query GroupedAggregatesByDerivative {
 
 To filter by aggregates on related tables, you will also need
 [postgraphile-plugin-connection-filter](https://github.com/graphile-contrib/postgraphile-plugin-connection-filter),
-and you will need to enable `graphileBuildOptions.connectionFilterRelations`
+and you will need to enable `schema.connectionFilterRelations`
 [as documented here](https://github.com/graphile-contrib/postgraphile-plugin-connection-filter#connectionfilterrelations).
 
-```js
-app.use(
-  postgraphile(DATABASE_URL, SCHEMA_NAME, {
-    graphileBuildOptions: {
-      connectionFilterRelations: true,
-    },
-  })
-);
+```ts
+import { PostGraphileConnectionFilterPreset } from "postgraphile-plugin-connection-filter";
+
+const preset: GraphileConfig.Preset = {
+  extends: [
+    PostGraphileAmberPreset,
+    PostGraphileConnectionFilterPreset,
+    PgAggregatesPreset,
+  ],
+  schema: {
+    connectionFilterRelations: true,
+  },
+};
 ```
 
 ## Interaction with connection parameters
@@ -420,8 +428,7 @@ const DateTruncAggregateGroupSpecsPlugin = (builder) => {
 module.exports = DateTruncAggregateGroupSpecsPlugin;
 ```
 
-Finally pass this plugin into PostGraphile via `--append-plugins` or
-`appendPlugins: [...]` - see https://www.graphile.org/postgraphile/extending/
+Finally, add this plugin to the `plugins` list in your Graphile config.
 
 See [src/AggregateSpecsPlugin.ts](src/AggregateSpecsPlugin.ts) for examples and
 more information.
