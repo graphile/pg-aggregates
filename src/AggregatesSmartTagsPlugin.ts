@@ -1,6 +1,5 @@
-import "graphile-config";
+import type {} from "graphile-config";
 
-import { gatherConfig } from "graphile-build";
 import type { PgSmartTagsDict } from "graphile-build-pg/pg-introspection";
 
 // @ts-ignore
@@ -28,7 +27,7 @@ export const PgAggregatesSmartTagsPlugin: GraphileConfig.Plugin = {
   ],
   provides: ["smart-tags"],
 
-  gather: gatherConfig({
+  gather: {
     namespace: "pgV4AggregatesSmartTags",
     initialCache() {
       return EMPTY_OBJECT;
@@ -45,7 +44,11 @@ export const PgAggregatesSmartTagsPlugin: GraphileConfig.Plugin = {
         }
       },
     },
-  }),
+  } satisfies GraphileConfig.PluginGatherConfig<
+    "pgV4AggregatesSmartTags",
+    typeof EMPTY_OBJECT,
+    typeof EMPTY_OBJECT
+  >,
 };
 
 function processTags(
