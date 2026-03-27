@@ -629,13 +629,16 @@ __metadata:
     typescript: "npm:^5.0.4"
     typescript-eslint: "npm:^8.36.0"
   peerDependencies:
-    graphile-build: ^5.0.0-rc.5
-    graphile-build-pg: ^5.0.0-rc.7
+    graphile-build: ^5.0.0
+    graphile-build-pg: ^5.0.0
+    graphile-config: ^1.0.0
     graphql: ^16.1.0-experimental-stream-defer.6
   peerDependenciesMeta:
     graphile-build:
       optional: true
     graphile-build-pg:
+      optional: true
+    graphile-config:
       optional: true
     graphql:
       optional: true
