@@ -37,22 +37,11 @@
   },
   "homepage": "https://github.com/graphile/pg-aggregates#readme",
   "peerDependencies": {
-    "graphile-build": "^5.0.0",
-    "graphile-build-pg": "^5.0.0",
-    "graphile-config": "^1.0.0",
+    "postgraphile": "^5.0.0",
     "graphql": "^16.1.0-experimental-stream-defer.6"
   },
   "peerDependenciesMeta": {
-    "graphile-build": {
-      "optional": true
-    },
-    "graphile-build-pg": {
-      "optional": true
-    },
-    "graphile-config": {
-      "optional": true
-    },
-    "graphql": {
+    "postgraphile": {
       "optional": true
     }
   },
@@ -70,8 +59,6 @@
     "eslint-plugin-jest": "^28.14.0",
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "eslint-plugin-tsdoc": "^0.3.0",
-    "graphile-build": "^5.0.0",
-    "graphile-build-pg": "^5.0.0",
     "graphql": "^16.9.0",
     "jest": "^29.6.4",
     "jest-serializer-graphql-schema": "^5.0.0",
