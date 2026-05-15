@@ -1,6 +1,7 @@
 {
   "extends": "@tsconfig/node20/tsconfig.json",
   "compilerOptions": {
+    "noEmit": true,
     "declaration": true,
     "allowJs": true,
     "sourceMap": true,
@@ -10,5 +11,6 @@
     "noUnusedParameters": false,
     "noUnusedLocals": false,
     "preserveWatchOutput": true
-  }
+  },
+  "include": ["src/**/*"]
 }
