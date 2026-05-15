@@ -1,9 +1,9 @@
-import type { PgSelectStep } from "@dataplan/pg";
+import type { PgSelectStep } from "postgraphile/@dataplan/pg";
 import type {
   GraphQLEnumType,
   GraphQLInputType,
   GraphQLObjectType,
-} from "graphql";
+} from "postgraphile/graphql";
 import type { ConnectionStep, FieldArg } from "postgraphile/grafast";
 
 import { EXPORTABLE } from "./EXPORTABLE";

@@ -3,12 +3,12 @@ import type {
   PgCodecAttribute,
   PgResourceUnique,
   PgSelectQueryBuilder,
-} from "@dataplan/pg";
-import type { PgSQL } from "graphile-build-pg/pg-sql2";
+} from "postgraphile/@dataplan/pg";
+import type { PgSQL } from "postgraphile/pg-sql2";
 import type {
   GraphQLEnumValueConfig,
   GraphQLEnumValueConfigMap,
-} from "graphql";
+} from "postgraphile/graphql";
 
 import type { AggregateGroupBySpec } from ".";
 import { EXPORTABLE } from "./EXPORTABLE";

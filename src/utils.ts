@@ -1,6 +1,9 @@
-import type { PgResource, PgResourceParameter } from "@dataplan/pg";
-import type { GraphileBuild } from "graphile-build";
-import type {} from "graphile-build-pg";
+import type {
+  PgResource,
+  PgResourceParameter,
+} from "postgraphile/@dataplan/pg";
+import type { GraphileBuild } from "postgraphile/graphile-build";
+import type {} from "postgraphile/graphile-build-pg";
 
 export function getComputedAttributeResources(
   build: GraphileBuild.Build,

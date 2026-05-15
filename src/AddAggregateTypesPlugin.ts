@@ -4,11 +4,14 @@ import type {
   PgResource,
   PgResourceParameter,
   PgSelectSingleStep,
-} from "@dataplan/pg";
-import type { FieldArgs } from "grafast";
-import type {} from "graphile-build-pg";
-import type {} from "graphile-config";
-import type { GraphQLFieldConfigMap, GraphQLOutputType } from "graphql";
+} from "postgraphile/@dataplan/pg";
+import type { FieldArgs } from "postgraphile/grafast";
+import type {} from "postgraphile/graphile-build-pg";
+import type {} from "postgraphile";
+import type {
+  GraphQLFieldConfigMap,
+  GraphQLOutputType,
+} from "postgraphile/graphql";
 
 import { EXPORTABLE } from "./EXPORTABLE.js";
 import type { AggregateSpec } from "./interfaces.js";

@@ -3,10 +3,10 @@ import type {
   PgCodecWithAttributes,
   PgRegistry,
   PgResource,
-} from "@dataplan/pg";
-import type {} from "graphile-build";
-import type {} from "graphile-build-pg";
-import type {} from "graphile-config";
+} from "postgraphile/@dataplan/pg";
+import type {} from "postgraphile/graphile-build";
+import type {} from "postgraphile/graphile-build-pg";
+import type {} from "postgraphile";
 
 import type {
   AggregateGroupBySpec,

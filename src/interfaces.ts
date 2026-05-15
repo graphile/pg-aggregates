@@ -1,4 +1,4 @@
-import type { PgCodec, PgResource, sql } from "@dataplan/pg";
+import type { PgCodec, PgResource, sql } from "postgraphile/@dataplan/pg";
 type SQL = ReturnType<typeof sql>;
 
 declare global {

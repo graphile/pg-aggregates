@@ -8,14 +8,17 @@ import type {
   PgResourceParameter,
   PgWhereConditionSpec,
   sql,
-} from "@dataplan/pg";
-import type { GrafastInputFieldConfigMap, Modifier } from "grafast";
-import type {} from "graphile-build";
+} from "postgraphile/@dataplan/pg";
+import type {
+  GrafastInputFieldConfigMap,
+  Modifier,
+} from "postgraphile/grafast";
+import type {} from "postgraphile/graphile-build";
 import type {
   GraphQLInputObjectType,
   GraphQLInputObjectTypeConfig,
   GraphQLInputType,
-} from "graphql";
+} from "postgraphile/graphql";
 import type {} from "postgraphile-plugin-connection-filter";
 
 import { EXPORTABLE } from "./EXPORTABLE.js";

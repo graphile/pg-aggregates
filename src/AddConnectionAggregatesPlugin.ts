@@ -1,5 +1,5 @@
-import type { PgSelectStep } from "graphile-build-pg/@dataplan/pg";
-import type { GraphQLObjectType } from "graphql";
+import type { PgSelectStep } from "postgraphile/@dataplan/pg";
+import type { GraphQLObjectType } from "postgraphile/graphql";
 import type { ConnectionStep } from "postgraphile/grafast";
 
 import { EXPORTABLE } from "./EXPORTABLE.js";

@@ -1,6 +1,4 @@
-import type {} from "graphile-config";
-
-import type { PgSmartTagsDict } from "graphile-build-pg/pg-introspection";
+import type {} from "postgraphile";
 
 // @ts-ignore
 const { version } = require("../package.json");
@@ -71,7 +69,7 @@ function processTags(
 }
 
 function addBehaviorToTags(
-  tags: Partial<PgSmartTagsDict>,
+  tags: Partial<GraphileBuild.PgSmartTagsDict>,
   behavior: string,
   prepend = false
 ): void {

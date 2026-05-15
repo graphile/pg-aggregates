@@ -5,8 +5,8 @@ import type {
   PgResource,
   PgSelectQueryBuilder,
   sql,
-} from "@dataplan/pg";
-import type { GraphQLEnumValueConfigMap } from "graphql";
+} from "postgraphile/@dataplan/pg";
+import type { GraphQLEnumValueConfigMap } from "postgraphile/graphql";
 
 import { EXPORTABLE } from "./EXPORTABLE.js";
 import type { AggregateSpec } from "./interfaces.js";

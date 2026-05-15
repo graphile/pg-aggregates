@@ -10,16 +10,16 @@ import type {
   PgResourceParameter,
   PgSelectArgumentDigest,
   sql,
-} from "@dataplan/pg";
+} from "postgraphile/@dataplan/pg";
 import type {
   GrafastInputFieldConfigMap,
   InputObjectFieldApplyResolver,
-} from "grafast";
+} from "postgraphile/grafast";
 import type {
   GraphQLInputObjectType,
   GraphQLInputType,
   GraphQLNamedType,
-} from "graphql";
+} from "postgraphile/graphql";
 
 import { EXPORTABLE } from "./EXPORTABLE.js";
 import type { AggregateSpec } from "./interfaces.js";

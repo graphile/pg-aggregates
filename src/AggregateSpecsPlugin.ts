@@ -1,4 +1,4 @@
-import type { PgCodec } from "@dataplan/pg";
+import type { PgCodec } from "postgraphile/@dataplan/pg";
 
 import { EXPORTABLE } from "./EXPORTABLE.js";
 import type { AggregateGroupBySpec, AggregateSpec } from "./interfaces.js";
