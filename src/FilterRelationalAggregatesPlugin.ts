@@ -1,426 +1,913 @@
-import type { Plugin } from "graphile-build";
-import type { ConnectionFilterResolver } from "postgraphile-plugin-connection-filter/dist/PgConnectionArgFilterPlugin";
-import type { BackwardRelationSpec } from "postgraphile-plugin-connection-filter/dist/PgConnectionArgFilterBackwardRelationsPlugin";
-import type { PgEntity, PgIntrospectionResultsByKind } from "graphile-build-pg";
 import type {
-  GraphQLInputFieldConfigMap,
+  PgCodec,
+  PgCodecAttributes,
+  PgCondition,
+  PgConditionCapableParent,
+  PgRegistry,
+  PgResource,
+  PgResourceParameter,
+  PgWhereConditionSpec,
+  sql,
+} from "@dataplan/pg";
+import type { GrafastInputFieldConfigMap, Modifier } from "grafast";
+import type {} from "graphile-build";
+import type {
   GraphQLInputObjectType,
+  GraphQLInputObjectTypeConfig,
+  GraphQLInputType,
 } from "graphql";
-import { AggregateSpec } from "./interfaces";
+import type {} from "postgraphile-plugin-connection-filter";
 
-const FilterRelationalAggregatesPlugin: Plugin = (builder, options) => {
-  // This hook adds 'aggregates' under a "backwards" relation, siblings of
-  // every, some, none.
-  // See https://github.com/graphile-contrib/postgraphile-plugin-connection-filter/blob/6223cdb1d2ac5723aecdf55f735a18f8e2b98683/src/PgConnectionArgFilterBackwardRelationsPlugin.ts#L374
-  builder.hook("GraphQLInputObjectType:fields", (fields, build, context) => {
-    const {
-      extend,
-      newWithHooks,
-      inflection,
-      pgSql: sql,
-      connectionFilterResolve,
-      connectionFilterRegisterResolver,
-      connectionFilterTypesByTypeName,
-      connectionFilterType,
-      graphql,
-    } = build;
-    const {
-      fieldWithHooks,
-      scope: { foreignTable, isPgConnectionFilterMany },
-      Self,
-    } = context;
+import { EXPORTABLE } from "./EXPORTABLE.js";
+import type { AggregateSpec } from "./interfaces.js";
 
-    if (!isPgConnectionFilterMany || !foreignTable) return fields;
-    if (
-      foreignTable.tags.aggregates === "off" || (
-        options.disableAggregatesByDefault &&
-        foreignTable.tags.aggregates !== "on"
-      )
-    ) {
-      return fields;
+type PgSQL = typeof sql;
+type SQL = ReturnType<PgSQL>;
+
+const { version } = require("../package.json");
+
+declare global {
+  namespace GraphileBuild {
+    interface Build {
+      PgAggregateCondition: PgAggregateConditionClass;
+      PgAggregateConditionExpression: PgAggregateConditionExpressionClass;
     }
+    interface BehaviorStrings {
+      "resource:aggregates:filterBy": true;
+      "aggregates:filterBy": true;
+      "aggregate:filterBy": true;
 
-    connectionFilterTypesByTypeName[Self.name] = Self;
+      "sum:resource:aggregates:filterBy": true;
+      "distinctCount:resource:aggregates:filterBy": true;
+      "min:resource:aggregates:filterBy": true;
+      "max:resource:aggregates:filterBy": true;
+      "average:resource:aggregates:filterBy": true;
+      "stddevSample:resource:aggregates:filterBy": true;
+      "stddevPopulation:resource:aggregates:filterBy": true;
+      "varianceSample:resource:aggregates:filterBy": true;
+      "variancePopulation:resource:aggregates:filterBy": true;
 
-    const foreignTableTypeName = inflection.tableType(foreignTable);
-    const foreignTableFilterTypeName = inflection.filterType(
-      foreignTableTypeName
-    );
-    const foreignTableAggregateFilterTypeName = inflection.filterType(
-      foreignTableTypeName + "Aggregates"
-    );
-
-    const FilterType: GraphQLInputObjectType = connectionFilterType(
-      newWithHooks,
-      foreignTableFilterTypeName,
-      foreignTable,
-      foreignTableTypeName
-    );
-
-    const filterFieldName = "filter";
-
-    const AggregateType: GraphQLInputObjectType | undefined = (() => {
-      if (
-        !(
-          foreignTableAggregateFilterTypeName in connectionFilterTypesByTypeName
-        )
-      ) {
-        connectionFilterTypesByTypeName[
-          foreignTableAggregateFilterTypeName
-        ] = newWithHooks(
-          graphql.GraphQLInputObjectType,
-          {
-            description: `A filter to be used against aggregates of \`${foreignTableTypeName}\` object types.`,
-            name: foreignTableAggregateFilterTypeName,
-            fields: {
-              [filterFieldName]: {
-                description: `A filter that must pass for the relevant \`${foreignTableTypeName}\` object to be included within the aggregate.`,
-                type: FilterType,
-              },
-            },
-          },
-          {
-            pgIntrospection: foreignTable,
-            isPgConnectionAggregateFilter: true,
-          },
-          true
-        );
-      }
-      return connectionFilterTypesByTypeName[
-        foreignTableAggregateFilterTypeName
-      ];
-    })();
-
-    if (!AggregateType) {
-      return fields;
+      "sum:attribute:aggregate:filterBy": true;
+      "distinctCount:attribute:aggregate:filterBy": true;
+      "min:attribute:aggregate:filterBy": true;
+      "max:attribute:aggregate:filterBy": true;
+      "average:attribute:aggregate:filterBy": true;
+      "stddevSample:attribute:aggregate:filterBy": true;
+      "stddevPopulation:attribute:aggregate:filterBy": true;
+      "varianceSample:attribute:aggregate:filterBy": true;
+      "variancePopulation:attribute:aggregate:filterBy": true;
     }
+  }
+}
 
-    const resolve: ConnectionFilterResolver = ({
-      sourceAlias,
-      fieldValue,
-      queryBuilder,
-      parentFieldInfo,
-    }) => {
-      if (fieldValue == null) return null;
-
-      if (!parentFieldInfo || !parentFieldInfo.backwardRelationSpec) {
-        throw new Error("Did not receive backward relation spec");
-      }
-      const {
-        keyAttributes,
-        foreignKeyAttributes,
-      }: BackwardRelationSpec = parentFieldInfo.backwardRelationSpec;
-
-      const foreignTableAlias = sql.identifier(Symbol());
-      const sqlIdentifier = sql.identifier(
-        foreignTable.namespace.name,
-        foreignTable.name
-      );
-      const sqlKeysMatch = sql.query`(${sql.join(
-        foreignKeyAttributes.map((attr, i) => {
-          return sql.fragment`${foreignTableAlias}.${sql.identifier(
-            attr.name
-          )} = ${sourceAlias}.${sql.identifier(keyAttributes[i].name)}`;
-        }),
-        ") and ("
-      )})`;
-
-      // Since we want `aggregates: {filter: {...}, sum: {...}}` at the same
-      // level, we extract the filter for the `where` clause whilst
-      // extracting all the other fields for the `select` clause.
-      const { [filterFieldName]: filter, ...rest } = fieldValue as any;
-      if (Object.keys(rest).length === 0) {
-        const fieldNames = Object.keys(AggregateType.getFields()).filter(
-          (n) => n !== filterFieldName
-        );
-        const lastFieldName = fieldNames.pop();
-        throw new Error(
-          `'aggregates' filter must specify at least one aggregate: ${
-            fieldNames.length > 0 ? `'${fieldNames.join("', '")}' or ` : ""
-          }'${lastFieldName}').`
-        );
-      }
-      const sqlFragment = filter
-        ? connectionFilterResolve(
-            filter,
-            foreignTableAlias,
-            foreignTableFilterTypeName,
-            queryBuilder
-          )
-        : sql.fragment`true`;
-      const sqlAggregateConditions = connectionFilterResolve(
-        rest,
-        foreignTableAlias,
-        foreignTableAggregateFilterTypeName,
-        queryBuilder
-      );
-      //const sqlAggregateConditions = [sql.fragment`sum(saves) > 9`];
-      const sqlSelectWhereKeysMatch = sql.query`(select (${sqlAggregateConditions}) from (
-          select * from ${sqlIdentifier} as ${foreignTableAlias}
-          where ${sqlKeysMatch}
-          and (${sqlFragment})
-        ) as ${foreignTableAlias}
-      )`;
-      return sqlSelectWhereKeysMatch;
-    };
-
-    const fieldName = "aggregates";
-    connectionFilterRegisterResolver(Self.name, fieldName, resolve);
-
-    return extend(fields, {
-      [fieldName]: fieldWithHooks(
-        fieldName,
-        {
-          description: `Aggregates across related \`${foreignTableTypeName}\` match the filter criteria.`,
-          type: AggregateType,
-        },
-        {
-          isPgConnectionFilterAggregatesField: true,
-        }
-      ),
-    });
-  });
-
-  // This hook adds our various aggregates to the 'aggregates' input defined in `AggregateType` above
-  builder.hook("GraphQLInputObjectType:fields", (fields, build, context) => {
-    const {
-      extend,
-      graphql,
-      newWithHooks,
-      inflection,
-      connectionFilterResolve,
-      connectionFilterRegisterResolver,
-    } = build;
-    const {
-      fieldWithHooks,
-      scope: { isPgConnectionAggregateFilter },
-      Self,
-    } = context;
-    const pgIntrospection: PgEntity | undefined = context.scope.pgIntrospection;
-    const pgAggregateSpecs: AggregateSpec[] = build.pgAggregateSpecs;
-
-    if (
-      !isPgConnectionAggregateFilter ||
-      !pgIntrospection ||
-      pgIntrospection.kind !== "class"
-    ) {
-      return fields;
-    }
-    const foreignTable = pgIntrospection;
-
-    const foreignTableTypeName = inflection.tableType(foreignTable);
-
-    return pgAggregateSpecs.reduce((memo, spec) => {
-      const filterTypeName = inflection.filterType(
-        foreignTableTypeName + inflection.upperCamelCase(spec.id) + "Aggregate"
-      );
-      const AggregateType = newWithHooks(
-        graphql.GraphQLInputObjectType,
-        {
-          name: filterTypeName,
-        },
-        {
-          isPgConnectionAggregateAggregateFilter: true,
-          pgConnectionAggregateFilterAggregateSpec: spec,
-          pgIntrospection,
-        },
-        true
-      );
-      if (!AggregateType) {
-        return memo;
-      }
-      const fieldName = inflection.camelCase(spec.id);
-
-      const resolve: ConnectionFilterResolver = ({
-        sourceAlias,
-        fieldValue,
-        queryBuilder,
-        //parentFieldInfo,
-      }) => {
-        if (fieldValue == null) return null;
-        const sqlFrag = connectionFilterResolve(
-          fieldValue,
-          sourceAlias,
-          filterTypeName,
-          queryBuilder
-        );
-        return sqlFrag;
+const pgAggregateApplyAttributeOrder = EXPORTABLE(
+  () =>
+    (
+      PgCondition: GraphileBuild.Build["dataplanPg"]["PgCondition"],
+      sql: GraphileBuild.Build["sql"],
+      spec: AggregateSpec,
+      attributeName: string,
+      attrCodec: PgCodec,
+      rawAttrCodec: PgCodec,
+      $parent: PgAggregateConditionExpression,
+      input: unknown
+    ) => {
+      if (input == null) return;
+      const $col = new PgCondition($parent);
+      $col.extensions.pgFilterAttribute = {
+        codec: attrCodec,
+        expression: spec.sqlAggregateWrap(
+          sql`${$col.alias}.${sql.identifier(attributeName)}`,
+          rawAttrCodec
+        ),
       };
-      connectionFilterRegisterResolver(Self.name, fieldName, resolve);
 
-      return extend(
-        memo,
-        {
-          [fieldName]: fieldWithHooks(fieldName, {
-            type: AggregateType,
-            description: `${spec.HumanLabel} aggregate over matching \`${foreignTableTypeName}\` objects.`,
-          }),
-        },
-        `Adding aggregate '${spec.id}' filter input for '${pgIntrospection.name}'. `
-      );
-    }, fields);
-  });
+      return $col;
+    },
+  [],
+  "pgAggregateApplyAttributeOrder"
+);
 
-  // This hook adds matching columns to the relevant aggregate types.
-  builder.hook("GraphQLInputObjectType:fields", (fields, build, context) => {
-    const {
-      extend,
-      inflection,
-      connectionFilterOperatorsType,
-      newWithHooks,
-      pgSql: sql,
-      connectionFilterResolve,
-      connectionFilterRegisterResolver,
-      pgGetComputedColumnDetails: getComputedColumnDetails,
-    } = build;
-    const pgIntrospectionResultsByKind: PgIntrospectionResultsByKind =
-      build.pgIntrospectionResultsByKind;
-    const {
-      scope: { isPgConnectionAggregateAggregateFilter },
-      Self,
-    } = context;
+const pgAggregateApplyComputedAttributeOrder = EXPORTABLE(
+  () =>
+    (
+      PgCondition: GraphileBuild.Build["dataplanPg"]["PgCondition"],
+      sql: GraphileBuild.Build["sql"],
+      spec: AggregateSpec,
+      proc: PgResource,
+      attrCodec: PgCodec,
+      $parent: PgAggregateConditionExpression,
+      input: unknown
+    ) => {
+      if (input == null) return;
+      const $col = new PgCondition($parent);
+      const sqlComputedAttributeCall = sql.query`${
+        typeof proc.from === "function"
+          ? proc.from({ placeholder: $col.alias })
+          : proc.from
+      }`;
+      $col.extensions.pgFilterAttribute = {
+        codec: attrCodec,
+        expression: spec.sqlAggregateWrap(sqlComputedAttributeCall, proc.codec),
+      };
 
-    const spec: AggregateSpec | undefined =
-      context.scope.pgConnectionAggregateFilterAggregateSpec;
-    const pgIntrospection: PgEntity | undefined = context.scope.pgIntrospection;
+      return $col;
+    },
+  [],
+  "pgAggregateApplyComputedAttributeOrder"
+);
 
-    if (
-      !isPgConnectionAggregateAggregateFilter ||
-      !spec ||
-      !pgIntrospection ||
-      pgIntrospection.kind !== "class"
+const pgAggregateApplyForeignCondition = EXPORTABLE(
+  () =>
+    function (
+      PgCondition: GraphileBuild.Build["dataplanPg"]["PgCondition"],
+      $subquery: PgAggregateCondition<any>,
+      input: unknown
     ) {
-      return fields;
-    }
-    const table = pgIntrospection;
+      if (input == null) return;
+      // Enable all the helpers
+      const $condition = new PgCondition($subquery, false, "AND");
+      return $condition;
+    },
+  [],
+  "pgAggregateApplyForeignCondition"
+);
 
-    return extend(fields, {
-      ...table.attributes.reduce((memo, attr) => {
-        if (
-          (spec.shouldApplyToEntity && !spec.shouldApplyToEntity(attr)) ||
-          !spec.isSuitableType(attr.type)
-        ) {
-          return memo;
+const pgAggregatesApply = EXPORTABLE(
+  () =>
+    (
+      PgAggregateCondition: PgAggregateConditionClass,
+      pgWhereConditionSpecListToSQL: GraphileBuild.Build["dataplanPg"]["pgWhereConditionSpecListToSQL"],
+      sql: GraphileBuild.Build["sql"],
+      $where: PgCondition<any>,
+      input: unknown
+    ) => {
+      if (input == null) return;
+      // assertAllowed(fieldArgs, "object");
+      if (!$where.extensions.pgFilterRelation) {
+        throw new Error(`Invalid use of filter, 'pgFilterRelation' expected`);
+      }
+      const { localAttributes, remoteAttributes, tableExpression, alias } =
+        $where.extensions.pgFilterRelation;
+      const $subQuery = new PgAggregateCondition(
+        $where,
+        {
+          sql,
+          tableExpression,
+          alias,
+        },
+        pgWhereConditionSpecListToSQL
+      );
+      localAttributes.forEach((localAttribute, i) => {
+        const remoteAttribute = remoteAttributes[i];
+        $subQuery.where(
+          sql`${$where.alias}.${sql.identifier(localAttribute as string)} = ${
+            $subQuery.alias
+          }.${sql.identifier(remoteAttribute as string)}`
+        );
+      });
+      return $subQuery;
+    },
+  [],
+  "pgAggregatesApply"
+);
+
+export const Plugin: GraphileConfig.Plugin = {
+  name: "PgAggregatesFilterRelationalAggregatesPlugin",
+  description: `\
+Adds the ability to filter a collection by aggregates on relationships if you \
+have postgraphile-plugin-connection-filter, e.g. filtering all players based on \
+the sum of their points scored.`,
+  version,
+
+  // This has to run AFTER any plugins that provide `build.pgAggregateSpecs`
+  // otherwise we might add codecs to build.allPgCodecs before all the relevant
+  // codecs/specs are available.
+  after: ["PgBasicsPlugin", "PgCodecsPlugin", "aggregates"],
+  provides: ["codecs"],
+  before: ["PgConnectionArgFilterPlugin"],
+
+  inflection: {
+    add: {
+      // TODO: rename this!
+      filterTableAggregateType(_preset, foreignTable, spec) {
+        const foreignTableTypeName = this.tableType(foreignTable.codec);
+        return this.filterType(
+          foreignTableTypeName + this.upperCamelCase(spec.id) + "Aggregate"
+        );
+      },
+    },
+  },
+
+  schema: {
+    behaviorRegistry: {
+      add: {
+        "aggregates:filterBy": {
+          description:
+            "Can we filter by the details of this resource whilst aggregating the resource?",
+          entities: ["pgResource"],
+        },
+        "aggregate:filterBy": {
+          description: "Can we filter using the value of this attribute",
+          entities: ["pgCodecAttribute"],
+        },
+      },
+    },
+
+    entityBehavior: {
+      pgResource: ["aggregates:filterBy", "aggregate:filterBy"],
+      pgCodecAttribute: ["aggregate:filterBy"],
+    },
+
+    hooks: {
+      build(build) {
+        const {
+          EXPORTABLE,
+          grafast: { Modifier },
+        } = build;
+
+        if (!build.allPgCodecs) {
+          throw new Error(
+            "PgAggregatesFilterRelationalAggregatesPlugin must run after build.allPgCodecs has been established"
+          );
         }
-        const [pgType, pgTypeModifier] = spec.pgTypeAndModifierModifier
-          ? spec.pgTypeAndModifierModifier(attr.type, attr.typeModifier)
-          : [attr.type, attr.typeModifier];
-        const fieldName = inflection.column(attr);
+        if (!build.pgAggregateSpecs) {
+          throw new Error(
+            "PgAggregatesFilterRelationalAggregatesPlugin must run after build.pgAggregateSpecs has been established"
+          );
+        }
 
-        const OperatorsType:
-          | GraphQLInputObjectType
-          | undefined = connectionFilterOperatorsType(
-          newWithHooks,
-          pgType.id,
-          pgTypeModifier
+        // Add aggregate derivative codecs to `allPgCodecs`
+        for (const spec of build.pgAggregateSpecs) {
+          if (!spec.pgTypeCodecModifier) {
+            continue;
+          }
+          for (const existingCodec of build.allPgCodecs) {
+            if (spec.isSuitableType(existingCodec)) {
+              const codec = spec.pgTypeCodecModifier(existingCodec);
+              if (!build.allPgCodecs.has(codec)) {
+                build.allPgCodecs.add(codec);
+              }
+            }
+          }
+        }
+        const PgAggregateConditionExpression = EXPORTABLE(
+          (Modifier) =>
+            class PgAggregateConditionExpression
+              extends Modifier<PgAggregateCondition<any>>
+              implements PgConditionCapableParent
+            {
+              alias: SQL;
+              conditions: PgWhereConditionSpec<any>[] = [];
+              constructor(
+                parent: PgAggregateCondition<any>,
+                private spec: AggregateSpec,
+                private pgWhereConditionSpecListToSQL: GraphileBuild.Build["dataplanPg"]["pgWhereConditionSpecListToSQL"]
+              ) {
+                super(parent);
+                this.alias = parent.alias;
+              }
+
+              where(condition: PgWhereConditionSpec<any>): void {
+                this.conditions.push(condition);
+              }
+
+              apply(): void {
+                const sqlCondition = this.pgWhereConditionSpecListToSQL(
+                  this.alias,
+                  this.conditions
+                );
+                if (sqlCondition) {
+                  this.parent.expression(sqlCondition);
+                }
+              }
+            } as PgAggregateConditionExpressionClass,
+          [Modifier]
+        );
+        const PgAggregateCondition = EXPORTABLE(
+          (Modifier, PgAggregateConditionExpression) =>
+            class PgAggregateCondition<
+              TParentStep extends PgConditionCapableParent
+            > extends Modifier<TParentStep> {
+              sql: PgSQL;
+              tableExpression: SQL;
+              alias: SQL;
+              conditions: PgWhereConditionSpec<any>[] = [];
+              expressions: SQL[] = [];
+              constructor(
+                parent: TParentStep,
+                options: {
+                  sql: PgSQL;
+                  tableExpression: SQL;
+                  alias?: string;
+                },
+                private pgWhereConditionSpecListToSQL: GraphileBuild.Build["dataplanPg"]["pgWhereConditionSpecListToSQL"]
+              ) {
+                super(parent);
+                const { sql, tableExpression, alias } = options;
+                this.sql = sql;
+                this.alias = sql.identifier(Symbol(alias ?? "aggregate"));
+                this.tableExpression = tableExpression;
+              }
+
+              where(condition: PgWhereConditionSpec<any>): void {
+                this.conditions.push(condition);
+              }
+
+              expression(expression: SQL): void {
+                this.expressions.push(expression);
+              }
+
+              forAggregate(
+                spec: AggregateSpec
+              ): PgAggregateConditionExpression {
+                return new PgAggregateConditionExpression(
+                  this,
+                  spec,
+                  this.pgWhereConditionSpecListToSQL
+                );
+              }
+
+              apply(): void {
+                const { sql } = this;
+
+                const sqlCondition = this.pgWhereConditionSpecListToSQL(
+                  this.alias,
+                  this.conditions
+                );
+                const where = sqlCondition
+                  ? sql`where ${sqlCondition}`
+                  : sql.blank;
+                const boolExpr =
+                  this.expressions.length === 0
+                    ? sql.true
+                    : sql.parens(
+                        sql.join(
+                          this.expressions.map((expr) => sql.parens(expr)),
+                          "\nand\n"
+                        )
+                      );
+                const subquery = sql`(${sql.indent`\
+select ${boolExpr}
+from ${this.tableExpression} as ${this.alias}
+${where}`}
+group by ())`;
+                return this.parent.where(subquery);
+              }
+            } as PgAggregateConditionClass,
+          [Modifier, PgAggregateConditionExpression]
         );
 
-        if (!OperatorsType) {
-          return memo;
-        }
-
-        const resolve: ConnectionFilterResolver = ({
-          sourceAlias,
-          fieldName,
-          fieldValue,
-          queryBuilder,
-        }) => {
-          if (fieldValue == null) return null;
-          const sqlColumn = sql.query`${sourceAlias}.${sql.identifier(
-            attr.name
-          )}`;
-          const sqlAggregate = spec.sqlAggregateWrap(sqlColumn);
-          const frag = connectionFilterResolve(
-            fieldValue,
-            sqlAggregate,
-            OperatorsType.name,
-            queryBuilder,
-            pgType,
-            pgTypeModifier,
-            fieldName
-          );
-          return frag;
-        };
-        connectionFilterRegisterResolver(Self.name, fieldName, resolve);
-
-        return build.extend(memo, {
-          [fieldName]: {
-            type: OperatorsType,
-          },
-        });
-      }, {} as GraphQLInputFieldConfigMap),
-
-      ...pgIntrospectionResultsByKind.procedure.reduce((memo, proc) => {
-        if (proc.returnsSet) {
-          return memo;
-        }
-        const type = pgIntrospectionResultsByKind.typeById[proc.returnTypeId];
-        if (
-          (spec.shouldApplyToEntity && !spec.shouldApplyToEntity(proc)) ||
-          !spec.isSuitableType(type)
-        ) {
-          return memo;
-        }
-        const computedColumnDetails = getComputedColumnDetails(
+        return build.extend(
           build,
-          table,
-          proc
-        );
-        if (!computedColumnDetails) {
-          return memo;
-        }
-        const { pseudoColumnName } = computedColumnDetails;
-        const fieldName = inflection.computedColumn(
-          pseudoColumnName,
-          proc,
-          table
-        );
-
-        const OperatorsType:
-          | GraphQLInputObjectType
-          | undefined = connectionFilterOperatorsType(
-          newWithHooks,
-          type.id,
-          null
-        );
-
-        if (!OperatorsType) {
-          return memo;
-        }
-
-        const resolve: ConnectionFilterResolver = ({
-          sourceAlias,
-          fieldName,
-          fieldValue,
-          queryBuilder,
-        }) => {
-          if (fieldValue == null) return null;
-          const sqlComputedColumnCall = sql.query`${sql.identifier(
-            proc.namespaceName,
-            proc.name
-          )}(${sourceAlias})`;
-          const sqlAggregate = spec.sqlAggregateWrap(sqlComputedColumnCall);
-          const frag = connectionFilterResolve(
-            fieldValue,
-            sqlAggregate,
-            OperatorsType.name,
-            queryBuilder,
-            type,
-            null,
-            fieldName
-          );
-          return frag;
-        };
-        connectionFilterRegisterResolver(Self.name, fieldName, resolve);
-
-        return build.extend(memo, {
-          [fieldName]: {
-            type: OperatorsType,
+          {
+            PgAggregateCondition,
+            PgAggregateConditionExpression,
           },
-        });
-      }, {} as GraphQLInputFieldConfigMap),
-    });
-  });
+          "Adding step classes from postgraphile-plugin-connection-filter"
+        );
+      },
+
+      init(_, build) {
+        const {
+          inflection,
+          dataplanPg: { PgCondition },
+          EXPORTABLE,
+        } = build;
+
+        if (!inflection.filterType) {
+          // Filter plugin is not enabled
+          return _;
+        }
+
+        // Register the aggregate filter type for each table
+        for (const foreignTable of Object.values(
+          build.input.pgRegistry.pgResources
+        )) {
+          if (foreignTable.parameters || !foreignTable.codec.attributes) {
+            continue;
+          }
+          if (
+            !build.behavior.pgResourceMatches(
+              foreignTable,
+              "resource:aggregates:filterBy"
+            )
+          ) {
+            continue;
+          }
+
+          const foreignTableTypeName = inflection.tableType(foreignTable.codec);
+          const foreignTableFilterTypeName =
+            inflection.filterType(foreignTableTypeName);
+          const foreignTableAggregateFilterTypeName = inflection.filterType(
+            foreignTableTypeName + "Aggregates"
+          );
+
+          build.recoverable(null, () => {
+            // TODO: inflect
+            const filterFieldName = "filter";
+            build.registerInputObjectType(
+              foreignTableAggregateFilterTypeName,
+              {
+                pgResource: foreignTable,
+                isPgConnectionAggregateFilter: true,
+              },
+              () => {
+                return {
+                  description: `A filter to be used against aggregates of \`${foreignTableTypeName}\` object types.`,
+                  fields: () => {
+                    const type = build.getTypeByName(
+                      foreignTableFilterTypeName
+                    ) as GraphQLInputObjectType;
+                    if (!type) {
+                      return {};
+                    }
+                    return {
+                      [filterFieldName as string]: {
+                        description: `A filter that must pass for the relevant \`${foreignTableTypeName}\` object to be included within the aggregate.`,
+                        type,
+                        apply: EXPORTABLE(
+                          (PgCondition, pgAggregateApplyForeignCondition) =>
+                            (
+                              $subquery: PgAggregateCondition<any>,
+                              input: unknown
+                            ) =>
+                              pgAggregateApplyForeignCondition(
+                                PgCondition,
+                                $subquery,
+                                input
+                              ),
+                          [PgCondition, pgAggregateApplyForeignCondition],
+                          `${filterFieldName}Apply`
+                        ),
+                        // No need to auto-apply since we're applied manually via `fieldArgs.apply($subQuery)` below.
+                      },
+                    };
+                  },
+                } as Omit<GraphQLInputObjectTypeConfig, "name">;
+              },
+              "Adding aggregate filter input type"
+            );
+          });
+
+          // Register the aggregate spec filter type for each aggreage spec for each source
+          for (const spec of build.pgAggregateSpecs) {
+            if (
+              !build.behavior.pgResourceMatches(
+                foreignTable,
+                `${spec.id}:resource:aggregates:filterBy`
+              )
+            ) {
+              continue;
+            }
+            const filterTypeName = inflection.filterTableAggregateType(
+              foreignTable,
+              spec
+            );
+            build.registerInputObjectType(
+              filterTypeName,
+              {
+                isPgConnectionAggregateAggregateFilter: true,
+                pgConnectionAggregateFilterAggregateSpec: spec,
+                pgTypeResource: foreignTable,
+              },
+              () => ({}),
+              `Add '${spec.id}' aggregate filter type for '${foreignTableTypeName}'`
+            );
+          }
+        }
+
+        return _;
+      },
+
+      // This hook adds 'aggregates' under a "backwards" relation, siblings of
+      // every, some, none.
+      // See https://github.com/graphile-contrib/postgraphile-plugin-connection-filter/blob/6223cdb1d2ac5723aecdf55f735a18f8e2b98683/src/PgConnectionArgFilterBackwardRelationsPlugin.ts#L374
+      GraphQLInputObjectType_fields(inFields, build, context) {
+        let fields = inFields;
+        const {
+          extend,
+          inflection,
+          sql,
+          pgAggregateSpecs,
+          dataplanPg: { PgCondition, pgWhereConditionSpecListToSQL },
+          PgAggregateCondition,
+          EXPORTABLE,
+        } = build;
+
+        if (!inflection.filterType) {
+          // Filter plugin is not enabled
+          return inFields;
+        }
+
+        const {
+          fieldWithHooks,
+          scope: {
+            foreignTable,
+            isPgConnectionFilterMany,
+            isPgConnectionAggregateFilter,
+            pgResource,
+            isPgConnectionAggregateAggregateFilter,
+            pgConnectionAggregateFilterAggregateSpec: spec,
+            pgTypeResource,
+          },
+        } = context;
+
+        // Add 'aggregates' field to relation filters, next to `every`/`some`/`none`
+        fields = (() => {
+          if (!isPgConnectionFilterMany || !foreignTable) return fields;
+
+          const foreignTableTypeName = inflection.tableType(foreignTable.codec);
+          const foreignTableAggregateFilterTypeName = inflection.filterType(
+            foreignTableTypeName + "Aggregates"
+          );
+
+          const fieldName = "aggregates";
+
+          const AggregateType = build.getTypeByName(
+            foreignTableAggregateFilterTypeName
+          ) as GraphQLInputObjectType;
+          if (!AggregateType) {
+            return fields;
+          }
+
+          return build.extend(
+            fields,
+            {
+              [fieldName]: fieldWithHooks(
+                {
+                  fieldName,
+                  isPgConnectionFilterAggregatesField: true,
+                },
+                {
+                  description: `Aggregates across related \`${foreignTableTypeName}\` match the filter criteria.`,
+                  type: AggregateType,
+                  apply: EXPORTABLE(
+                    (
+                      PgAggregateCondition,
+                      pgAggregatesApply,
+                      pgWhereConditionSpecListToSQL,
+                      sql
+                    ) =>
+                      function ($where: PgCondition<any>, input: unknown) {
+                        return pgAggregatesApply(
+                          PgAggregateCondition,
+                          pgWhereConditionSpecListToSQL,
+                          sql,
+                          $where,
+                          input
+                        );
+                      },
+                    [
+                      PgAggregateCondition,
+                      pgAggregatesApply,
+                      pgWhereConditionSpecListToSQL,
+                      sql,
+                    ]
+                  ),
+                  // No need to auto-apply, postgraphile-plugin-connection-filter explicitly calls fieldArgs.apply()
+                }
+              ),
+            },
+            "Adding 'aggregates' filter field on relation"
+          );
+        })();
+
+        // This hook adds our various aggregates to the 'aggregates' input defined in `AggregateType` above
+        fields = (() => {
+          if (
+            !isPgConnectionAggregateFilter ||
+            !pgResource ||
+            pgResource.parameters ||
+            !pgResource.codec.attributes
+          ) {
+            return fields;
+          }
+          const foreignTable = pgResource;
+
+          const foreignTableTypeName = inflection.tableType(foreignTable.codec);
+
+          return pgAggregateSpecs.reduce((memo, spec) => {
+            const filterTypeName = inflection.filterTableAggregateType(
+              foreignTable,
+              spec
+            );
+            const fieldName = inflection.camelCase(spec.id);
+
+            const type = build.getTypeByName(
+              filterTypeName
+            ) as GraphQLInputType;
+            if (!type) {
+              return memo;
+            }
+            return extend(
+              memo,
+              {
+                [fieldName]: fieldWithHooks({ fieldName }, () => ({
+                  type,
+                  description: `${spec.HumanLabel} aggregate over matching \`${foreignTableTypeName}\` objects.`,
+                  apply: EXPORTABLE(
+                    (spec) =>
+                      function (
+                        $subquery: PgAggregateCondition<any>,
+                        input: unknown
+                      ) {
+                        if (input == null) return;
+                        return $subquery.forAggregate(spec);
+                      },
+                    [spec]
+                  ),
+                })),
+              },
+              `Adding aggregate '${spec.id}' filter input for '${pgResource.name}'. `
+            );
+          }, fields);
+        })();
+
+        // This hook adds matching attributes to the relevant aggregate types.
+        fields = (() => {
+          if (
+            !isPgConnectionAggregateAggregateFilter ||
+            !spec ||
+            !pgTypeResource ||
+            pgTypeResource.parameters ||
+            !pgTypeResource.codec.attributes
+          ) {
+            return fields;
+          }
+          const table = pgTypeResource;
+
+          const attributes: PgCodecAttributes = table.codec.attributes;
+
+          fields = extend(
+            fields,
+            {
+              ...Object.entries(attributes).reduce(
+                (memo, [attributeName, attribute]) => {
+                  if (
+                    !build.behavior.pgCodecAttributeMatches(
+                      [table.codec, attributeName],
+                      `${spec.id}:attribute:aggregate:filterBy`
+                    )
+                  ) {
+                    return memo;
+                  }
+                  if (
+                    (spec.shouldApplyToEntity &&
+                      !spec.shouldApplyToEntity({
+                        type: "attribute",
+                        codec: table.codec,
+                        attributeName: attributeName,
+                      })) ||
+                    !spec.isSuitableType(attribute.codec)
+                  ) {
+                    return memo;
+                  }
+                  const rawAttrCodec = attribute.codec;
+                  const attrCodec = spec.pgTypeCodecModifier
+                    ? spec.pgTypeCodecModifier(attribute.codec)
+                    : attribute.codec;
+                  const fieldName = inflection.attribute({
+                    codec: table.codec,
+                    attributeName,
+                  });
+
+                  const digest =
+                    build.connectionFilterOperatorsDigest(attrCodec);
+                  if (!digest) {
+                    return memo;
+                  }
+                  const OperatorsType = build.getTypeByName(
+                    digest.operatorsTypeName
+                  ) as GraphQLInputObjectType;
+
+                  if (!OperatorsType) {
+                    return memo;
+                  }
+
+                  return build.extend(
+                    memo,
+                    {
+                      [fieldName]: {
+                        type: OperatorsType,
+                        apply: EXPORTABLE(
+                          (
+                            PgCondition,
+                            attrCodec,
+                            attributeName,
+                            pgAggregateApplyAttributeOrder,
+                            rawAttrCodec,
+                            spec,
+                            sql
+                          ) =>
+                            function (
+                              $parent: PgAggregateConditionExpression,
+                              input: unknown
+                            ) {
+                              return pgAggregateApplyAttributeOrder(
+                                PgCondition,
+                                sql,
+                                spec,
+                                attributeName,
+                                attrCodec,
+                                rawAttrCodec,
+                                $parent,
+                                input
+                              );
+                            },
+                          [
+                            PgCondition,
+                            attrCodec,
+                            attributeName,
+                            pgAggregateApplyAttributeOrder,
+                            rawAttrCodec,
+                            spec,
+                            sql,
+                          ]
+                        ),
+                        // No need to auto-apply since we're called via `fieldArgs.apply($subquery.forAggregate(spec))` above
+                      },
+                    },
+                    `Add aggregate '${attributeName}' filter for source '${table.name}' for spec '${spec.id}'`
+                  );
+                },
+                Object.create(null) as GrafastInputFieldConfigMap<any>
+              ),
+            },
+            `Adding per-attribute '${spec.id}' aggregate filters for '${pgTypeResource.name}'`
+          );
+
+          const computedAttributeResources = (
+            Object.values(build.input.pgRegistry.pgResources) as PgResource[]
+          ).filter(
+            (
+              s
+            ): s is PgResource<
+              string,
+              PgCodec,
+              never[],
+              PgResourceParameter[],
+              PgRegistry
+            > =>
+              isComputedScalarAttributeResource(s) &&
+              s.parameters[0].codec === table.codec &&
+              s.parameters.slice(1).every((p) => p.optional)
+          );
+
+          fields = extend(
+            fields,
+            {
+              ...computedAttributeResources.reduce((memo, proc) => {
+                if (
+                  (spec.shouldApplyToEntity &&
+                    !spec.shouldApplyToEntity({
+                      type: "computedAttribute",
+                      resource: proc,
+                    })) ||
+                  !spec.isSuitableType(proc.codec)
+                ) {
+                  return memo;
+                }
+                const fieldName = inflection.computedAttributeField({
+                  resource: proc,
+                });
+
+                const attrCodec = spec.pgTypeCodecModifier
+                  ? spec.pgTypeCodecModifier(proc.codec)
+                  : proc.codec;
+                const digest = build.connectionFilterOperatorsDigest(attrCodec);
+                if (!digest) {
+                  return memo;
+                }
+                const OperatorsType = build.getTypeByName(
+                  digest.operatorsTypeName
+                ) as GraphQLInputObjectType;
+
+                if (!OperatorsType) {
+                  return memo;
+                }
+
+                return build.extend(
+                  memo,
+                  {
+                    [fieldName]: {
+                      type: OperatorsType,
+                      apply: EXPORTABLE(
+                        (
+                          PgCondition,
+                          attrCodec,
+                          pgAggregateApplyComputedAttributeOrder,
+                          proc,
+                          spec,
+                          sql
+                        ) =>
+                          function apply(
+                            $parent: PgAggregateConditionExpression,
+                            input: unknown
+                          ) {
+                            return pgAggregateApplyComputedAttributeOrder(
+                              PgCondition,
+                              sql,
+                              spec,
+                              proc,
+                              attrCodec,
+                              $parent,
+                              input
+                            );
+                          },
+                        [
+                          PgCondition,
+                          attrCodec,
+                          pgAggregateApplyComputedAttributeOrder,
+                          proc,
+                          spec,
+                          sql,
+                        ]
+                      ),
+                    },
+                  },
+                  `Add computed aggregate '${fieldName}' filter for source '${table.name}' for spec '${spec.id}'`
+                );
+              }, Object.create(null) as GrafastInputFieldConfigMap<PgAggregateConditionExpression>),
+            },
+            `Adding per-computed-column '${spec.id}' aggregate filters for '${pgTypeResource.name}'`
+          );
+
+          return fields;
+        })();
+
+        return fields;
+      },
+    },
+  },
 };
 
-export default FilterRelationalAggregatesPlugin;
+export { Plugin as PgAggregatesFilterRelationalAggregatesPlugin };
+
+interface PgAggregateCondition<TParentStep extends PgConditionCapableParent>
+  extends Modifier<TParentStep> {
+  sql: PgSQL;
+  tableExpression: SQL;
+  alias: SQL;
+  conditions: PgWhereConditionSpec<any>[];
+  expressions: SQL[];
+  where(condition: PgWhereConditionSpec<any>): void;
+  expression(expression: SQL): void;
+  forAggregate(spec: AggregateSpec): PgAggregateConditionExpression;
+  apply(): void;
+}
+
+interface PgAggregateConditionClass {
+  new <TParentStep extends PgConditionCapableParent>(
+    $parent: TParentStep,
+    options: {
+      sql: PgSQL;
+      tableExpression: SQL;
+      alias?: string;
+    },
+    pgWhereConditionSpecListToSQL: GraphileBuild.Build["dataplanPg"]["pgWhereConditionSpecListToSQL"]
+  ): PgAggregateCondition<TParentStep>;
+}
+
+interface PgAggregateConditionExpression
+  extends Modifier<PgAggregateCondition<any>> {
+  alias: SQL;
+  conditions: PgWhereConditionSpec<any>[];
+
+  where(condition: PgWhereConditionSpec<any>): void;
+
+  apply(): void;
+}
+
+interface PgAggregateConditionExpressionClass {
+  new (
+    $parent: PgAggregateCondition<any>,
+    spec: AggregateSpec,
+    pgWhereConditionSpecListToSQL: GraphileBuild.Build["dataplanPg"]["pgWhereConditionSpecListToSQL"]
+  ): PgAggregateConditionExpression;
+}
+
+function isComputedScalarAttributeResource(
+  s: PgResource<any, any, any, any, any>
+): s is PgResource<
+  string,
+  PgCodec,
+  never[],
+  PgResourceParameter[],
+  PgRegistry
+> {
+  if (!s.parameters || s.parameters.length < 1) {
+    return false;
+  }
+  if (s.codec.attributes) {
+    return false;
+  }
+  if (!s.isUnique) {
+    return false;
+  }
+  const firstParameter = s.parameters[0] as PgResourceParameter;
+  if (!firstParameter?.codec.attributes) {
+    return false;
+  }
+  return true;
+}

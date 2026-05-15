@@ -1,293 +1,566 @@
-import type { Plugin } from "graphile-build";
 import type {
-  PgAttribute,
-  QueryBuilder,
-  PgProc,
-  PgClass,
-} from "graphile-build-pg";
-import type { GraphQLResolveInfo, GraphQLFieldConfigMap } from "graphql";
-import { AggregateSpec } from "./interfaces";
+  PgCodec,
+  PgCodecAttribute,
+  PgResource,
+  PgResourceParameter,
+  PgSelectSingleStep,
+} from "@dataplan/pg";
+import type { FieldArgs } from "grafast";
+import type {} from "graphile-build-pg";
+import type {} from "graphile-config";
+import type { GraphQLFieldConfigMap, GraphQLOutputType } from "graphql";
 
-const AddAggregateTypesPlugin: Plugin = (builder, options) => {
-  // Create the aggregates type for each table
-  builder.hook("init", (init, build, _context) => {
-    const {
-      newWithHooks,
-      graphql: {
-        GraphQLObjectType,
-        GraphQLList,
-        GraphQLNonNull,
-        GraphQLString,
-      },
-      inflection,
-      pgIntrospectionResultsByKind,
-      pgOmit: omit,
-    } = build;
+import { EXPORTABLE } from "./EXPORTABLE.js";
+import type { AggregateSpec } from "./interfaces.js";
+import { getComputedAttributeResources } from "./utils.js";
 
-    pgIntrospectionResultsByKind.class.forEach((table: PgClass) => {
-      if (!table.namespace) {
-        return;
-      }
-      if (omit(table, "read")) {
-        return;
-      }
-      if (table.tags.enum) {
-        return;
-      }
-      if (!table.isSelectable) {
-        return;
-      }
-      if (
-        table.tags.aggregates === "off" || (
-          options.disableAggregatesByDefault &&
-          table.tags.aggregates !== "on"
-        )
-      ) {
-        return;
-      }
+declare global {
+  namespace GraphileBuild {
+    interface BehaviorStrings {
+      "resource:aggregates": true;
+      aggregates: true;
+      aggregate: true;
 
-      /* const AggregateContainerType = */
-      newWithHooks(
-        GraphQLObjectType,
-        {
-          name: inflection.aggregateContainerType(table),
-          fields: {
-            keys: {
-              type: new GraphQLList(new GraphQLNonNull(GraphQLString)),
-              resolver(parent: any) {
-                return parent.keys || [];
-              },
-            },
-          },
-        },
-        {
-          isPgAggregateContainerType: true,
-          pgIntrospection: table,
-        },
-        true
-      );
-    });
+      "sum:resource:aggregates": true;
+      "distinctCount:resource:aggregates": true;
+      "min:resource:aggregates": true;
+      "max:resource:aggregates": true;
+      "average:resource:aggregates": true;
+      "stddevSample:resource:aggregates": true;
+      "stddevPopulation:resource:aggregates": true;
+      "varianceSample:resource:aggregates": true;
+      "variancePopulation:resource:aggregates": true;
 
-    return init;
-  });
+      "sum:resource:aggregate": true;
+      "distinctCount:resource:aggregate": true;
+      "min:resource:aggregate": true;
+      "max:resource:aggregate": true;
+      "average:resource:aggregate": true;
+      "stddevSample:resource:aggregate": true;
+      "stddevPopulation:resource:aggregate": true;
+      "varianceSample:resource:aggregate": true;
+      "variancePopulation:resource:aggregate": true;
 
-  // Hook the '*Aggregates' type for each table to add the "sum" operation
-  builder.hook(
-    "GraphQLObjectType:fields",
-    function addAggregateFieldsToAggregateType(fields, build, context) {
-      const {
-        pgField,
-        inflection,
-        newWithHooks,
-        graphql: { GraphQLObjectType },
-        getSafeAliasFromResolveInfo,
-      } = build;
-      const {
-        fieldWithHooks,
-        scope: { isPgAggregateContainerType, pgIntrospection: table },
-      } = context;
-      if (!isPgAggregateContainerType) {
-        return fields;
-      }
-
-      return build.extend(
-        fields,
-        (build.pgAggregateSpecs as AggregateSpec[]).reduce(
-          (memo: GraphQLFieldConfigMap<unknown, unknown>, spec) => {
-            const AggregateType = newWithHooks(
-              GraphQLObjectType,
-              {
-                name: inflection.aggregateType(table, spec),
-              },
-              {
-                isPgAggregateType: true,
-                pgAggregateSpec: spec,
-                pgIntrospection: table,
-              },
-              true
-            );
-
-            if (!AggregateType) {
-              // No aggregates for this connection for this spec, abort
-              return memo;
-            }
-            const fieldName = inflection.aggregatesField(spec);
-            return build.extend(memo, {
-              ...fields,
-              [fieldName]: pgField(
-                build,
-                fieldWithHooks,
-                fieldName,
-                {
-                  description: `${spec.HumanLabel} aggregates across the matching connection (ignoring before/after/first/last/offset)`,
-                  type: AggregateType,
-                  resolve(
-                    parent: any,
-                    _args: any,
-                    _context: any,
-                    resolveInfo: GraphQLResolveInfo
-                  ) {
-                    const safeAlias = getSafeAliasFromResolveInfo(resolveInfo);
-                    return parent[safeAlias];
-                  },
-                },
-                {
-                  isPgAggregateField: true,
-                  pgAggregateSpec: spec,
-                  pgFieldIntrospection: table,
-                } // scope,
-              ),
-            });
-          },
-          {}
-        )
-      );
+      "sum:attribute:aggregate": true;
+      "distinctCount:attribute:aggregate": true;
+      "min:attribute:aggregate": true;
+      "max:attribute:aggregate": true;
+      "average:attribute:aggregate": true;
+      "stddevSample:attribute:aggregate": true;
+      "stddevPopulation:attribute:aggregate": true;
+      "varianceSample:attribute:aggregate": true;
+      "variancePopulation:attribute:aggregate": true;
     }
-  );
+  }
+}
 
-  // Hook the sum aggregates type to add fields for each numeric table column
-  builder.hook("GraphQLObjectType:fields", (fields, build, context) => {
-    const {
-      pgSql: sql,
-      graphql: { GraphQLNonNull },
-      inflection,
-      getSafeAliasFromAlias,
-      getSafeAliasFromResolveInfo,
-      pgField,
-      pgIntrospectionResultsByKind,
-      pgGetComputedColumnDetails: getComputedColumnDetails,
-    } = build;
-    const {
-      fieldWithHooks,
-      scope: {
-        isPgAggregateType,
-        pgIntrospection: table,
-        pgAggregateSpec: spec,
-      },
-    } = context;
-    if (!isPgAggregateType || !table || table.kind !== "class" || !spec) {
-      return fields;
-    }
+// @ts-ignore
+const { version } = require("../package.json");
 
-    return {
-      ...fields,
-      // Figure out the columns that we're allowed to do a `SUM(...)` of
-      ...table.attributes.reduce(
-        (memo: GraphQLFieldConfigMap<any, any>, attr: PgAttribute) => {
-          if (
-            (spec.shouldApplyToEntity && !spec.shouldApplyToEntity(attr)) ||
-            !spec.isSuitableType(attr.type)
-          ) {
-            return memo;
-          }
-          const [pgType, pgTypeModifier] = spec.pgTypeAndModifierModifier
-            ? spec.pgTypeAndModifierModifier(attr.type, attr.typeModifier)
-            : [attr.type, attr.typeModifier];
-          const Type = build.pgGetGqlTypeByTypeIdAndModifier(
-            pgType.id,
-            pgTypeModifier
-          );
-          if (!Type) {
-            return memo;
-          }
-          const fieldName = inflection.column(attr);
-          return build.extend(memo, {
-            [fieldName]: pgField(
-              build,
-              fieldWithHooks,
-              fieldName,
-              ({ addDataGenerator }: any) => {
-                addDataGenerator((parsedResolveInfoFragment: any) => {
-                  return {
-                    pgQuery: (queryBuilder: QueryBuilder) => {
-                      // Note this expression is just an sql fragment, so you
-                      // could add CASE statements, function calls, or whatever
-                      // you need here
-                      const sqlColumn = sql.fragment`${queryBuilder.getTableAlias()}.${sql.identifier(
-                        attr.name
-                      )}`;
-                      const sqlAggregate = spec.sqlAggregateWrap(sqlColumn);
-                      queryBuilder.select(
-                        sqlAggregate,
-                        // We need a unique alias that we can later reference in the resolver
-                        getSafeAliasFromAlias(parsedResolveInfoFragment.alias)
-                      );
-                    },
-                  };
-                });
-                return {
-                  description: `${spec.HumanLabel} of ${fieldName} across the matching connection`,
-                  type: spec.isNonNull ? new GraphQLNonNull(Type) : Type,
-                  resolve(
-                    parent: any,
-                    _args: any,
-                    _context: any,
-                    resolveInfo: GraphQLResolveInfo
-                  ) {
-                    const safeAlias = getSafeAliasFromResolveInfo(resolveInfo);
-                    return parent[safeAlias];
-                  },
-                };
-              },
-              {
-                // In case anyone wants to hook us, describe ourselves
-                isPgConnectionAggregateField: true,
-                pgFieldIntrospection: attr,
-              },
-              false,
-              {
-                pgType,
-                pgTypeModifier,
-              }
-            ),
-          });
-        },
-        {}
-      ),
-      ...pgIntrospectionResultsByKind.procedure.reduce(
-        (memo: GraphQLFieldConfigMap<any, any>, proc: PgProc) => {
-          if (proc.returnsSet) {
-            return memo;
-          }
-          const type = pgIntrospectionResultsByKind.typeById[proc.returnTypeId];
-          if (
-            (spec.shouldApplyToEntity && !spec.shouldApplyToEntity(proc)) ||
-            !spec.isSuitableType(type)
-          ) {
-            return memo;
-          }
-          const computedColumnDetails = getComputedColumnDetails(
-            build,
-            table,
-            proc
-          );
-          if (!computedColumnDetails) {
-            return memo;
-          }
-          const { pseudoColumnName } = computedColumnDetails;
-          const fieldName = inflection.computedColumn(
-            pseudoColumnName,
-            proc,
-            table
-          );
-          return build.extend(memo, {
-            [fieldName]: build.pgMakeProcField(fieldName, proc, build, {
-              fieldWithHooks,
-              computed: true,
-              aggregateWrapper: spec.sqlAggregateWrap,
-              pgTypeAndModifierModifier: spec.pgTypeAndModifierModifier,
-              description: `${
-                spec.HumanLabel
-              } of this field across the matching connection.${
-                proc.description ? `\n\n---\n\n${proc.description}` : ""
-              }`,
-            }),
-          });
-        },
-        {}
-      ),
-    };
-  });
+const isSuitableSource = (
+  build: GraphileBuild.Build,
+  resource: PgResource<any, any, any, any>
+): boolean => {
+  if (resource.parameters || !resource.codec.attributes) {
+    return false;
+  }
+  if (!build.behavior.pgResourceMatches(resource, "select")) {
+    return false;
+  }
+
+  return !!build.behavior.pgResourceMatches(resource, "resource:aggregates");
 };
 
-export default AddAggregateTypesPlugin;
+const pgAggregatesPlanKeys = EXPORTABLE(
+  () =>
+    (
+      lambda: GraphileBuild.Build["grafast"]["lambda"],
+      $pgSelectSingle: PgSelectSingleStep<any>
+    ) => {
+      const $pgSelect = $pgSelectSingle.getClassStep();
+      const $groupDetails = $pgSelect.getGroupDetails();
+      return lambda(
+        [$groupDetails, $pgSelectSingle],
+        ([groupDetails, item]) => {
+          if (groupDetails.indicies.length === 0 || item == null) {
+            return null;
+          } else {
+            return groupDetails.indicies.map(({ index }) => item[index]);
+          }
+        }
+      );
+    },
+  [],
+  "pgAggregatesPlanKeys"
+);
+
+const pgAggregatesPlanAggregates = EXPORTABLE(
+  () =>
+    function plan($pgSelectSingle: PgSelectSingleStep<any>) {
+      return $pgSelectSingle;
+    },
+  [],
+  "pgAggregatesPlanAggregates"
+);
+
+const pgAggregatesPlanAggregateAttribute = EXPORTABLE(
+  () =>
+    (
+      attributeCodec: PgCodec,
+      attributeName: string,
+      codec: PgCodec,
+      spec: AggregateSpec,
+      sql: GraphileBuild.Build["sql"],
+      $pgSelectSingle: PgSelectSingleStep
+    ) => {
+      // Note this expression is just an sql fragment, so you
+      // could add CASE statements, function calls, or whatever
+      // you need here
+      const sqlAttribute = sql.fragment`${
+        $pgSelectSingle.getClassStep().alias
+      }.${sql.identifier(attributeName)}`;
+      const sqlAggregate = spec.sqlAggregateWrap(sqlAttribute, attributeCodec);
+      return $pgSelectSingle.select(sqlAggregate, codec);
+    },
+  [],
+  "pgAggregatesPlanAggregateAttribute"
+);
+
+const pgAggregatesPlanComputedColumnAggregates = EXPORTABLE(
+  () =>
+    (
+      codec: PgCodec,
+      computedAttributeResource: PgResource,
+      makeArgs: ReturnType<
+        GraphileBuild.Build["pgGetArgDetailsFromParameters"]
+      >["makeArgs"],
+      pgFromExpression: GraphileBuild.Build["dataplanPg"]["pgFromExpression"],
+      spec: AggregateSpec,
+      targetCodec: PgCodec,
+      $pgSelectSingle: PgSelectSingleStep<any>,
+      fieldArgs: FieldArgs
+    ) => {
+      // Because we require that the computed attribute is
+      // evaluated inline, we have to convert it to an
+      // expression here; this is only needed because of the
+      // aggregation.
+      const src = pgFromExpression(
+        $pgSelectSingle,
+        computedAttributeResource.from,
+        computedAttributeResource.parameters!,
+        [
+          {
+            placeholder: $pgSelectSingle.getClassStep().alias,
+            position: 0,
+          },
+          ...makeArgs(fieldArgs),
+        ]
+      );
+
+      const sqlAggregate = spec.sqlAggregateWrap(src, codec);
+      return $pgSelectSingle.select(sqlAggregate, targetCodec);
+    },
+  [],
+  "pgAggregatesPlanComputedColumnAggregates"
+);
+
+const Plugin: GraphileConfig.Plugin = {
+  name: "PgAggregatesAddAggregateTypesPlugin",
+  description: `\
+Creates the FooAggregates type for each suitable resource, creates the 'sum' \
+and similar fields on this type, and the entries within these types for \
+attributes and computed columns.`,
+  version,
+  provides: ["aggregates"],
+
+  // Create the aggregates type for each table
+  schema: {
+    behaviorRegistry: {
+      add: {
+        aggregates: {
+          description:
+            "For collection resources (e.g. returning a setof records)",
+          entities: ["pgResource"],
+        },
+        aggregate: {
+          description:
+            "for computed column resources (e.g. returning a scalar)",
+          entities: ["pgResource"],
+        },
+      },
+    },
+
+    entityBehavior: {
+      // `aggregates` - for collection resources (e.g. returning a setof records)
+      // `aggregate` - for computed column resources (e.g. returning a scalar)
+      pgResource: ["select", "aggregates", "aggregate"],
+      pgCodecAttribute: "aggregate",
+    },
+
+    hooks: {
+      init(init, build, _context) {
+        const {
+          graphql: { GraphQLList, GraphQLString },
+          grafast: { lambda },
+          dataplanPg: { assertPgClassSingleStep },
+          inflection,
+          input: {
+            pgRegistry: { pgResources },
+          },
+          EXPORTABLE,
+        } = build;
+
+        // TODO: should we be using the codec rather than the source here? What if two sources share the same codec?
+        for (const resource of Object.values(pgResources)) {
+          if (!isSuitableSource(build, resource)) {
+            continue;
+          }
+
+          /* const AggregateContainerType = */
+          build.registerObjectType(
+            inflection.aggregateContainerType({ resource: resource }),
+            {
+              isPgAggregateContainerType: true,
+              pgTypeResource: resource,
+            },
+            () => ({
+              assertStep: assertPgClassSingleStep,
+              fields: {
+                keys: {
+                  type: new GraphQLList(GraphQLString),
+                  plan: EXPORTABLE(
+                    (lambda, pgAggregatesPlanKeys) =>
+                      function plan($pgSelectSingle: PgSelectSingleStep<any>) {
+                        return pgAggregatesPlanKeys(lambda, $pgSelectSingle);
+                      },
+                    [lambda, pgAggregatesPlanKeys]
+                  ),
+                },
+              },
+            }),
+            `@graphile/pg-aggregates aggregate container type for ${resource.name}`
+          );
+
+          for (const aggregateSpec of build.pgAggregateSpecs) {
+            const aggregateTypeName = inflection.aggregateType({
+              resource: resource,
+              aggregateSpec,
+            });
+            if (
+              !build.behavior.pgResourceMatches(
+                resource,
+                `${aggregateSpec.id}:resource:aggregates`
+              )
+            ) {
+              continue;
+            }
+            build.registerObjectType(
+              aggregateTypeName,
+              {
+                isPgAggregateType: true,
+                pgAggregateSpec: aggregateSpec,
+                pgTypeResource: resource,
+              },
+              () => ({}),
+              `${aggregateTypeName} aggregate type for '${resource.name}' source`
+            );
+          }
+        }
+
+        return init;
+      },
+
+      GraphQLObjectType_fields(inFields, build, context) {
+        let fields = inFields;
+        const {
+          inflection,
+          sql,
+          graphql: { GraphQLNonNull, isOutputType },
+          dataplanPg: { pgFromExpression },
+          EXPORTABLE,
+        } = build;
+        const {
+          fieldWithHooks,
+          Self,
+          scope: {
+            isPgAggregateContainerType,
+            isPgAggregateType,
+            pgTypeResource: resource,
+            pgAggregateSpec: spec,
+          },
+        } = context;
+        if (!resource || !isSuitableSource(build, resource)) {
+          return fields;
+        }
+
+        // Hook the '*Aggregates' type for each source to add the "sum" operation
+        if (isPgAggregateContainerType) {
+          fields = build.extend(
+            fields,
+            build.pgAggregateSpecs.reduce((memo, aggregateSpec) => {
+              return build.recoverable(memo, () => {
+                if (
+                  !build.behavior.pgResourceMatches(
+                    resource,
+                    `${aggregateSpec.id}:resource:aggregates`
+                  )
+                ) {
+                  return memo;
+                }
+                const aggregateTypeName = inflection.aggregateType({
+                  resource: resource,
+                  aggregateSpec,
+                });
+                const AggregateType = build.getTypeByName(aggregateTypeName);
+                if (!AggregateType || !isOutputType(AggregateType)) {
+                  return memo;
+                }
+                const fieldName = inflection.aggregatesField({ aggregateSpec });
+                return build.extend(
+                  memo,
+                  {
+                    [fieldName]: fieldWithHooks(
+                      {
+                        fieldName,
+                        isPgAggregateField: true,
+                        pgAggregateSpec: aggregateSpec,
+                        pgFieldResource: resource,
+                      },
+                      () => ({
+                        description: `${aggregateSpec.HumanLabel} aggregates across the matching connection (ignoring before/after/first/last/offset)`,
+                        type: AggregateType,
+                        plan: pgAggregatesPlanAggregates,
+                      })
+                    ),
+                  },
+                  `Adding aggregates field to ${Self.name}`
+                );
+              });
+            }, Object.create(null) as GraphQLFieldConfigMap<unknown, unknown>),
+            "Adding sum operation to aggregate type"
+          );
+        }
+
+        // Hook the sum aggregates type to add fields for each numeric source attribute
+        if (isPgAggregateType && spec) {
+          fields = build.extend(
+            fields,
+            // Figure out the attributes that we're allowed to do a `SUM(...)` of
+            (
+              Object.entries(resource.codec.attributes) as [
+                string,
+                PgCodecAttribute
+              ][]
+            ).reduce((memo, [attributeName, attribute]) => {
+              if (
+                !build.behavior.pgCodecAttributeMatches(
+                  [resource.codec, attributeName],
+                  `${spec.id}:attribute:aggregate`
+                )
+              ) {
+                return memo;
+              }
+              if (
+                (spec.shouldApplyToEntity &&
+                  !spec.shouldApplyToEntity({
+                    type: "attribute",
+                    codec: resource.codec,
+                    attributeName,
+                  })) ||
+                !spec.isSuitableType(attribute.codec)
+              ) {
+                return memo;
+              }
+              const codec = spec.pgTypeCodecModifier
+                ? spec.pgTypeCodecModifier(attribute.codec)
+                : attribute.codec;
+              const Type = build.getGraphQLTypeByPgCodec(
+                codec,
+                "output"
+              ) as GraphQLOutputType | null;
+              if (!Type) {
+                return memo;
+              }
+              const fieldName = inflection.attribute({
+                attributeName,
+                codec: resource.codec,
+              });
+              return build.extend(
+                memo,
+                {
+                  [fieldName]: fieldWithHooks(
+                    {
+                      fieldName,
+                      // In case anyone wants to hook us, describe ourselves
+                      isPgConnectionAggregateField: true,
+                      //pgFieldIntrospection: attr,
+                      //TODO: add more details here
+                    },
+                    () => {
+                      const attributeCodec = attribute.codec;
+                      return {
+                        description: `${spec.HumanLabel} of ${fieldName} across the matching connection`,
+                        type: spec.isNonNull ? new GraphQLNonNull(Type) : Type,
+                        plan: EXPORTABLE(
+                          (
+                            attributeCodec,
+                            attributeName,
+                            codec,
+                            pgAggregatesPlanAggregateAttribute,
+                            spec,
+                            sql
+                          ) =>
+                            function plan($pgSelectSingle: PgSelectSingleStep) {
+                              return pgAggregatesPlanAggregateAttribute(
+                                attributeCodec,
+                                attributeName,
+                                codec,
+                                spec,
+                                sql,
+                                $pgSelectSingle
+                              );
+                            },
+                          [
+                            attributeCodec,
+                            attributeName,
+                            codec,
+                            pgAggregatesPlanAggregateAttribute,
+                            spec,
+                            sql,
+                          ]
+                        ),
+                      };
+                    }
+                  ),
+                },
+                `Add attribute '${attributeName}' compatible with this aggregate`
+              );
+            }, Object.create(null) as GraphQLFieldConfigMap<any, any>),
+            "Add attributes compatible with this aggregate"
+          );
+
+          const computedAttributeSources = getComputedAttributeResources(
+            build,
+            resource
+          );
+          fields = build.extend(
+            fields,
+            computedAttributeSources.reduce(
+              (memo, computedAttributeResource) => {
+                if (
+                  !build.behavior.pgResourceMatches(
+                    computedAttributeResource,
+                    `${spec.id}:resource:aggregate`
+                  )
+                ) {
+                  return memo;
+                }
+                const codec = computedAttributeResource.codec;
+                if (
+                  (spec.shouldApplyToEntity &&
+                    !spec.shouldApplyToEntity({
+                      type: "computedAttribute",
+                      resource: computedAttributeResource,
+                    })) ||
+                  !spec.isSuitableType(codec)
+                ) {
+                  return memo;
+                }
+                const fieldName = inflection.computedAttributeField({
+                  resource: computedAttributeResource as PgResource<
+                    any,
+                    any,
+                    any,
+                    readonly PgResourceParameter[],
+                    any
+                  >,
+                });
+                const targetCodec = spec.pgTypeCodecModifier?.(codec) ?? codec;
+                const targetType = build.getGraphQLTypeByPgCodec(
+                  targetCodec,
+                  "output"
+                ) as GraphQLOutputType | undefined;
+                if (!targetType) {
+                  return memo;
+                }
+
+                return build.extend(
+                  memo,
+                  {
+                    [fieldName]: fieldWithHooks(
+                      {
+                        fieldName,
+                      },
+                      () => {
+                        const { makeFieldArgs, makeArgs } =
+                          build.pgGetArgDetailsFromParameters(
+                            computedAttributeResource,
+                            computedAttributeResource.parameters,
+                            1
+                          );
+
+                        return {
+                          type: targetType,
+                          description: `${
+                            spec.HumanLabel
+                          } of this field across the matching connection.${
+                            computedAttributeResource.description
+                              ? `\n\n---\n\n${computedAttributeResource.description}`
+                              : ""
+                          }`,
+                          args: makeFieldArgs(),
+                          plan: EXPORTABLE(
+                            (
+                              codec,
+                              computedAttributeResource,
+                              makeArgs,
+                              pgAggregatesPlanComputedColumnAggregates,
+                              pgFromExpression,
+                              spec,
+                              targetCodec
+                            ) =>
+                              function plan(
+                                $pgSelectSingle: PgSelectSingleStep<any>,
+                                fieldArgs: FieldArgs
+                              ) {
+                                return pgAggregatesPlanComputedColumnAggregates(
+                                  codec,
+                                  computedAttributeResource,
+                                  makeArgs,
+                                  pgFromExpression,
+                                  spec,
+                                  targetCodec,
+                                  $pgSelectSingle,
+                                  fieldArgs
+                                );
+                              },
+                            [
+                              codec,
+                              computedAttributeResource,
+                              makeArgs,
+                              pgAggregatesPlanComputedColumnAggregates,
+                              pgFromExpression,
+                              spec,
+                              targetCodec,
+                            ]
+                          ),
+                        };
+                      }
+                    ),
+                  },
+                  ""
+                );
+              },
+              Object.create(null) as GraphQLFieldConfigMap<any, any>
+            ),
+            ""
+          );
+        }
+
+        return fields;
+      },
+    },
+  },
+};
+
+export { Plugin as PgAggregatesAddAggregateTypesPlugin };

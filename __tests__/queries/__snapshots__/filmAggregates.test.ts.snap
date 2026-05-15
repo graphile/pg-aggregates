@@ -1,0 +1,40 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`calculates film aggregates: result 1`] = `
+{
+  "allFilms": {
+    "aggregates": {
+      "distinctCount": {
+        "computedColumn": "20",
+        "name": "20",
+        "rowId": "20",
+        "yearOfRelease": "9",
+      },
+      "sum": {
+        "boxOfficeInBillions": 30.61,
+        "computedColumn": "2937",
+        "computedColumnWithArguments": "2957",
+        "yearOfRelease": "40283",
+      },
+    },
+  },
+}
+`;
+
+exports[`calculates film aggregates: sql 1`] = `
+[
+  "select
+  (count(distinct __films__."id"))::text as "0",
+  (coalesce(sum("test"."films_computed_column"(__films__)), '0'))::text as "1",
+  (count(distinct __films__."name"))::text as "2",
+  (coalesce(sum("test"."films_computed_column_with_arguments"(
+    __films__,
+    $1::"int4"
+  )), '0'))::text as "3",
+  (count(distinct __films__."year_of_release"))::text as "4",
+  (coalesce(sum(__films__."year_of_release"), '0'))::text as "5",
+  (count(distinct "test"."films_computed_column"(__films__)))::text as "6",
+  (coalesce(sum(__films__."box_office_in_billions"), '0'))::text as "7"
+from "test"."films" as __films__;",
+]
+`;

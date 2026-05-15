@@ -1,22 +1,110 @@
-import type { PgAttribute, PgType, SQL, PgProc } from "graphile-build-pg";
+import type { PgCodec, PgResource, sql } from "@dataplan/pg";
+type SQL = ReturnType<typeof sql>;
+
+declare global {
+  namespace DataplanPg {
+    interface PgCodecExtensions {
+      isNumberLike?: boolean;
+      isIntervalLike?: boolean;
+    }
+    interface PgConditionStepExtensions {
+      pgFilterAttribute?: {
+        codec: PgCodec<any, any, any, any, any, any, any>;
+        expression: SQL;
+      };
+    }
+  }
+
+  namespace GraphileBuild {
+    interface Inflection {
+      filterTableAggregateType(
+        foreignTable: PgResource<any, any, any, any>,
+        spec: AggregateSpec
+      ): string;
+    }
+    interface Build {
+      pgAggregateSpecs: AggregateSpec[];
+      pgAggregateGroupBySpecs: AggregateGroupBySpec[];
+      pgHavingFilterTypeNameForCodec(
+        codec: PgCodec<any, any, any, any>
+      ): string | null;
+    }
+    interface ScopeObject {
+      isPgAggregateContainerType?: boolean;
+      isPgAggregateType?: boolean;
+      pgAggregateSpec?: AggregateSpec;
+    }
+    interface ScopeInputObject {
+      pgTypeResource?: PgResource<any, any, any, any>;
+      isPgHavingFilterInputType?: boolean;
+      isPgAggregateHavingInputType?: boolean;
+      pgHavingFilterSpec?: string;
+      isPgConnectionAggregateFilter?: boolean;
+      isPgConnectionAggregateAggregateFilter?: boolean;
+      pgConnectionAggregateFilterAggregateSpec?: AggregateSpec;
+    }
+    interface ScopeObjectFieldsField {
+      isPgAggregateField?: boolean;
+      isPgConnectionAggregateField?: boolean;
+      // TODO: remove this, it's redundant vs pgTypeResource?
+      pgFieldResource?: PgResource<any, any, any, any, any>;
+    }
+    interface ScopeInputObjectFieldsField {
+      isPgConnectionFilterAggregatesField?: boolean;
+    }
+    interface ScopeEnum {
+      pgTypeResource?: PgResource<any, any, any, any, any>;
+      isPgAggregateGroupEnum?: boolean;
+    }
+  }
+}
+
+export type AggregateTargetEntity =
+  | {
+      type: "attribute";
+      /** table codec - NOT attribute codec! */
+      codec: PgCodec<any, any, any, any, any, any, any>;
+      /** attribute name available on this codec */
+      attributeName: string;
+      resource?: never;
+    }
+  | {
+      type: "computedAttribute";
+      resource: PgResource<any, any, any, any, any>;
+      codec?: never;
+      attributeName?: never;
+    };
 
 export interface AggregateGroupBySpec {
   /** Must not change since it's used in type names/etc */
   id: string; // e.g. 'truncated-to-hour'
 
   /** Return true if we can process this type */
-  isSuitableType: (type: PgType) => boolean;
+  isSuitableType: (
+    codec: PgCodec<any, any, any, any, any, any, any>
+  ) => boolean;
 
   /** Return false if we cannot process this attribute (default: true) */
-  shouldApplyToEntity?: (entity: PgAttribute | PgProc) => boolean;
+  shouldApplyToEntity?: (entity: AggregateTargetEntity) => boolean;
 
-  /** Wraps the SQL to return a derivative (e.g. sqlFrag => sql.fragment`date_trunc('hour', ${sqlFrag})`) */
+  /** Wraps the SQL to return a derivative (e.g.:
+   * ```
+   * sqlFrag => sql.fragment`date_trunc('hour', ${sqlFrag})`)
+   * ```
+   */
   sqlWrap: (sqlFrag: SQL) => SQL;
+
+  /**
+   * Which codec represents the type returned by sqlWrap?
+   */
+  sqlWrapCodec: (
+    codec: PgCodec<any, any, any, any, any, any, any>
+  ) => PgCodec<any, any, any, any, any, any, any>;
 }
 
 export interface AggregateSpec {
   /** Must not change since it's used in type names/etc */
-  id: string;
+  id: keyof GraphileBuild.AggregateSpecIds;
 
   /** Used in descriptions, starts with lowercase */
   humanLabel: string;
@@ -25,13 +113,13 @@ export interface AggregateSpec {
   HumanLabel: string;
 
   /** Return true if we can process this type */
-  isSuitableType: (type: PgType) => boolean;
+  isSuitableType: (codec: PgCodec<any, any, any, any>) => boolean;
 
   /** Return false if we cannot process this attribute (default: true) */
-  shouldApplyToEntity?: (entity: PgAttribute | PgProc) => boolean;
+  shouldApplyToEntity?: (entity: AggregateTargetEntity) => boolean;
 
   /** Wraps the SQL in an aggregate call */
-  sqlAggregateWrap: (sqlFrag: SQL) => SQL;
+  sqlAggregateWrap: (sqlFrag: SQL, codec: PgCodec<any, any, any, any>) => SQL;
 
   /**
    * Used to translate the PostgreSQL return type for the aggregate; for example:
@@ -40,10 +128,9 @@ export interface AggregateSpec {
    * - Average of int should be float
    * - Median of int should be int
    */
-  pgTypeAndModifierModifier?: (
-    pgType: PgType,
-    pgTypeModifier: null | string | number
-  ) => [PgType, null | string | number];
+  pgTypeCodecModifier?: (
+    codec: PgCodec<any, any, any, any>
+  ) => PgCodec<any, any, any, any>;
 
   /** Set true if the result is guaranteed to be non-null */
   isNonNull?: boolean;
@@ -85,3 +172,12 @@ export const REG_ROLE_OID = "4096";
 export const REG_NAMESPACE_OID = "4089";
 export const REG_CONFIG_OID = "3734";
 export const REG_DICTIONARY_OID = "3769";
+
+export const CORE_HAVING_FILTER_SPECS = [
+  "int",
+  "bigint",
+  "float",
+  "bigfloat",
+  "datetime",
+  "string",
+] as const;

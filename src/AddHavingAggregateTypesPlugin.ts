@@ -1,621 +1,936 @@
-import type { GraphQLFieldConfigMap, GraphQLInputObjectType } from "graphql";
-import type { Plugin } from "graphile-build";
-import type { PgClass, PgProc, PgType, SQL } from "graphile-build-pg";
-import {
-  INT2_OID,
-  INT4_OID,
-  BIGINT_OID,
-  FLOAT4_OID,
-  FLOAT8_OID,
-  MONEY_OID,
-  NUMERIC_OID,
-  DATE_OID,
-  TIMESTAMP_OID,
-  TIMESTAMPTZ_OID,
-  CHAR_OID,
-  TEXT_OID,
-  VARCHAR_OID,
-  AggregateSpec,
-} from "./interfaces";
+import type {
+  PgBooleanFilter,
+  PgCodec,
+  PgCodecAttribute,
+  PgCodecWithAttributes,
+  PgCondition,
+  PgConditionCapableParent,
+  PgConditionLike,
+  PgResource,
+  PgResourceParameter,
+  PgSelectArgumentDigest,
+  sql,
+} from "@dataplan/pg";
+import type {
+  GrafastInputFieldConfigMap,
+  InputObjectFieldApplyResolver,
+} from "grafast";
+import type {
+  GraphQLInputObjectType,
+  GraphQLInputType,
+  GraphQLNamedType,
+} from "graphql";
 
-const AddHavingAggregateTypesPlugin: Plugin = (builder) => {
-  builder.hook("build", (build, _build, _context) => {
-    const havingFilterByName: {
-      [name: string]: GraphQLInputObjectType;
-    } = {};
-    function getHavingFilter(spec: string): GraphQLInputObjectType {
-      const {
-        newWithHooks,
-        graphql: { GraphQLInputObjectType },
-        pgSql: sql,
-      } = build;
+import { EXPORTABLE } from "./EXPORTABLE.js";
+import type { AggregateSpec } from "./interfaces.js";
+import { CORE_HAVING_FILTER_SPECS } from "./interfaces.js";
+import { getComputedAttributeResources } from "./utils.js";
 
-      const name = build.inflection.upperCamelCase(`having-${spec}-filter`);
-      if (!(name in havingFilterByName)) {
-        const HavingFilterType = newWithHooks(
-          GraphQLInputObjectType,
-          {
-            name,
-            fields: {},
-            extensions: {
-              graphile: {
-                toSql(argValue: any, details: any) {
-                  const fragments: SQL[] = [];
-                  if (argValue != null) {
-                    const fields = HavingFilterType.getFields();
-                    Object.keys(fields).forEach((fieldName) => {
-                      const field = fields[fieldName];
-                      const value = argValue[fieldName];
-                      if (value == null) {
-                        return;
-                      }
-                      const toSql = field.extensions?.graphile?.toSql;
-                      if (typeof toSql === "function") {
-                        fragments.push(toSql(value, details));
-                      }
-                    });
-                  }
-                  return fragments.length > 0
-                    ? sql.fragment`(${sql.join(fragments, ") AND (")})`
-                    : sql.true;
-                },
-              },
-            },
-          },
-          {
-            isPgHavingFilterInputType: true,
-            pgHavingFilterSpec: spec,
-          },
-          true
-        );
-        havingFilterByName[name] = HavingFilterType;
-      }
-      return havingFilterByName[name];
+type SQL = ReturnType<typeof sql>;
+
+const { version } = require("../package.json");
+
+declare global {
+  namespace GraphileBuild {
+    interface BehaviorStrings {
+      "resource:groupedAggregates:having": true;
+      having: true;
+      "resource:havingBy": true;
+      "attribute:havingBy": true;
+      havingBy: true;
+
+      "sum:resource:groupedAggregates:having": true;
+      "distinctCount:resource:groupedAggregates:having": true;
+      "min:resource:groupedAggregates:having": true;
+      "max:resource:groupedAggregates:having": true;
+      "average:resource:groupedAggregates:having": true;
+      "stddevSample:resource:groupedAggregates:having": true;
+      "stddevPopulation:resource:groupedAggregates:having": true;
+      "varianceSample:resource:groupedAggregates:having": true;
+      "variancePopulation:resource:groupedAggregates:having": true;
     }
-    return build.extend(build, {
-      pgHavingFilterTypeForTypeAndModifier(
-        type: PgType,
-        _modifier: null | number | string
-      ) {
-        switch (type.id) {
-          case INT2_OID:
-          case INT4_OID: {
-            return getHavingFilter("int");
-          }
-          case BIGINT_OID: {
-            return getHavingFilter("bigint");
-          }
-          case FLOAT4_OID:
-          case FLOAT8_OID: {
-            return getHavingFilter("float");
-          }
-          case MONEY_OID:
-          case NUMERIC_OID: {
-            return getHavingFilter("bigfloat");
-          }
-          case DATE_OID:
-          case TIMESTAMP_OID:
-          case TIMESTAMPTZ_OID: {
-            return getHavingFilter("datetime");
-          }
-          case CHAR_OID:
-          case TEXT_OID:
-          case VARCHAR_OID: {
-            return getHavingFilter("string");
-          }
-          default: {
-            return null;
-          }
+  }
+}
+
+const pgAggregatesApplyAnd = EXPORTABLE(
+  () =>
+    function apply($where: PgConditionCapableParent) {
+      return $where;
+    },
+  [],
+  "pgAggregatesApplyAnd"
+);
+
+const pgAggregatesApplyHaving = EXPORTABLE(
+  () =>
+    function apply($filter: PgConditionLike) {
+      return $filter;
+    },
+  [],
+  "pgAggregatesApplyHaving"
+);
+
+const pgAggregatesApplyAttributeFilter = EXPORTABLE(
+  () =>
+    (
+      PgBooleanFilter: GraphileBuild.Build["dataplanPg"]["PgBooleanFilter"],
+      aggregateSpec: AggregateSpec,
+      attribute: PgCodecAttribute,
+      attributeName: string,
+      sql: GraphileBuild.Build["sql"],
+      $having: PgConditionLike
+    ) => {
+      const attributeExpression = sql.fragment`${
+        $having.alias
+      }.${sql.identifier(attributeName)}`;
+      const aggregateExpression = aggregateSpec.sqlAggregateWrap(
+        attributeExpression,
+        attribute.codec
+      );
+      return new PgBooleanFilter($having, aggregateExpression);
+    },
+  [],
+  "pgAggregatesApplyAttributeFilter"
+);
+
+const pgAggregatesApplyComputedColumnFilter = EXPORTABLE(
+  () =>
+    (
+      PgBooleanFilter: GraphileBuild.Build["dataplanPg"]["PgBooleanFilter"],
+      aggregateSpec: AggregateSpec,
+      computedAttributeResource: PgResource,
+      from: (...args: PgSelectArgumentDigest[]) => SQL,
+      getNullableType: GraphileBuild.Build["graphql"]["getNullableType"],
+      isInputObjectType: GraphileBuild.Build["graphql"]["isInputObjectType"],
+      makeArgsRuntime: ReturnType<
+        GraphileBuild.Build["pgGetArgDetailsFromParameters"]
+      >["makeArgsRuntime"],
+      parameterAnalysis: ReturnType<
+        GraphileBuild.Build["dataplanPg"]["generatePgParameterAnalysis"]
+      >,
+      parameters: readonly PgResourceParameter[] | undefined,
+      pgFromExpressionRuntime: GraphileBuild.Build["dataplanPg"]["pgFromExpressionRuntime"],
+      $having: PgCondition,
+      input: Record<string, unknown> | null,
+      { field, schema }: Parameters<InputObjectFieldApplyResolver>[2]
+    ) => {
+      if (input == null) {
+        return;
+      }
+      const fieldType = getNullableType(field.type);
+      if (!isInputObjectType(fieldType)) {
+        throw new Error(`Expected an input object type (${field.type})`);
+      }
+      const argsField = fieldType.getFields().args;
+      const firstArg = {
+        placeholder: $having.alias,
+        position: 0,
+      };
+      let src: SQL;
+      if (argsField && input.args != null) {
+        const argsType = getNullableType(fieldType.getFields().args.type);
+        if (!isInputObjectType(argsType)) {
+          throw new Error(`Expected an input object type (${argsType})`);
         }
+        const fields = argsType.getFields();
+        // Because we require that the computed attribute is
+        // evaluated inline, we have to convert it to an
+        // expression here; this is only needed because of the
+        // aggregation.
+        src = pgFromExpressionRuntime(
+          from,
+          parameters!,
+          [firstArg, ...makeArgsRuntime(schema, fields, input.args)],
+          parameterAnalysis
+        );
+      } else {
+        src = pgFromExpressionRuntime(
+          from,
+          parameters!,
+          [firstArg],
+          parameterAnalysis
+        );
+      }
+
+      const aggregateExpression = aggregateSpec.sqlAggregateWrap(
+        src,
+        computedAttributeResource.codec
+      );
+      const $filter = new PgBooleanFilter($having, aggregateExpression);
+      // fieldArgs.apply($filter, "filter");
+      return $filter;
+    },
+  [],
+  "pgAggregatesApplyComputedColumnFilter"
+);
+
+const pgAggregatesPlanAggregatesField = EXPORTABLE(
+  () =>
+    function apply($having: PgConditionLike) {
+      return $having;
+    },
+  [],
+  "pgAggregatesPlanAggregatesField"
+);
+
+const pgAggregatesApplyHavingBinaryOperation = EXPORTABLE(
+  () =>
+    (
+      codec:
+        | GraphileBuild.Build["dataplanPg"]["TYPES"]["int"]
+        | GraphileBuild.Build["dataplanPg"]["TYPES"]["bigint"]
+        | GraphileBuild.Build["dataplanPg"]["TYPES"]["float"]
+        | GraphileBuild.Build["dataplanPg"]["TYPES"]["numeric"]
+        | GraphileBuild.Build["dataplanPg"]["TYPES"]["timestamptz"],
+      infix: () => SQL,
+      sql: GraphileBuild.Build["sql"],
+      sqlValueWithCodec: GraphileBuild.Build["dataplanPg"]["sqlValueWithCodec"],
+      $booleanFilter: PgBooleanFilter,
+      input: unknown
+    ) => {
+      if (input == null) return;
+      $booleanFilter.having(
+        sql`(${sql.parens(
+          $booleanFilter.expression
+        )} ${infix()} ${sqlValueWithCodec(input, codec!)})`
+      );
+    },
+  [],
+  "pgAggregatesApplyHavingBinaryOperation"
+);
+
+const Plugin: GraphileConfig.Plugin = {
+  name: "PgAggregatesAddHavingAggregateTypesPlugin",
+  description: `\
+Creates the types for the 'having' clause in groupedAggregates, the fields \
+below that for each aggregate spec, and adds fields for attributes and computed \
+columns.`,
+  version,
+  provides: ["aggregates"],
+  after: ["PgBasicsPlugin"],
+
+  schema: {
+    behaviorRegistry: {
+      add: {
+        having: {
+          description:
+            "Should we add a 'having' option to aggregates on this resource?",
+          entities: ["pgResource"],
+        },
+        havingBy: {
+          description:
+            "Should this function-like resource, or attribute, be usable in the 'having' clause when aggregating?",
+          entities: ["pgResource", "pgCodecAttribute"],
+        },
       },
-    });
-  });
+    },
 
-  builder.hook(
-    "init",
-    (_, build) => {
-      const {
-        newWithHooks,
-        pgIntrospectionResultsByKind: introspectionResultsByKind,
-        graphql: { GraphQLInputObjectType, GraphQLList, GraphQLNonNull },
-        inflection,
-        pgOmit: omit,
-        sqlCommentByAddingTags,
-        describePgEntity,
-        pgSql: sql,
-      } = build;
-      introspectionResultsByKind.class.forEach((table: PgClass) => {
-        if (!table.isSelectable || omit(table, "order")) return;
-        if (!table.namespace) return;
+    entityBehavior: {
+      // having - for connections' groupedAggregates field
+      // havingBy - for computed column functions acting like attributes
+      pgResource: ["order", "having", "havingBy"],
+      pgCodecAttribute: ["havingBy"],
+    },
 
-        const tableTypeName = inflection.tableType(table);
-        const TableHavingInputType = newWithHooks(
-          GraphQLInputObjectType,
+    hooks: {
+      build(build) {
+        if (!build.dataplanPg) {
+          throw new Error(`PgBasicsPlugin must be loaded first`);
+        }
+        const {
+          dataplanPg: { TYPES },
+        } = build;
+        return build.extend(
+          build,
           {
-            name: inflection.aggregateHavingInputType(table),
-            description: build.wrapDescription(
-              `Conditions for \`${tableTypeName}\` aggregates.`,
-              "type"
-            ),
-            fields: () => {
-              return {
-                AND: {
-                  type: new GraphQLList(
-                    new GraphQLNonNull(TableHavingInputType)
-                  ),
-                  extensions: {
-                    graphile: {
-                      toSql(val: any, details: any) {
-                        if (val) {
-                          const children = val.map((item: any) =>
-                            TableHavingInputType.extensions.graphile.toSql(
-                              item,
-                              details
-                            )
-                          );
-                          if (children.length > 0) {
-                            return sql.fragment`(${sql.join(
-                              children,
-                              ") AND ("
-                            )})`;
-                          }
-                        }
-                        return sql.true;
-                      },
-                    },
-                  },
-                },
-                OR: {
-                  type: new GraphQLList(
-                    new GraphQLNonNull(TableHavingInputType)
-                  ),
-                  extensions: {
-                    graphile: {
-                      toSql(val: any, details: any) {
-                        if (val) {
-                          const children = val.map((item: any) =>
-                            TableHavingInputType.extensions.graphile.toSql(
-                              item,
-                              details
-                            )
-                          );
-                          if (children.length > 0) {
-                            return sql.fragment`(${sql.join(
-                              children,
-                              ") OR ("
-                            )})`;
-                          }
-                        }
-                        return sql.true;
-                      },
-                    },
-                  },
-                },
-              };
-            },
-            extensions: {
-              graphile: {
-                toSql(argValue: any, details: any) {
-                  const fragments: SQL[] = [];
-                  if (argValue != null) {
-                    const fields = TableHavingInputType.getFields();
-                    Object.keys(fields).forEach((fieldName) => {
-                      const field = fields[fieldName];
-                      const value = argValue[fieldName];
-                      if (value == null) {
-                        return;
-                      }
-                      const toSql = field.extensions?.graphile?.toSql;
-                      if (typeof toSql === "function") {
-                        fragments.push(toSql(value, details));
-                      }
-                    });
-                  }
-                  return fragments.length > 0
-                    ? sql.fragment`(${sql.join(fragments, ") AND (")})`
-                    : sql.true;
-                },
-              },
+            pgHavingFilterTypeNameForCodec(codec: PgCodec<any, any, any, any>) {
+              switch (codec) {
+                case TYPES.int2:
+                case TYPES.int: {
+                  return build.inflection.aggregateHavingFilterInputType("int");
+                }
+                case TYPES.bigint: {
+                  return build.inflection.aggregateHavingFilterInputType(
+                    "bigint"
+                  );
+                }
+                case TYPES.float4:
+                case TYPES.float: {
+                  return build.inflection.aggregateHavingFilterInputType(
+                    "float"
+                  );
+                }
+                case TYPES.money:
+                case TYPES.numeric: {
+                  return build.inflection.aggregateHavingFilterInputType(
+                    "bigfloat"
+                  );
+                }
+                case TYPES.date:
+                case TYPES.timestamp:
+                case TYPES.timestamptz: {
+                  return build.inflection.aggregateHavingFilterInputType(
+                    "datetime"
+                  );
+                }
+                case TYPES.char:
+                case TYPES.text:
+                case TYPES.varchar: {
+                  return build.inflection.aggregateHavingFilterInputType(
+                    "string"
+                  );
+                }
+                default: {
+                  return null;
+                }
+              }
             },
           },
-          {
-            __origin: `Adding connection "groupBy" having input type for ${describePgEntity(
-              table
-            )}. You can rename the table's GraphQL type via a 'Smart Comment':\n\n  ${sqlCommentByAddingTags(
-              table,
-              {
-                name: "newNameHere",
-              }
-            )}`,
-            pgIntrospection: table,
-            isPgAggregateHavingInputType: true,
-          }
+          "adding pgHavingFilterTypeForTypeAndModifier"
         );
-      });
-      return _;
-    },
-    ["AddHavingAggregateTypesPlugin"]
-  );
+      },
 
-  builder.hook(
-    "GraphQLInputObjectType:fields",
-    function AddHavingAggregateTypesPluginAddColumns(fields, build, context) {
-      const {
-        inflection,
-        graphql: { GraphQLInputObjectType },
-        newWithHooks,
-        pgIntrospectionResultsByKind,
-        pgSql: sql,
-        pgGetComputedColumnDetails: getComputedColumnDetails,
-        pgProcFieldDetails: procFieldDetails,
-      } = build;
-      const {
-        scope: { isPgAggregateHavingInputType, pgIntrospection },
-        fieldWithHooks,
-      } = context;
-      if (!isPgAggregateHavingInputType || pgIntrospection.kind !== "class") {
-        return fields;
-      }
-      const table: PgClass = pgIntrospection;
-      return build.extend(
-        fields,
-        build.pgAggregateSpecs.reduce(
-          (aggregateFields: any, spec: AggregateSpec) => {
-            const typeName = inflection.aggregateHavingAggregateInputType(
-              table,
-              spec
-            );
-            const SpecInput = newWithHooks(
-              GraphQLInputObjectType,
-              {
+      init(_, build, _context) {
+        const {
+          graphql: {
+            GraphQLList,
+            GraphQLNonNull,
+            getNullableType,
+            isInputObjectType,
+          },
+          inflection,
+          sql,
+          dataplanPg: {
+            PgOrFilter,
+            PgBooleanFilter,
+            pgFromExpressionRuntime,
+            generatePgParameterAnalysis,
+          },
+          EXPORTABLE,
+        } = build;
+
+        for (const spec of CORE_HAVING_FILTER_SPECS) {
+          const name = build.inflection.aggregateHavingFilterInputType(spec);
+          build.registerInputObjectType(
+            name,
+            {
+              isPgHavingFilterInputType: true,
+              pgHavingFilterSpec: spec,
+            },
+            () => ({
+              name,
+              fields: Object.create(null),
+            }),
+            ""
+          );
+        }
+
+        for (const resource of Object.values(
+          build.input.pgRegistry.pgResources
+        )) {
+          if (
+            resource.parameters ||
+            !resource.codec.attributes ||
+            resource.isUnique
+          ) {
+            continue;
+          }
+          if (!build.behavior.pgResourceMatches(resource, "order")) {
+            continue;
+          }
+          if (
+            !build.behavior.pgResourceMatches(
+              resource,
+              "resource:groupedAggregates:having"
+            )
+          ) {
+            continue;
+          }
+
+          const tableTypeName = inflection.tableType(resource.codec);
+
+          const tableHavingInputTypeName = inflection.aggregateHavingInputType({
+            resource: resource,
+          });
+          build.registerInputObjectType(
+            tableHavingInputTypeName,
+            {
+              pgTypeResource: resource,
+              isPgAggregateHavingInputType: true,
+            },
+            (): Omit<GraphileBuild.GrafastInputObjectTypeConfig, "name"> => ({
+              description: build.wrapDescription(
+                `Conditions for \`${tableTypeName}\` aggregates.`,
+                "type"
+              ),
+              fields: (): GrafastInputFieldConfigMap<any> => {
+                return {
+                  AND: {
+                    type: new GraphQLList(
+                      new GraphQLNonNull(
+                        build.getInputTypeByName(tableHavingInputTypeName)
+                      )
+                    ),
+                    apply: pgAggregatesApplyAnd,
+                    // No need to auto-apply, the having field calls `fieldArgs.apply(...)`
+                  },
+                  OR: {
+                    type: new GraphQLList(
+                      new GraphQLNonNull(
+                        build.getInputTypeByName(tableHavingInputTypeName)
+                      )
+                    ),
+                    apply: EXPORTABLE(
+                      (PgOrFilter) => ($where) => new PgOrFilter($where),
+                      [PgOrFilter]
+                    ),
+                    // No need to auto-apply, the having field calls `fieldArgs.apply(...)`
+                  },
+                };
+              },
+            }),
+            `Adding connection "groupBy" having input type for ${resource.name}.`
+          );
+
+          const computedAttributeResources = getComputedAttributeResources(
+            build,
+            resource
+          );
+
+          for (const aggregateSpec of build.pgAggregateSpecs) {
+            for (const computedAttributeResource of computedAttributeResources) {
+              const argsTypeName =
+                inflection.aggregateHavingAggregateComputedAttributeArgsInputType(
+                  {
+                    resource: resource,
+                    aggregateSpec,
+                    computedAttributeResource: computedAttributeResource,
+                  }
+                );
+              build.registerInputObjectType(
+                argsTypeName,
+                {},
+                () => {
+                  return {
+                    fields: () => {
+                      const { argDetails } =
+                        build.pgGetArgDetailsFromParameters(
+                          computedAttributeResource,
+                          computedAttributeResource.parameters,
+                          1
+                        );
+                      return argDetails.reduce(
+                        (memo, { inputType, graphqlArgName }) => {
+                          memo[graphqlArgName] = {
+                            type: inputType,
+                            // NO PLAN NEEDED!
+                          };
+                          return memo;
+                        },
+                        Object.create(null) as GrafastInputFieldConfigMap<any>
+                      );
+                    },
+                  };
+                },
+                ""
+              );
+              const computedHavingInputName =
+                inflection.aggregateHavingAggregateComputedAttributeInputType({
+                  resource: resource,
+                  aggregateSpec,
+                  computedAttributeResource: computedAttributeResource,
+                });
+              /*const ComputedHavingInput =*/
+              build.registerInputObjectType(
+                computedHavingInputName,
+                {},
+                () => {
+                  return {
+                    fields: () => {
+                      const havingFilterTypeName =
+                        build.pgHavingFilterTypeNameForCodec(
+                          computedAttributeResource.codec
+                        );
+                      const HavingFilterType = havingFilterTypeName
+                        ? (build.getTypeByName(havingFilterTypeName) as
+                            | GraphQLInputObjectType
+                            | undefined)
+                        : undefined;
+                      const ArgsType = build.getTypeByName(argsTypeName) as
+                        | GraphQLInputObjectType
+                        | undefined;
+                      if (!HavingFilterType || !ArgsType) {
+                        return { fields: Object.create(null) };
+                      }
+                      const requiresAtLeastOneArg = (
+                        computedAttributeResource.parameters as PgResourceParameter[]
+                      )
+                        .slice(1)
+                        .some((p) => !p.optional);
+                      return {
+                        ...(ArgsType
+                          ? {
+                              args: {
+                                type: build.nullableIf(
+                                  !requiresAtLeastOneArg,
+                                  ArgsType
+                                ),
+                                // NO PLAN NEEDED
+                              },
+                            }
+                          : null),
+                        filter: {
+                          type: new GraphQLNonNull(HavingFilterType),
+                          apply: pgAggregatesApplyHaving,
+                          // No need to auto-apply, parent calls `fieldArgs.apply($filter, "filter")` below
+                        },
+                      } as GrafastInputFieldConfigMap<any>;
+                    },
+                  };
+                },
+                ""
+              );
+            }
+
+            const typeName = inflection.aggregateHavingAggregateInputType({
+              resource: resource,
+              aggregateSpec,
+            });
+            build.registerInputObjectType(
+              typeName,
+              {},
+              () => ({
                 name: typeName,
-                fields: ({ fieldWithHooks }: any) => {
-                  let fields = {};
+                fields: ({
+                  fieldWithHooks,
+                }: GraphileBuild.ContextInputObjectFields) => {
+                  let fields = Object.create(
+                    null
+                  ) as GrafastInputFieldConfigMap<any>;
 
                   fields = build.extend(
                     fields,
-                    table.attributes.reduce((newFields, attr) => {
-                      const fieldName = inflection.column(attr);
-                      const HavingFilterType = build.pgHavingFilterTypeForTypeAndModifier(
-                        attr.type,
-                        attr.typeModifier
-                      );
-                      if (!HavingFilterType) {
-                        return newFields;
-                      }
-                      const newField = fieldWithHooks(
-                        fieldName,
-                        {
+                    Object.entries(resource.codec.attributes!).reduce(
+                      (
+                        newFields,
+                        [attributeName, attribute]: [string, PgCodecAttribute]
+                      ) => {
+                        if (
+                          !build.behavior.pgCodecAttributeMatches(
+                            [resource.codec, attributeName],
+                            "attribute:havingBy"
+                          )
+                        ) {
+                          return newFields;
+                        }
+                        const fieldName = inflection.attribute({
+                          codec: resource.codec as PgCodecWithAttributes,
+                          attributeName: attributeName,
+                        });
+                        const havingFilterTypeName =
+                          build.pgHavingFilterTypeNameForCodec(attribute.codec);
+                        const HavingFilterType = havingFilterTypeName
+                          ? (build.getTypeByName(
+                              havingFilterTypeName
+                            ) as GraphQLInputType & GraphQLNamedType)
+                          : undefined;
+                        if (!HavingFilterType) {
+                          return newFields;
+                        }
+                        const newField = fieldWithHooks({ fieldName }, () => ({
                           type: HavingFilterType,
-                          extensions: {
-                            graphile: {
-                              toSql(
-                                val: any,
-                                details: {
-                                  aggregateSpec: AggregateSpec;
-                                  tableAlias: SQL;
-                                }
-                              ) {
-                                const { tableAlias, aggregateSpec } = details;
-                                const columnExpression = sql.fragment`${tableAlias}.${sql.identifier(
-                                  attr.name
-                                )}`;
-                                const aggregateExpression = aggregateSpec.sqlAggregateWrap(
-                                  columnExpression
-                                );
-                                return (
-                                  HavingFilterType.extensions?.graphile?.toSql?.(
-                                    val,
-                                    { ...details, aggregateExpression }
-                                  ) ?? sql.true
+                          apply: EXPORTABLE(
+                            (
+                                PgBooleanFilter,
+                                aggregateSpec,
+                                attribute,
+                                attributeName,
+                                pgAggregatesApplyAttributeFilter,
+                                sql
+                              ) =>
+                              ($having: PgConditionLike) => {
+                                return pgAggregatesApplyAttributeFilter(
+                                  PgBooleanFilter,
+                                  aggregateSpec,
+                                  attribute,
+                                  attributeName,
+                                  sql,
+                                  $having
                                 );
                               },
-                            },
-                          },
-                        },
-                        {}
-                      );
-                      return build.extend(
-                        newFields,
-                        { [fieldName]: newField },
-                        `Adding column '${attr.name}' to having filter type for '${table.namespaceName}.${table.name}'`
-                      );
-                    }, {})
+                            [
+                              PgBooleanFilter,
+                              aggregateSpec,
+                              attribute,
+                              attributeName,
+                              pgAggregatesApplyAttributeFilter,
+                              sql,
+                            ]
+                          ),
+                        }));
+                        return build.extend(
+                          newFields,
+                          { [fieldName]: newField },
+                          `Adding attribute '${attributeName}' to having filter type for '${resource.name}'`
+                        );
+                      },
+                      Object.create(null) as GrafastInputFieldConfigMap<any>
+                    ),
+                    ""
                   );
 
                   fields = build.extend(
                     fields,
-                    pgIntrospectionResultsByKind.procedure.reduce(
-                      (memo: GraphQLFieldConfigMap<any, any>, proc: PgProc) => {
-                        if (proc.returnsSet) {
-                          return memo;
-                        }
-                        const type =
-                          pgIntrospectionResultsByKind.typeById[
-                            proc.returnTypeId
-                          ];
+                    computedAttributeResources.reduce(
+                      (memo, computedAttributeResource) => {
                         if (
-                          (spec.shouldApplyToEntity &&
-                            !spec.shouldApplyToEntity(proc)) ||
-                          !spec.isSuitableType(type)
+                          !build.behavior.pgResourceMatches(
+                            computedAttributeResource,
+                            "resource:havingBy"
+                          )
                         ) {
                           return memo;
                         }
-                        const computedColumnDetails = getComputedColumnDetails(
-                          build,
-                          table,
-                          proc
-                        );
-                        if (!computedColumnDetails) {
+                        const codec = computedAttributeResource.codec;
+                        if (
+                          (aggregateSpec.shouldApplyToEntity &&
+                            !aggregateSpec.shouldApplyToEntity({
+                              type: "computedAttribute",
+                              resource: computedAttributeResource,
+                            })) ||
+                          !aggregateSpec.isSuitableType(codec)
+                        ) {
                           return memo;
                         }
-                        const details = procFieldDetails(proc, build, {
-                          computed: true,
-                        });
-                        const { inputs, makeSqlFunctionCall } = details;
-                        const { pseudoColumnName } = computedColumnDetails;
-                        const fieldName = inflection.computedColumn(
-                          pseudoColumnName,
-                          proc,
-                          table
-                        );
-
-                        const returnType = pgIntrospectionResultsByKind.type.find(
-                          (t: PgType) => t.id === proc.returnTypeId
-                        );
-                        if (!returnType) {
-                          throw new Error(
-                            `Could not find return type for function '${proc.returnTypeId}'`
+                        const argsTypeName =
+                          inflection.aggregateHavingAggregateComputedAttributeArgsInputType(
+                            {
+                              resource: resource,
+                              aggregateSpec,
+                              computedAttributeResource:
+                                computedAttributeResource,
+                            }
                           );
-                        }
-                        const HavingFilterType = build.pgHavingFilterTypeForTypeAndModifier(
-                          returnType,
-                          null
-                        );
-                        if (!HavingFilterType) {
+                        const havingFilterTypeName =
+                          build.pgHavingFilterTypeNameForCodec(
+                            computedAttributeResource.codec
+                          );
+                        const HavingFilterType = havingFilterTypeName
+                          ? (build.getTypeByName(havingFilterTypeName) as
+                              | GraphQLInputObjectType
+                              | undefined)
+                          : undefined;
+                        const ArgsType = build.getTypeByName(argsTypeName) as
+                          | GraphQLInputObjectType
+                          | undefined;
+                        const computedHavingInputName =
+                          inflection.aggregateHavingAggregateComputedAttributeInputType(
+                            {
+                              resource: resource,
+                              aggregateSpec,
+                              computedAttributeResource:
+                                computedAttributeResource,
+                            }
+                          );
+                        const ComputedHavingInput = build.getTypeByName(
+                          computedHavingInputName
+                        ) as GraphQLInputObjectType | undefined;
+                        if (
+                          !HavingFilterType ||
+                          !ArgsType ||
+                          !ComputedHavingInput
+                        ) {
                           return memo;
                         }
-                        const ArgsType = newWithHooks(
-                          GraphQLInputObjectType,
-                          {
-                            name: inflection.aggregateHavingAggregateComputedColumnArgsInputType(
-                              table,
-                              spec,
-                              proc
-                            ),
-                            fields: inputs,
-                          },
-                          {},
-                          true
+                        const fieldName = inflection.computedAttributeField({
+                          resource: computedAttributeResource as PgResource<
+                            any,
+                            any,
+                            any,
+                            PgResourceParameter[],
+                            any
+                          >,
+                        });
+                        const { from: rawFrom, parameters } =
+                          computedAttributeResource;
+                        const { makeArgsRuntime } =
+                          build.pgGetArgDetailsFromParameters(
+                            computedAttributeResource,
+                            parameters,
+                            1
+                          );
+                        const parameterAnalysis = EXPORTABLE(
+                          (generatePgParameterAnalysis, parameters) =>
+                            generatePgParameterAnalysis(parameters!),
+                          [generatePgParameterAnalysis, parameters],
+                          `${computedAttributeResource.name}ParameterAnalysis`
                         );
-                        const ComputedHavingInput = newWithHooks(
-                          GraphQLInputObjectType,
-                          {
-                            name: inflection.aggregateHavingAggregateComputedColumnInputType(
-                              table,
-                              spec,
-                              proc
-                            ),
-                            fields: {
-                              ...(ArgsType
-                                ? {
-                                    args: {
-                                      type: ArgsType,
-                                    },
-                                  }
-                                : null),
-                              filter: {
-                                type: HavingFilterType,
-                              },
-                            },
-                          },
-                          {}
-                        );
+                        const from =
+                          typeof rawFrom === "function"
+                            ? rawFrom
+                            : () => rawFrom;
+
                         const newField = fieldWithHooks(
-                          fieldName,
+                          { fieldName },
                           {
                             type: ComputedHavingInput,
-                            extensions: {
-                              graphile: {
-                                toSql(
-                                  val: { args?: any; filter: any },
-                                  details: any
-                                ) {
-                                  const { tableAlias, aggregateSpec } = details;
-                                  const functionCallExpression = makeSqlFunctionCall(
-                                    val.args,
-                                    { implicitArgs: [tableAlias] }
-                                  );
-                                  const aggregateExpression = aggregateSpec.sqlAggregateWrap(
-                                    functionCallExpression
-                                  );
-                                  return HavingFilterType.extensions.graphile.toSql(
-                                    val.filter,
-                                    { ...details, aggregateExpression }
+                            apply: EXPORTABLE(
+                              (
+                                  PgBooleanFilter,
+                                  aggregateSpec,
+                                  computedAttributeResource,
+                                  from,
+                                  getNullableType,
+                                  isInputObjectType,
+                                  makeArgsRuntime,
+                                  parameterAnalysis,
+                                  parameters,
+                                  pgAggregatesApplyComputedColumnFilter,
+                                  pgFromExpressionRuntime
+                                ) =>
+                                (
+                                  $having: PgCondition,
+                                  input: Record<string, unknown> | null,
+                                  info
+                                ) => {
+                                  return pgAggregatesApplyComputedColumnFilter(
+                                    PgBooleanFilter,
+                                    aggregateSpec,
+                                    computedAttributeResource,
+                                    from,
+                                    getNullableType,
+                                    isInputObjectType,
+                                    makeArgsRuntime,
+                                    parameterAnalysis,
+                                    parameters,
+                                    pgFromExpressionRuntime,
+                                    $having,
+                                    input,
+                                    info
                                   );
                                 },
-                              },
-                            },
-                          },
-                          {}
+                              [
+                                PgBooleanFilter,
+                                aggregateSpec,
+                                computedAttributeResource,
+                                from,
+                                getNullableType,
+                                isInputObjectType,
+                                makeArgsRuntime,
+                                parameterAnalysis,
+                                parameters,
+                                pgAggregatesApplyComputedColumnFilter,
+                                pgFromExpressionRuntime,
+                              ]
+                            ),
+                            // No need to auto-apply, parent does `return $having;`
+                          }
                         );
                         return build.extend(
                           memo,
                           { [fieldName]: newField },
-                          `Adding computed column function '${proc.namespaceName}.${proc.name}' to having filter type for '${table.namespaceName}.${table.name}'`
+                          `Adding computed attribute function '${computedAttributeResource.name}' to having filter type for '${resource.name}'`
                         );
                       },
-                      {}
-                    )
+                      Object.create(null) as GrafastInputFieldConfigMap<any>
+                    ),
+                    ""
                   );
 
                   return fields;
                 },
-                extensions: {
-                  graphile: {
-                    toSql(argValue: any, details: any) {
-                      const fragments: SQL[] = [];
-                      if (argValue != null) {
-                        const fields = SpecInput.getFields();
-                        Object.keys(fields).forEach((fieldName) => {
-                          const field = fields[fieldName];
-                          const value = argValue[fieldName];
-                          if (value == null) {
-                            return;
-                          }
-                          const toSql = field.extensions?.graphile?.toSql;
-                          if (typeof toSql === "function") {
-                            fragments.push(toSql(value, details));
-                          }
-                        });
-                      }
-                      return fragments.length > 0
-                        ? sql.fragment`(${sql.join(fragments, ") AND (")})`
-                        : sql.true;
-                    },
-                  },
-                },
-              },
-              {},
-              true
+              }),
+              ""
             );
-            if (!SpecInput) {
-              return aggregateFields;
-            }
-            const fieldName = inflection.aggregatesField(spec);
-            return build.extend(aggregateFields, {
-              [fieldName]: fieldWithHooks(
-                fieldName, // e.g. 'average' or 'stddevPopulation'
-                {
-                  type: SpecInput,
-                  extensions: {
-                    graphile: {
-                      toSql(val: any, details: any) {
-                        return (
-                          SpecInput.extensions?.graphile?.toSql?.(val, {
-                            ...details,
-                            aggregateSpec: spec,
-                          }) ?? sql.true
-                        );
-                      },
-                    },
-                  },
-                },
-                {}
-              ),
-            });
+          }
+        }
+
+        return _;
+      },
+
+      GraphQLInputObjectType_fields(inFields, build, context) {
+        const {
+          sql,
+          inflection,
+          dataplanPg: { TYPES, sqlValueWithCodec },
+          EXPORTABLE,
+        } = build;
+        const {
+          scope: {
+            isPgHavingFilterInputType,
+            pgHavingFilterSpec,
+            isPgAggregateHavingInputType,
+            pgTypeResource: table,
           },
-          {}
-        ),
-        `Adding columns to having filter for '${table.namespaceName}.${table.name}'`
-      );
-    }
-  );
-
-  builder.hook(
-    "GraphQLInputObjectType:fields",
-    function AddHavingAggregateTypesPluginAddHavingFilters(
-      fields,
-      build,
-      context
-    ) {
-      const { pgSql: sql, pgIntrospectionResultsByKind, gql2pg } = build;
-      const {
-        scope: { isPgHavingFilterInputType, pgHavingFilterSpec },
-        fieldWithHooks,
-      } = context;
-      if (!isPgHavingFilterInputType) {
-        return fields;
-      }
-      const pgType = (() => {
-        switch (pgHavingFilterSpec) {
-          case "int": {
-            return pgIntrospectionResultsByKind.type.find(
-              (t: PgType) => t.id === INT4_OID
-            );
+          fieldWithHooks,
+        } = context;
+        let fields = inFields;
+        fields = (() => {
+          if (
+            !isPgAggregateHavingInputType ||
+            !table ||
+            table.parameters ||
+            !table.codec.attributes
+          ) {
+            return fields;
           }
-          case "bigint": {
-            return pgIntrospectionResultsByKind.type.find(
-              (t: PgType) => t.id === BIGINT_OID
-            );
-          }
-          case "float": {
-            return pgIntrospectionResultsByKind.type.find(
-              (t: PgType) => t.id === FLOAT8_OID
-            );
-          }
-          case "bigfloat": {
-            return pgIntrospectionResultsByKind.type.find(
-              (t: PgType) => t.id === NUMERIC_OID
-            );
-          }
-          case "datetime": {
-            return pgIntrospectionResultsByKind.type.find(
-              (t: PgType) => t.id === TIMESTAMPTZ_OID
-            );
-          }
-          default: {
-            return null;
-          }
-        }
-      })();
-
-      if (pgType === null) {
-        return fields;
-      }
-      const FieldType = build.pgGetGqlInputTypeByTypeIdAndModifier(
-        pgType.id,
-        null
-      );
-      if (FieldType === null) {
-        return fields;
-      }
-
-      function addBinaryOp(fieldName: string, infix: SQL) {
-        fields = build.extend(fields, {
-          [fieldName]: fieldWithHooks(
-            fieldName,
-            {
-              type: FieldType,
-              extensions: {
-                graphile: {
-                  toSql(val: any, details: { aggregateExpression: SQL }) {
-                    if (val != null) {
-                      const { aggregateExpression } = details;
-
-                      return sql.fragment`(${aggregateExpression} ${infix} ${gql2pg(
-                        val,
-                        pgType,
-                        null
-                      )})`;
-                    } else {
-                      return sql.true;
-                    }
+          return build.extend(
+            fields,
+            build.pgAggregateSpecs.reduce(
+              (aggregateFields: any, aggregateSpec: AggregateSpec) => {
+                if (
+                  !build.behavior.pgResourceMatches(
+                    table,
+                    `${aggregateSpec.id}:resource:groupedAggregates:having`
+                  )
+                ) {
+                  return aggregateFields;
+                }
+                const typeName = inflection.aggregateHavingAggregateInputType({
+                  resource: table,
+                  aggregateSpec,
+                });
+                const SpecInput = build.getTypeByName(typeName) as
+                  | GraphQLInputObjectType
+                  | undefined;
+                if (!SpecInput) {
+                  return aggregateFields;
+                }
+                const fieldName = inflection.aggregatesField({ aggregateSpec });
+                return build.extend(
+                  aggregateFields,
+                  {
+                    [fieldName]: fieldWithHooks(
+                      { fieldName }, // e.g. 'average' or 'stddevPopulation'
+                      {
+                        type: SpecInput,
+                        apply: pgAggregatesPlanAggregatesField,
+                        // No need to auto-apply, `filter` field does `return new PgBooleanFilter($having, aggregateExpression)`
+                      }
+                    ),
                   },
-                },
+                  ""
+                );
               },
-            },
-            {}
-          ),
-        });
-      }
-      switch (pgHavingFilterSpec) {
-        case "int":
-        case "bigint":
-        case "float":
-        case "bigfloat":
-        case "datetime": {
-          addBinaryOp("equalTo", sql.fragment`=`);
-          addBinaryOp("notEqualTo", sql.fragment`<>`);
-          addBinaryOp("greaterThan", sql.fragment`>`);
-          addBinaryOp("greaterThanOrEqualTo", sql.fragment`>=`);
-          addBinaryOp("lessThan", sql.fragment`<`);
-          addBinaryOp("lessThanOrEqualTo", sql.fragment`<=`);
-        }
-      }
-      return fields;
-    }
-  );
+              Object.create(null)
+            ),
+            `Adding attributes to having filter for '${table.name}'`
+          );
+        })();
+
+        fields = (() => {
+          if (!isPgHavingFilterInputType) {
+            return fields;
+          }
+          const rawCodec = (() => {
+            switch (pgHavingFilterSpec) {
+              case "int":
+                return TYPES.int;
+              case "bigint":
+                return TYPES.bigint;
+              case "float":
+                return TYPES.float;
+              case "bigfloat":
+                return TYPES.numeric;
+              case "datetime":
+                return TYPES.timestamptz;
+              default: {
+                return null;
+              }
+            }
+          })();
+
+          if (rawCodec === null) {
+            return fields;
+          }
+          const codec = rawCodec;
+          const FieldType = build.getGraphQLTypeByPgCodec(
+            codec,
+            "input"
+          ) as GraphQLInputType;
+          if (FieldType == null) {
+            return fields;
+          }
+
+          function addBinaryOp(fieldName: string, infix: () => SQL) {
+            fields = build.extend(
+              fields,
+              {
+                [fieldName]: fieldWithHooks(
+                  { fieldName },
+                  {
+                    type: FieldType,
+                    apply: EXPORTABLE(
+                      (
+                          codec,
+                          infix,
+                          pgAggregatesApplyHavingBinaryOperation,
+                          sql,
+                          sqlValueWithCodec
+                        ) =>
+                        ($booleanFilter: PgBooleanFilter, input: unknown) => {
+                          return pgAggregatesApplyHavingBinaryOperation(
+                            codec,
+                            infix,
+                            sql,
+                            sqlValueWithCodec,
+                            $booleanFilter,
+                            input
+                          );
+                        },
+                      [
+                        codec,
+                        infix,
+                        pgAggregatesApplyHavingBinaryOperation,
+                        sql,
+                        sqlValueWithCodec,
+                      ]
+                    ),
+                    // No need to auto-apply
+                  }
+                ),
+              },
+              ""
+            );
+          }
+          switch (pgHavingFilterSpec) {
+            case "int":
+            case "bigint":
+            case "float":
+            case "bigfloat":
+            case "datetime": {
+              addBinaryOp(
+                "equalTo",
+                EXPORTABLE((sql) => () => sql.fragment`=`, [sql])
+              );
+              addBinaryOp(
+                "notEqualTo",
+                EXPORTABLE((sql) => () => sql.fragment`<>`, [sql])
+              );
+              addBinaryOp(
+                "greaterThan",
+                EXPORTABLE((sql) => () => sql.fragment`>`, [sql])
+              );
+              addBinaryOp(
+                "greaterThanOrEqualTo",
+                EXPORTABLE((sql) => () => sql.fragment`>=`, [sql])
+              );
+              addBinaryOp(
+                "lessThan",
+                EXPORTABLE((sql) => () => sql.fragment`<`, [sql])
+              );
+              addBinaryOp(
+                "lessThanOrEqualTo",
+                EXPORTABLE((sql) => () => sql.fragment`<=`, [sql])
+              );
+            }
+          }
+          return fields;
+        })();
+        return fields;
+      },
+    },
+  },
 };
 
-export default AddHavingAggregateTypesPlugin;
+export { Plugin as PgAggregatesAddHavingAggregateTypesPlugin };

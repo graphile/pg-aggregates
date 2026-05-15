@@ -1,0 +1,21 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`LoadsOfAggregates: result 1`] = `
+{
+  "allFilms": {
+    "aggregates": {
+      "average": {
+        "durationInMinutes": "136.8500000000000000",
+      },
+    },
+  },
+}
+`;
+
+exports[`LoadsOfAggregates: sql 1`] = `
+[
+  "select
+  (avg(__films__."duration_in_minutes"))::text as "0"
+from "test"."films" as __films__;",
+]
+`;

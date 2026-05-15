@@ -1,0 +1,62 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`PlayersWith9OrMoreSavesInMatchesTheyScoredIn: result 1`] = `
+{
+  "allPlayers": {
+    "nodes": [
+      {
+        "matchStatsByPlayerId": {
+          "aggregates": {
+            "sum": {
+              "goals": "28",
+              "rating": 142,
+              "saves": "10",
+            },
+          },
+        },
+        "name": "JutheKid",
+      },
+    ],
+  },
+}
+`;
+
+exports[`PlayersWith9OrMoreSavesInMatchesTheyScoredIn: sql 1`] = `
+[
+  "select
+  __players__."name" as "0",
+  array(
+    select array[
+      (coalesce(sum(__match_stats__."saves"), '0'))::text,
+      (coalesce(sum("test"."match_stats_rating"(__match_stats__)), '0'))::text,
+      (coalesce(sum(__match_stats__."goals"), '0'))::text
+    ]::text[]
+    from "test"."match_stats" as __match_stats__
+    where
+      (
+        __match_stats__."player_id" = __players__."id"
+      ) and (
+        __match_stats__."goals" > $1::"int4"
+      )
+  )::text as "1"
+from "test"."players" as __players__
+where (
+    (
+      select (
+        (coalesce(sum("test"."match_stats_rating"(__match_stats_2)), '0') < $2::"float8")
+      and
+        (coalesce(sum(__match_stats_2."saves"), '0') > $3::"int8")
+      )
+      from "test"."match_stats" as __match_stats_2
+      where (
+        (__players__."id" = __match_stats_2."player_id")
+      and
+        (
+          __match_stats_2."goals" > $4::"int4"
+        )
+      )
+    group by ())
+)
+order by __players__."id" asc;",
+]
+`;

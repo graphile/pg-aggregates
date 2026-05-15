@@ -1,0 +1,39 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`AverageGoalsOnDaysWithAveragePointsOver200: result 1`] = `
+{
+  "allMatchStats": {
+    "byDay": [
+      {
+        "average": {
+          "goals": "2.8571428571428571",
+        },
+        "keys": [
+          "2020-10-24T00:00:00.000000+00:00",
+        ],
+      },
+      {
+        "average": {
+          "goals": "2.8461538461538462",
+        },
+        "keys": [
+          "2020-10-22T00:00:00.000000+00:00",
+        ],
+      },
+    ],
+  },
+}
+`;
+
+exports[`AverageGoalsOnDaysWithAveragePointsOver200: sql 1`] = `
+[
+  "select
+  (avg(__match_stats__."goals"))::text as "0",
+  to_char(date_trunc('day', __match_stats__."created_at"), 'YYYY-MM-DD"T"HH24:MI:SS.USTZH:TZM'::text) as "1"
+from "test"."match_stats" as __match_stats__
+group by date_trunc('day', __match_stats__."created_at")
+having (
+  ((avg(__match_stats__."points")) > $1::"int4")
+);",
+]
+`;

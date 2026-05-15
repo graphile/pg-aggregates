@@ -1,107 +1,92 @@
-import type { Plugin } from "graphile-build";
-import type { QueryBuilder } from "graphile-build-pg";
-import type { GraphQLResolveInfo, GraphQLObjectType } from "graphql";
+import type { PgSelectStep } from "graphile-build-pg/@dataplan/pg";
+import type { GraphQLObjectType } from "graphql";
+import type { ConnectionStep } from "postgraphile/grafast";
 
-const AddAggregatesPlugin: Plugin = (builder) => {
-  // Hook all connections to add the 'aggregates' field
-  builder.hook("GraphQLObjectType:fields", (fields, build, context) => {
-    const {
-      inflection,
-      getSafeAliasFromResolveInfo,
-      pgSql: sql,
-      getSafeAliasFromAlias,
-      pgQueryFromResolveData: queryFromResolveData,
-    } = build;
-    const {
-      fieldWithHooks,
-      scope: { isPgRowConnectionType, pgIntrospection: table },
-    } = context;
+import { EXPORTABLE } from "./EXPORTABLE.js";
 
-    // If it's not a table connection, abort
-    if (
-      !isPgRowConnectionType ||
-      !table ||
-      table.kind !== "class" ||
-      !table.namespace
+const { version } = require("../package.json");
+
+const pgAggregatesCloneSubplanWithoutPaginationSingle = EXPORTABLE(
+  () =>
+    function plan(
+      $connection: ConnectionStep<any, any, any, any, any, PgSelectStep>
     ) {
-      return fields;
-    }
+      return $connection.cloneSubplanWithoutPagination("aggregate").single();
+    },
+  [],
+  "pgAggregatesCloneSubplanWithoutPaginationSingle"
+);
 
-    const AggregateContainerType:
-      | GraphQLObjectType
-      | undefined = build.getTypeByName(
-      inflection.aggregateContainerType(table)
-    );
+const Plugin: GraphileConfig.Plugin = {
+  name: "PgAggregatesAddConnectionAggregatesPlugin",
+  description: "Adds the `aggregates` field to connections.",
+  version,
+  provides: ["aggregates"],
 
-    if (
-      !AggregateContainerType ||
-      Object.keys(AggregateContainerType.getFields()).length === 0
-    ) {
-      // No aggregates for this connection, abort
-      return fields;
-    }
+  schema: {
+    hooks: {
+      // Hook all connections to add the 'aggregates' field
+      GraphQLObjectType_fields(fields, build, context) {
+        const { inflection } = build;
+        const {
+          fieldWithHooks,
+          scope: {
+            pgCodec,
+            pgTypeResource,
+            isConnectionType,
+            isPgConnectionRelated,
+          },
+        } = context;
 
-    const fieldName = inflection.aggregatesContainerField(table);
-    return {
-      ...fields,
-      [fieldName]: fieldWithHooks(
-        fieldName,
-        ({ addDataGenerator, getDataFromParsedResolveInfoFragment }: any) => {
-          addDataGenerator((parsedResolveInfoFragment: any) => {
-            const safeAlias = getSafeAliasFromAlias(
-              parsedResolveInfoFragment.alias
-            );
-            const resolveData = getDataFromParsedResolveInfoFragment(
-              parsedResolveInfoFragment,
-              AggregateContainerType
-            );
+        const table =
+          pgTypeResource ??
+          Object.values(build.input.pgRegistry.pgResources).find(
+            (s) => s.codec === pgCodec && !s.parameters
+          );
+
+        // If it's not a table connection, abort
+        if (
+          !isConnectionType ||
+          !isPgConnectionRelated ||
+          !table ||
+          table.parameters ||
+          !table.codec.attributes
+        ) {
+          return fields;
+        }
+
+        if (!build.behavior.pgResourceMatches(table, `resource:aggregates`)) {
+          return fields;
+        }
+
+        const AggregateContainerType = build.getTypeByName(
+          inflection.aggregateContainerType({ resource: table })
+        ) as GraphQLObjectType | undefined;
+
+        if (
+          !AggregateContainerType ||
+          Object.keys(AggregateContainerType.getFields()).length === 0
+        ) {
+          // No aggregates for this connection, abort
+          return fields;
+        }
+
+        const fieldName = inflection.aggregatesContainerField({
+          resource: table,
+        });
+        return {
+          ...fields,
+          [fieldName]: fieldWithHooks({ fieldName }, () => {
             return {
-              // This tells the query planner that we want to add an aggregate
-              pgNamedQuery: {
-                name: "aggregates",
-                query: (aggregateQueryBuilder: QueryBuilder) => {
-                  aggregateQueryBuilder.select(() => {
-                    const query = queryFromResolveData(
-                      sql.identifier(Symbol()),
-                      aggregateQueryBuilder.getTableAlias(), // Keep using our alias down the tree
-                      resolveData,
-                      { onlyJsonField: true },
-                      (innerQueryBuilder: QueryBuilder) => {
-                        innerQueryBuilder.parentQueryBuilder = aggregateQueryBuilder;
-                        innerQueryBuilder.select(
-                          sql.fragment`sum(1)`,
-                          "__force_aggregate__"
-                        );
-                      },
-                      aggregateQueryBuilder.context
-                    );
-                    return sql.fragment`(${query})`;
-                  }, safeAlias);
-                },
-              },
+              description: `Aggregates across the matching connection (ignoring before/after/first/last/offset)`,
+              type: AggregateContainerType,
+              plan: pgAggregatesCloneSubplanWithoutPaginationSingle,
             };
-          });
-
-          return {
-            description: `Aggregates across the matching connection (ignoring before/after/first/last/offset)`,
-            type: AggregateContainerType,
-            resolve(
-              parent: any,
-              _args: any,
-              _context: any,
-              resolveInfo: GraphQLResolveInfo
-            ) {
-              // Figure out the unique alias we chose earlier
-              const safeAlias = getSafeAliasFromResolveInfo(resolveInfo);
-              // All aggregates are stored into the aggregates object which is also identified by aggregateAlias, reference ours here
-              return parent.aggregates[safeAlias] || 0;
-            },
-          };
-        },
-        {}
-      ),
-    };
-  });
+          }),
+        };
+      },
+    },
+  },
 };
 
-export default AddAggregatesPlugin;
+export { Plugin as PgAggregatesAddConnectionAggregatesPlugin };

@@ -74,6 +74,8 @@ create table match_stats (
   saves int not null,
   created_at timestamptz not null default now()
 );
+create index on match_stats (match_id);
+create index on match_stats (player_id);
 
 create view view_match_stats as (select * from match_stats);
 comment on view view_match_stats is E'@foreignKey (match_id) references matches|@fieldName match|@foreignFieldName viewMatchStats

@@ -35,7 +35,7 @@ a semver minor release.
 
 ## Usage
 
-Requires PostGraphile v4.12.0-alpha.0 or higher.
+Requires PostGraphile V5.
 
 Install with:
 
@@ -43,21 +43,24 @@ Install with:
 yarn add postgraphile @graphile/pg-aggregates
 ```
 
-CLI usage via `--append-plugins`:
-
-```
-postgraphile --append-plugins @graphile/pg-aggregates -c postgres://localhost/my_db ...
-```
-
-Library usage via `appendPlugins`:
+Add the preset to your Graphile config:
 
 ```ts
-import PgAggregatesPlugin from "@graphile/pg-aggregates";
-// or: const PgAggregatesPlugin = require("@graphile/pg-aggregates").default;
+import { makePgService } from "postgraphile/adaptors/pg";
+import { PostGraphileAmberPreset } from "postgraphile/presets/amber";
+import { PgAggregatesPreset } from "@graphile/pg-aggregates";
 
-const middleware = postgraphile(DATABASE_URL, SCHEMAS, {
-  appendPlugins: [PgAggregatesPlugin],
-});
+const preset: GraphileConfig.Preset = {
+  extends: [PostGraphileAmberPreset, PgAggregatesPreset],
+  pgServices: [
+    makePgService({
+      connectionString: process.env.DATABASE_URL!,
+      schemas: ["app_public"],
+    }),
+  ],
+};
+
+export default preset;
 ```
 
 If you want you could install our [example schema](__tests__/schema.sql) and
@@ -124,17 +127,22 @@ query GroupedAggregatesByDerivative {
 
 To filter by aggregates on related tables, you will also need
 [postgraphile-plugin-connection-filter](https://github.com/graphile-contrib/postgraphile-plugin-connection-filter),
-and you will need to enable `graphileBuildOptions.connectionFilterRelations`
+and you will need to enable `schema.connectionFilterRelations`
 [as documented here](https://github.com/graphile-contrib/postgraphile-plugin-connection-filter#connectionfilterrelations).
 
-```js
-app.use(
-  postgraphile(DATABASE_URL, SCHEMA_NAME, {
-    graphileBuildOptions: {
-      connectionFilterRelations: true,
-    },
-  })
-);
+```ts
+import { PostGraphileConnectionFilterPreset } from "postgraphile-plugin-connection-filter";
+
+const preset: GraphileConfig.Preset = {
+  extends: [
+    PostGraphileAmberPreset,
+    PostGraphileConnectionFilterPreset,
+    PgAggregatesPreset,
+  ],
+  schema: {
+    connectionFilterRelations: true,
+  },
+};
 ```
 
 ## Interaction with connection parameters
@@ -417,71 +425,115 @@ const DateTruncAggregateGroupSpecsPlugin = (builder) => {
 module.exports = DateTruncAggregateGroupSpecsPlugin;
 ```
 
-Finally pass this plugin into PostGraphile via `--append-plugins` or
-`appendPlugins: [...]` - see https://www.graphile.org/postgraphile/extending/
+Finally, add this plugin to the `plugins` list in your Graphile config.
 
 See [src/AggregateSpecsPlugin.ts](src/AggregateSpecsPlugin.ts) for examples and
 more information.
 
 ## Disable aggregates
 
-By default, aggregates are created for all tables. This significantly increases
-the size of your GraphQL schema, and could also be a security (DoS) concern as
-aggregates can be expensive. We recommend that you use the
-`disableAggregatesByDefault: true` option to disable aggregates by default, and
-then enable them only for the tables you need:
+By default, aggregates are created for all suitable tables, all suitable
+columns, and all suitable computed column functions. This significantly
+increases the size of your GraphQL schema, and could also be a security (DoS)
+concern as aggregates can be expensive. We recommend that you use the
+`-aggregates` default behavior to disable aggregates by default, and then enable
+them only for the tables you need:
+
+(This currently doesn't work due to a
+[bug in PostGraphile that's being worked on](https://github.com/graphile/crystal/pull/1803).)
 
 ```ts
-const middleware = postgraphile(DATABASE_URL, SCHEMAS, {
-  // ...
-  appendPlugins: [
-    // ...
-    PgAggregatesPlugin,
-  ],
+// graphile.config.mjs
 
-  graphileBuildOptions: {
-    // Disable aggregates by default; opt each table in via the `@aggregates` smart tag
-    disableAggregatesByDefault: true,
+export default {
+  // ...
+  schema: {
+    defaultBehavior: "-aggregates -aggregates:filterBy -aggregates:orderBy",
   },
-});
+};
 ```
+
+For the specific aggregate behavior strings available, please see the
+[PostGraphile behavior documentation](https://postgraphile.org/postgraphile/next/behavior).
+
+The `aggregates` behavior is used to enable/disable the 'aggregates' field
+appearing on a table's connections.
+
+The `groupedAggregates` behavior is used to enable/disable the
+'groupedAggregates' field appearing on a table's connections.
+
+The `having` behavior is used to enable/disable the `having` filter on the
+'groupedAggregates' field appearing on a table's connections.
+
+The `aggregates:filterBy` behavior is used to enable/disable the
+[filtering by aggregates](#filtering-by-aggregates) in general (e.g. used on
+tables, relationships).
+
+The `aggregates:orderBy` behavior is used to enable/disable the
+[ordering by aggregates](#ordering-by-aggregates) in general (e.g. used on
+tables, relationships).
+
+The `aggregate` (note: singular!) behavior is used to enable/disable a specific
+attribute (or computed column) from being aggregated on.
+
+The `aggregate:filterBy` behavior is used to enable/disable filtering by a
+specific aggregate (e.g. used on attributes, computed columns). You can further
+scope these, for example adding the behavior `-sum:attribute:aggregate:filterBy`
+to a specific column would disable filtering by the `sum` aggregate of this
+column whilst leaving all other aggregates as is.
+
+The `aggregate:orderBy` is used to enable/disable ordering by a specific
+aggregate (e.g. used on attributes, computed columns).
+
+The `groupBy` behavior is used to enable/disable a specific attribute (or
+computed column) from being used as the grouping clause in a grouped aggregate.
+
+The `havingBy` behavior is used to enable/disable aggregates of a specific
+attribute (or computed column) from being used in the having clause of a grouped
+aggregate.
 
 Enable aggregates for a specific table:
 
-```json
-"class": {
-  "my_schema.my_table": {
-    "tags": {
-      "aggregates": "on"
-    }
-  }
-}
-```
-
-or:
-
 ```sql
-COMMENT ON TABLE my_schema.my_table IS E'@aggregates on';
+COMMENT ON TABLE my_schema.my_table IS E'@behavior +aggregates +aggregates:filterBy +aggregates:orderBy';
 ```
 
 You also can keep aggregates enabled by default, but disable aggregates for
 specific tables:
 
+```sql
+COMMENT ON TABLE my_schema.my_table IS E'@behavior -aggregates -aggregates:filterBy -aggregates:orderBy';
+```
+
+You can also use a smart tags file such as `postgraphile.tags.json5` to add
+these behaviors:
+
+- to enable aggregates for a specific table:
+
 ```json
 "class": {
   "my_schema.my_table": {
     "tags": {
-      "aggregates": "off"
+      "behavior": "+aggregates +aggregates:filterBy +aggregates:orderBy"
     }
   }
 }
 ```
 
-or:
+- to disable aggregates for a specific table:
 
-```sql
-COMMENT ON TABLE my_schema.my_table IS E'@aggregates off';
+```json
+"class": {
+  "my_schema.my_table": {
+    "tags": {
+      "behavior": "-aggregates -aggregates:filterBy -aggregates:orderBy"
+    }
+  }
+}
 ```
+
+You can continue to use your `@aggregates` smart tags and smart comments if you
+already have them - it isn't necessary to replace them with behaviors.
 
 ## Thanks
 

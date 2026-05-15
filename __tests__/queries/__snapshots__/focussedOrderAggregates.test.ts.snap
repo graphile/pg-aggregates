@@ -1,0 +1,105 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`FocussedOrderedAggregate: result 1`] = `
+{
+  "allPlayers": {
+    "nodes": [
+      {
+        "matchStatsByPlayerId": {
+          "aggregates": {
+            "average": {
+              "points": "283.4000000000000000",
+            },
+            "sum": {
+              "goals": "28",
+            },
+          },
+          "totalCount": 10,
+        },
+        "name": "JutheKid",
+      },
+      {
+        "matchStatsByPlayerId": {
+          "aggregates": {
+            "average": {
+              "points": "253.0000000000000000",
+            },
+            "sum": {
+              "goals": "18",
+            },
+          },
+          "totalCount": 7,
+        },
+        "name": "Purge",
+      },
+      {
+        "matchStatsByPlayerId": {
+          "aggregates": {
+            "average": {
+              "points": "219.6250000000000000",
+            },
+            "sum": {
+              "goals": "20",
+            },
+          },
+          "totalCount": 8,
+        },
+        "name": "Jmar25",
+      },
+      {
+        "matchStatsByPlayerId": {
+          "aggregates": {
+            "average": {
+              "points": "217.5000000000000000",
+            },
+            "sum": {
+              "goals": "30",
+            },
+          },
+          "totalCount": 10,
+        },
+        "name": "BenjieG",
+      },
+      {
+        "matchStatsByPlayerId": {
+          "aggregates": {
+            "average": {
+              "points": "179.5000000000000000",
+            },
+            "sum": {
+              "goals": "29",
+            },
+          },
+          "totalCount": 10,
+        },
+        "name": "HollaDolla",
+      },
+    ],
+  },
+}
+`;
+
+exports[`FocussedOrderedAggregate: sql 1`] = `
+[
+  "select
+  __players__."name" as "0",
+  array(
+    select array[
+      (count(*))::text,
+      (coalesce(sum(__match_stats__."goals"), '0'))::text,
+      (avg(__match_stats__."points"))::text
+    ]::text[]
+    from "test"."match_stats" as __match_stats__
+    where (
+      __match_stats__."player_id" = __players__."id"
+    )
+  )::text as "1"
+from "test"."players" as __players__
+order by (
+  select avg(__match_stats_2."points")
+  from "test"."match_stats" __match_stats_2
+  where (__match_stats_2."player_id" = __players__."id")
+) desc, __players__."id" desc
+limit 5;",
+]
+`;

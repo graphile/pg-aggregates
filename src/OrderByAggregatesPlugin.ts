@@ -1,203 +1,416 @@
-import type { SQL, QueryBuilder, PgClass, PgEntity } from "graphile-build-pg";
-import type { Plugin } from "graphile-build";
-import { AggregateSpec } from "./interfaces";
+import type {
+  PgCodecAttribute,
+  PgCodecRelation,
+  PgCodecWithAttributes,
+  PgResource,
+  PgSelectQueryBuilder,
+  sql,
+} from "@dataplan/pg";
+import type { GraphQLEnumValueConfigMap } from "graphql";
 
-type OrderBySpecIdentity =
-  | string
-  | SQL
-  | ((options: { queryBuilder: QueryBuilder }) => SQL);
+import { EXPORTABLE } from "./EXPORTABLE.js";
+import type { AggregateSpec } from "./interfaces.js";
 
-type OrderSpec =
-  | [OrderBySpecIdentity, boolean]
-  | [OrderBySpecIdentity, boolean, boolean];
-export interface OrderSpecs {
-  [orderByEnumValue: string]: {
-    value: {
-      alias?: string;
-      specs: Array<OrderSpec>;
-      unique: boolean;
-    };
-  };
-}
+type SQL = ReturnType<typeof sql>;
 
-const OrderByAggregatesPlugin: Plugin = (builder, options) => {
-  builder.hook("GraphQLEnumType:values", (values, build, context) => {
-    const {
-      extend,
-      pgOmit: omit,
-      pgIntrospectionResultsByKind: introspectionResultsByKind,
-      pgSql: sql,
-      inflection,
-    } = build;
-    const pgAggregateSpecs: AggregateSpec[] = build.pgAggregateSpecs;
-    const {
-      scope: { isPgRowSortEnum },
-    } = context;
+const { version } = require("../package.json");
 
-    const pgIntrospection: PgEntity | undefined = context.scope.pgIntrospection;
+declare global {
+  namespace GraphileBuild {
+    interface BehaviorStrings {
+      "relatedAggregates:orderBy": true;
+      "resource:relatedAggregates:orderBy": true;
+      "aggregates:orderBy": true;
+      "manyRelation:aggregates:orderBy": true;
+      "aggregate:orderBy": true;
+      "attribute:aggregate:orderBy": true;
 
-    if (
-      !isPgRowSortEnum ||
-      !pgIntrospection ||
-      pgIntrospection.kind !== "class"
-    ) {
-      return values;
+      "sum:manyRelation:aggregates:orderBy": true;
+      "distinctCount:manyRelation:aggregates:orderBy": true;
+      "min:manyRelation:aggregates:orderBy": true;
+      "max:manyRelation:aggregates:orderBy": true;
+      "average:manyRelation:aggregates:orderBy": true;
+      "stddevSample:manyRelation:aggregates:orderBy": true;
+      "stddevPopulation:manyRelation:aggregates:orderBy": true;
+      "varianceSample:manyRelation:aggregates:orderBy": true;
+      "variancePopulation:manyRelation:aggregates:orderBy": true;
+
+      "sum:attribute:aggregate:orderBy": true;
+      "distinctCount:attribute:aggregate:orderBy": true;
+      "min:attribute:aggregate:orderBy": true;
+      "max:attribute:aggregate:orderBy": true;
+      "average:attribute:aggregate:orderBy": true;
+      "stddevSample:attribute:aggregate:orderBy": true;
+      "stddevPopulation:attribute:aggregate:orderBy": true;
+      "varianceSample:attribute:aggregate:orderBy": true;
+      "variancePopulation:attribute:aggregate:orderBy": true;
     }
-
-    const foreignTable: PgClass = pgIntrospection;
-
-    const foreignKeyConstraints = foreignTable.foreignConstraints.filter(
-      (con) => con.type === "f"
-    );
-
-    const newValues = foreignKeyConstraints.reduce((memo, constraint) => {
-      if (omit(constraint, "read")) {
-        return memo;
-      }
-      const table: PgClass | undefined =
-        introspectionResultsByKind.classById[constraint.classId];
-      if (!table) {
-        throw new Error(
-          `Could not find the table that referenced us (constraint: ${constraint.name})`
-        );
-      }
-      if (
-        table.tags.aggregates === "off" || (
-          options.disableAggregatesByDefault &&
-          table.tags.aggregates !== "on"
-        )
-      ) {
-        return memo;
-      }
-      const keys = constraint.keyAttributes;
-      const foreignKeys = constraint.foreignKeyAttributes;
-      if (!keys.every((_) => _) || !foreignKeys.every((_) => _)) {
-        throw new Error("Could not find key columns!");
-      }
-      if (keys.some((key) => omit(key, "read"))) {
-        return memo;
-      }
-      if (foreignKeys.some((key) => omit(key, "read"))) {
-        return memo;
-      }
-      const isUnique = !!table.constraints.find(
-        (c) =>
-          (c.type === "p" || c.type === "u") &&
-          c.keyAttributeNums.length === keys.length &&
-          c.keyAttributeNums.every((n, i) => keys[i].num === n)
-      );
-      if (isUnique) {
-        // No point aggregating over a relation that's unique
-        return memo;
-      }
-      const tableAlias = sql.identifier(
-        Symbol(`${foreignTable.namespaceName}.${foreignTable.name}`)
-      );
-
-      // Add count
-      memo = build.extend(
-        memo,
-        orderByAscDesc(
-          inflection.orderByCountOfManyRelationByKeys(
-            keys,
-            table,
-            foreignTable,
-            constraint
-          ),
-          ({ queryBuilder }) => {
-            const foreignTableAlias = queryBuilder.getTableAlias();
-            const conditions: SQL[] = [];
-            keys.forEach((key, i) => {
-              conditions.push(
-                sql.fragment`${tableAlias}.${sql.identifier(
-                  key.name
-                )} = ${foreignTableAlias}.${sql.identifier(
-                  foreignKeys[i].name
-                )}`
-              );
-            });
-            return sql.fragment`(select count(*) from ${sql.identifier(
-              table.namespaceName,
-              table.name
-            )} ${tableAlias} where (${sql.join(conditions, " AND ")}))`;
-          },
-          false
-        ),
-        `Adding orderBy count to '${foreignTable.namespaceName}.${foreignTable.name}' using constraint '${constraint.name}'`
-      );
-
-      // Add other aggregates
-      pgAggregateSpecs.forEach((spec) => {
-        table.attributes.forEach((attr) => {
-          memo = build.extend(
-            memo,
-            orderByAscDesc(
-              inflection.orderByColumnAggregateOfManyRelationByKeys(
-                keys,
-                table,
-                foreignTable,
-                constraint,
-                spec,
-                attr
-              ),
-              ({ queryBuilder }) => {
-                const foreignTableAlias = queryBuilder.getTableAlias();
-                const conditions: SQL[] = [];
-                keys.forEach((key, i) => {
-                  conditions.push(
-                    sql.fragment`${tableAlias}.${sql.identifier(
-                      key.name
-                    )} = ${foreignTableAlias}.${sql.identifier(
-                      foreignKeys[i].name
-                    )}`
-                  );
-                });
-                return sql.fragment`(select ${spec.sqlAggregateWrap(
-                  sql.fragment`${tableAlias}.${sql.identifier(attr.name)}`
-                )} from ${sql.identifier(
-                  table.namespaceName,
-                  table.name
-                )} ${tableAlias} where (${sql.join(conditions, " AND ")}))`;
-              },
-              false
-            ),
-            `Adding orderBy ${spec.id} of '${attr.name}' to '${foreignTable.namespaceName}.${foreignTable.name}' using constraint '${constraint.name}'`
-          );
-        });
-      });
-
-      return memo;
-    }, {} as OrderSpecs);
-
-    return extend(
-      values,
-      newValues,
-      `Adding aggregate orders to '${foreignTable.namespaceName}.${foreignTable.name}'`
-    );
-  });
-};
-
-export function orderByAscDesc(
-  baseName: string,
-  columnOrSqlFragment: OrderBySpecIdentity,
-  unique = false
-): OrderSpecs {
-  return {
-    [`${baseName}_ASC`]: {
-      value: {
-        alias: `${baseName}_ASC`,
-        specs: [[columnOrSqlFragment, true]],
-        unique,
-      },
-    },
-    [`${baseName}_DESC`]: {
-      value: {
-        alias: `${baseName}_DESC`,
-        specs: [[columnOrSqlFragment, false]],
-        unique,
-      },
-    },
-  };
+  }
 }
 
-export default OrderByAggregatesPlugin;
+const pgAggregatesApplyOrderByTotalCount = EXPORTABLE(
+  () =>
+    (
+      TYPES: GraphileBuild.Build["dataplanPg"]["TYPES"],
+      direction: "ASC" | "DESC",
+      relation: PgCodecRelation,
+      sql: GraphileBuild.Build["sql"],
+      table: PgResource,
+      $select: PgSelectQueryBuilder
+    ) => {
+      const foreignTableAlias = $select.alias;
+      const conditions: SQL[] = [];
+      const tableAlias = sql.identifier(Symbol(table.name));
+      (relation.localAttributes as string[]).forEach((localAttribute, i) => {
+        const remoteAttribute = relation.remoteAttributes[i] as string;
+        conditions.push(
+          sql.fragment`${tableAlias}.${sql.identifier(
+            remoteAttribute
+          )} = ${foreignTableAlias}.${sql.identifier(localAttribute)}`
+        );
+      });
+      if (typeof table.from === "function") {
+        throw new Error(`Function source unsupported`);
+      }
+      // TODO: refactor this to use joins instead of subqueries
+      const fragment = sql`(${sql.indent`select count(*)
+from ${table.from} ${tableAlias}
+where ${sql.parens(
+        sql.join(
+          conditions.map((c) => sql.parens(c)),
+          " AND "
+        )
+      )}`})`;
+      $select.orderBy({
+        fragment,
+        codec: TYPES.bigint,
+        direction,
+      });
+    },
+  [],
+  "pgAggregatesApplyOrderByTotalCount"
+);
+
+const pgAggregatesApplyOrderByAttribute = EXPORTABLE(
+  () =>
+    (
+      aggregateSpec: AggregateSpec,
+      attribute: PgCodecAttribute,
+      attributeName: string,
+      direction: "ASC" | "DESC",
+      relation: PgCodecRelation,
+      sql: GraphileBuild.Build["sql"],
+      table: PgResource,
+      $select: PgSelectQueryBuilder
+    ) => {
+      const foreignTableAlias = $select.alias;
+      const conditions: SQL[] = [];
+      const tableAlias = sql.identifier(Symbol(table.name));
+      (relation.localAttributes as string[]).forEach((localAttribute, i) => {
+        const remoteAttribute = relation.remoteAttributes[i] as string;
+        conditions.push(
+          sql.fragment`${tableAlias}.${sql.identifier(
+            remoteAttribute
+          )} = ${foreignTableAlias}.${sql.identifier(localAttribute)}`
+        );
+      });
+      if (typeof table.from === "function") {
+        throw new Error(`Function source unsupported`);
+      }
+      // TODO: refactor this to use joins instead of subqueries
+      const fragment = sql`(${sql.indent`
+select ${aggregateSpec.sqlAggregateWrap(
+        sql.fragment`${tableAlias}.${sql.identifier(attributeName)}`,
+        attribute.codec
+      )}
+from ${table.from} ${tableAlias}
+where ${sql.join(
+        conditions.map((c) => sql.parens(c)),
+        " AND "
+      )}`})`;
+      $select.orderBy({
+        fragment,
+        codec:
+          aggregateSpec.pgTypeCodecModifier?.(attribute.codec) ??
+          attribute.codec,
+        direction,
+      });
+    },
+  [],
+  "pgAggregatesApplyOrderByAttribute"
+);
+
+export const PgAggregatesOrderByAggregatesPlugin: GraphileConfig.Plugin = {
+  name: "PgAggregatesOrderByAggregatesPlugin",
+  description:
+    "Adds enum values to the OrderBy enum to allow ordering by aggregates on relations.",
+  version,
+  provides: ["aggregates"],
+
+  schema: {
+    behaviorRegistry: {
+      add: {
+        "relatedAggregates:orderBy": {
+          description: "",
+          entities: ["pgResource"],
+        },
+        "aggregates:orderBy": {
+          description: "",
+          entities: ["pgCodecRelation"],
+        },
+        "aggregate:orderBy": {
+          description: "",
+          entities: ["pgCodecAttribute"],
+        },
+      },
+    },
+
+    entityBehavior: {
+      pgResource: "resource:relatedAggregates:orderBy",
+      pgCodecRelation: ["select", "manyRelation:aggregates:orderBy"],
+      pgCodecAttribute: ["attribute:aggregate:orderBy"],
+    },
+
+    hooks: {
+      GraphQLEnumType_values(values, build, context) {
+        const {
+          extend,
+          sql,
+          inflection,
+          dataplanPg: { TYPES },
+          EXPORTABLE,
+        } = build;
+        const pgAggregateSpecs: AggregateSpec[] = build.pgAggregateSpecs;
+        const {
+          scope: { isPgRowSortEnum, pgTypeResource, pgCodec },
+        } = context;
+
+        const foreignTable =
+          pgTypeResource ??
+          Object.values(build.input.pgRegistry.pgResources).find(
+            (s) => s.codec === pgCodec && !s.parameters
+          );
+
+        if (
+          !isPgRowSortEnum ||
+          !foreignTable ||
+          foreignTable.parameters ||
+          !foreignTable.codec.attributes
+        ) {
+          return values;
+        }
+        if (
+          !build.behavior.pgResourceMatches(
+            foreignTable,
+            "resource:relatedAggregates:orderBy"
+          )
+        ) {
+          return values;
+        }
+
+        const relations = foreignTable.getRelations() as {
+          [relName: string]: PgCodecRelation<any, any>;
+        };
+        const referenceeRelations = Object.entries(relations).filter(
+          ([_, rel]) => rel.isReferencee
+        );
+
+        const newValues = referenceeRelations.reduce(
+          (memo, [relationName, relation]) => {
+            if (!build.behavior.pgCodecRelationMatches(relation, "select")) {
+              return memo;
+            }
+            if (
+              !build.behavior.pgCodecRelationMatches(
+                relation,
+                "manyRelation:aggregates:orderBy"
+              )
+            ) {
+              return memo;
+            }
+            const table = relation.remoteResource as PgResource<
+              string,
+              PgCodecWithAttributes
+            >;
+            const isUnique = !!relation.isUnique;
+            if (isUnique) {
+              // No point aggregating over a relation that's unique
+              return memo;
+            }
+
+            // Add count
+            const totalCountBaseName =
+              inflection.orderByCountOfManyRelationByKeys({
+                registry: foreignTable.registry,
+                codec: foreignTable.codec,
+                relationName,
+              });
+
+            const makeTotalCountApply = (direction: "ASC" | "DESC") => {
+              return EXPORTABLE(
+                (
+                  TYPES,
+                  direction,
+                  pgAggregatesApplyOrderByTotalCount,
+                  relation,
+                  sql,
+                  table
+                ) =>
+                  function apply($select: PgSelectQueryBuilder) {
+                    pgAggregatesApplyOrderByTotalCount(
+                      TYPES,
+                      direction,
+                      relation,
+                      sql,
+                      table,
+                      $select
+                    );
+                  },
+                [
+                  TYPES,
+                  direction,
+                  pgAggregatesApplyOrderByTotalCount,
+                  relation,
+                  sql,
+                  table,
+                ]
+              );
+            };
+
+            memo = build.extend(
+              memo,
+              {
+                [`${totalCountBaseName}_ASC`]: {
+                  extensions: {
+                    grafast: {
+                      apply: makeTotalCountApply("ASC"),
+                    },
+                  },
+                },
+                [`${totalCountBaseName}_DESC`]: {
+                  extensions: {
+                    grafast: {
+                      apply: makeTotalCountApply("DESC"),
+                    },
+                  },
+                },
+              },
+              `Adding orderBy count to '${foreignTable.name}' using relation '${relationName}'`
+            );
+
+            // Add other aggregates
+            pgAggregateSpecs.forEach((aggregateSpec) => {
+              if (
+                !build.behavior.pgCodecRelationMatches(
+                  relation,
+                  `${aggregateSpec.id}:manyRelation:aggregates:orderBy`
+                )
+              ) {
+                return;
+              }
+              for (const [attributeName, attribute] of Object.entries(
+                table.codec.attributes
+              )) {
+                if (
+                  !build.behavior.pgCodecAttributeMatches(
+                    [table.codec, attributeName],
+                    `${aggregateSpec.id}:attribute:aggregate:orderBy`
+                  )
+                ) {
+                  continue;
+                }
+                if (
+                  (aggregateSpec.shouldApplyToEntity &&
+                    !aggregateSpec.shouldApplyToEntity({
+                      type: "attribute",
+                      codec: table.codec,
+                      attributeName: attributeName,
+                    })) ||
+                  !aggregateSpec.isSuitableType(attribute.codec)
+                ) {
+                  continue;
+                }
+                const baseName =
+                  inflection.orderByAttributeAggregateOfManyRelationByKeys({
+                    registry: foreignTable.registry,
+                    codec: foreignTable.codec,
+                    relationName,
+                    attributeName: attributeName,
+                    aggregateSpec,
+                  });
+
+                const makeApply = (direction: "ASC" | "DESC") => {
+                  return EXPORTABLE(
+                    (
+                      aggregateSpec,
+                      attribute,
+                      attributeName,
+                      direction,
+                      pgAggregatesApplyOrderByAttribute,
+                      relation,
+                      sql,
+                      table
+                    ) =>
+                      function apply($select: PgSelectQueryBuilder) {
+                        pgAggregatesApplyOrderByAttribute(
+                          aggregateSpec,
+                          attribute,
+                          attributeName,
+                          direction,
+                          relation,
+                          sql,
+                          table,
+                          $select
+                        );
+                      },
+                    [
+                      aggregateSpec,
+                      attribute,
+                      attributeName,
+                      direction,
+                      pgAggregatesApplyOrderByAttribute,
+                      relation,
+                      sql,
+                      table,
+                    ]
+                  );
+                };
+
+                memo = build.extend(
+                  memo,
+                  {
+                    [`${baseName}_ASC`]: {
+                      extensions: {
+                        grafast: {
+                          apply: makeApply("ASC"),
+                        },
+                      },
+                    },
+                    [`${baseName}_DESC`]: {
+                      extensions: {
+                        grafast: {
+                          apply: makeApply("DESC"),
+                        },
+                      },
+                    },
+                  },
+
+                  `Adding orderBy ${aggregateSpec.id} of '${attributeName}' to '${foreignTable.name}' using constraint '${relationName}'`
+                );
+              }
+            });
+
+            return memo;
+          },
+          Object.create(null) as GraphQLEnumValueConfigMap
+        );
+
+        return extend(
+          values,
+          newValues,
+          `Adding aggregate orders to '${foreignTable.name}'`
+        );
+      },
+    },
+  },
+};
