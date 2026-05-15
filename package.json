@@ -37,8 +37,8 @@
   },
   "homepage": "https://github.com/graphile/pg-aggregates#readme",
   "peerDependencies": {
-    "postgraphile": "^5.0.0",
-    "graphql": "^16.1.0-experimental-stream-defer.6"
+    "graphql": "^16.1.0-experimental-stream-defer.6",
+    "postgraphile": "^5.0.0"
   },
   "peerDependenciesMeta": {
     "postgraphile": {
